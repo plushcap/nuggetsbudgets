@@ -29,6 +29,17 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
   and the button's and the unsubscribe link's addresses are in it.
 - A screen reader reads the menu's Activity link with its count as "Activity, 2 new"; it
   read "Activity , 2 new", with a pause before the comma.
+- Creating a budget period from the Budget page's **Create Period** now takes in that month's
+  transactions that have no period yet, as **Settings → Budget Periods → Add** always has.
+  Before, the month's existing transactions stayed outside the new period. When one of them is
+  being changed at that moment, the dialog now says so (nothing was saved, try again) instead
+  of a generic failure.
+- A new budget period, made either way, no longer takes in a transaction a member took out of a
+  period (for instance one moved to another month's period and then taken out of it), as the
+  bank sync already didn't. One that was in another month's period when that period was deleted
+  stays out too. As with the bank sync, a transaction that last left its own month's period
+  (taken out of it, or the period deleted) goes back in when that period has been deleted and
+  the month's period is made again.
 
 ## 3.0.0 (2026-11-12)
 

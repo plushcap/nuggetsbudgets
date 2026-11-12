@@ -107,7 +107,8 @@ export const getBudgetPeriods = async (): Promise<BudgetPeriod[]> =>
 
 /**
  * Create a budget period (the Budget page's Create Period). It takes in the month's
- * transactions that have no period yet, as {@link createManagedBudgetPeriod} does. Answers
+ * transactions that have no period yet (not one a member took out of a period), as
+ * {@link createManagedBudgetPeriod} does. Answers
  * with the new period's row and how many of its items were created; 409
  * BUDGET_PERIOD_EXISTS when the ledger already has the month.
  */
