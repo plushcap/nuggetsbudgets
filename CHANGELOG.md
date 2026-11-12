@@ -24,8 +24,9 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
 - minimatch 11 and glob 14, which fix two moderate advisories: minimatch could be made to
   build huge numbers of patterns from one glob (a denial of service), and glob kept walking
   the filesystem after its AbortSignal had cancelled it. An old dependency override held
-  minimatch at 9 for every package; it now raises it to 11. Nuggets never matches a pattern
-  it was sent: they come from its code (ESLint's settings, the backup's uploads folder).
+  every package but one at minimatch 9; overrides now raise only the affected versions,
+  minimatch to 11 and glob to 14. The server never matches a glob: only ESLint and mjml's
+  command-line tool do.
 
 ### Fixed
 

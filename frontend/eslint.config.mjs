@@ -12,8 +12,8 @@ export default tseslint.config(
     // `overrides` lets it install beside ESLint 10. Its rules use only
     // context.report/options/settings, which ESLint 10 still provides, so it
     // needs no @eslint/compat wrapper. The same override keeps its minimatch on
-    // 3.x: it calls minimatch's default export, which the 9.x the root
-    // `minimatch` override pins elsewhere doesn't have.
+    // 3.x (3.1.5 or later): it calls minimatch's default export, which 9.x and
+    // later, the 11.x the other packages here use included, don't have.
     extends: [js.configs.recommended, ...tseslint.configs.recommended, jsxA11y.flatConfigs.recommended],
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
