@@ -75,21 +75,58 @@ export function envSecret(name: string, env: NodeJS.ProcessEnv = process.env): s
   return env[name] || undefined;
 }
 
+/** The variables startup copied into the environment from their files (copySecretsIntoEnvironment). */
+const copiedFromFiles = new Set<string>();
+
+/**
+ * Copy the secrets read from their files into the environment, where envSecret's readers
+ * (the security checks, the CSRF token) find them; once, at startup (index.ts). Remembered,
+ * so a variable set this way is never taken for one a stack set (refusedVariable).
+ */
+export function copySecretsIntoEnvironment(secrets: SecretsConfig): void {
+  const copies = {
+    JWT_SECRET: secrets.jwtSecret,
+    DB_PASSWORD: secrets.dbPassword,
+    SESSION_SECRET: secrets.sessionSecret,
+    CSRF_SECRET: secrets.csrfSecret,
+  };
+  for (const [name, value] of Object.entries(copies)) {
+    process.env[name] = value;
+    copiedFromFiles.add(name);
+  }
+}
+
+/**
+ * In production, why a secret's variable is no use: it is set in the environment, which
+ * production never reads a secret from (startup copies aside). Undefined otherwise.
+ */
+export function refusedVariable(variable: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  if (configFor(env).NODE_ENV !== 'production' || !envSecret(variable, env) || copiedFromFiles.has(variable)) return undefined;
+  return `${variable} is set in the environment, which production never reads a secret from`;
+}
+
 /**
  * An optional secret read for one task, by the environment it is given: its file in
  * SECRETS_PATH (the variable's name in lower case: `migration_db_password` for
  * MIGRATION_DB_PASSWORD), else, outside production, the variable. Undefined when neither.
+ * A file that is there but can't be read is an error, not a reason to sign in another way.
  */
 export function optionalSecret(
   variable: 'MIGRATION_DB_PASSWORD' | 'BACKUP_DB_PASSWORD',
   env: NodeJS.ProcessEnv = process.env
 ): string | undefined {
   const settings = configFor(env);
+  const file = path.join(settings.SECRETS_PATH, secretFileName(variable));
   try {
-    const value = fs.readFileSync(path.join(settings.SECRETS_PATH, secretFileName(variable)), 'utf8').trim();
+    const value = fs.readFileSync(file, 'utf8').trim();
     if (value) return value;
-  } catch {
-    // no file: the variable, outside production
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw new Error(
+        `The ${secretFileName(variable)} secret file (${file}) can't be read: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`,
+        { cause: error }
+      );
+    }
   }
   return settings.NODE_ENV === 'production' ? undefined : envSecret(variable, env);
 }
@@ -109,12 +146,10 @@ export const secretFileName = (variable: string): string => variable.toLowerCase
  * production, where the variables are how development and the tests set them.
  */
 export function secretsInEnvironment(env: NodeJS.ProcessEnv = process.env): string[] {
-  if (configFor(env).NODE_ENV !== 'production') return [];
-  return SECRET_VARIABLES.filter((name) => envSecret(name, env)).map(
-    (name) =>
-      `${name} is set in the environment, which production never reads a secret from: put it in the ` +
-      `${secretFileName(name)} Docker secret file (in SECRETS_PATH) and remove the variable`
-  );
+  return SECRET_VARIABLES.flatMap((name) => {
+    const refused = refusedVariable(name, env);
+    return refused ? [`${refused}: put it in the ${secretFileName(name)} Docker secret file (in SECRETS_PATH) and remove the variable`] : [];
+  });
 }
 
 /**
@@ -215,12 +250,10 @@ export const loadSecrets = (): SecretsConfig => {
     const production = config().NODE_ENV === 'production';
     const described = missingSecrets.map((name) => {
       // In production a variable left where the file should be is the likeliest cause: name it.
-      const variable = name.toUpperCase();
+      const refused = refusedVariable(name.toUpperCase());
       const reasons = [
         unusableSecretFiles.get(name),
-        production && envSecret(variable)
-          ? `${variable} is set in the environment, which production never reads a secret from: put it in this file and remove the variable`
-          : undefined,
+        refused ? `${refused}: put it in this file and remove the variable` : undefined,
       ].filter(Boolean);
       return reasons.length > 0 ? `${name} (${reasons.join('; ')})` : name;
     });

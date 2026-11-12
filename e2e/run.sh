@@ -93,7 +93,7 @@ rm -rf "$RUN_DIR"
 mkdir -p "$RUN_DIR"
 export DB_HOST DB_PORT DB_NAME
 export MIGRATION_DB_USER="$OWNER"
-export USE_DOCKER_SECRETS=true SECRETS_PATH="$RUN_DIR/secrets"
+export SECRETS_PATH="$RUN_DIR/secrets"
 mkdir -m 700 "$SECRETS_PATH"
 secret_file() { (umask 077 && printf '%s' "$2" > "$SECRETS_PATH/$1"); }
 secret_file db_password "$OWNER_PASSWORD"
@@ -101,7 +101,9 @@ secret_file app_db_password "$APP_DB_PASSWORD"
 secret_file jwt_secret "$(openssl rand -base64 48)"
 secret_file session_secret "$(openssl rand -base64 32)"
 secret_file csrf_secret "$(openssl rand -base64 32)"
-unset APP_DB_PASSWORD
+# Any secret variable from the caller's shell (APP_DB_PASSWORD is this script's own input)
+# would make migrate and the backend refuse to start, as production does.
+unset DB_PASSWORD APP_DB_PASSWORD JWT_SECRET SESSION_SECRET CSRF_SECRET MIGRATION_DB_PASSWORD BACKUP_DB_PASSWORD
 export DATA_ENCRYPTION_KEY_FILE="$RUN_DIR/data_encryption_key"
 openssl rand -base64 32 | tr -d '\n' > "$DATA_ENCRYPTION_KEY_FILE"
 chmod 600 "$DATA_ENCRYPTION_KEY_FILE"

@@ -317,7 +317,7 @@ These are the patterns most likely to be violated. Treat them as hard rules.
   credential-domain AES key is HKDF-derived from the `data_encryption_key` Docker secret).
   **Never** drop a secret into `system_settings.setting_value` (or any column) in the
   clear — that key/value store is for non-secret config only. Secrets that don't need to
-  live in the DB stay Docker secrets / env. A new encrypted column or setting goes in
+  live in the DB stay Docker secret files. A new encrypted column or setting goes in
   `REWRAP_TARGETS` / `ENCRYPTED_SETTINGS` (`services/secretRewrap.ts`), or rotating the key
   (`rewrap-secrets`) leaves it unreadable. Stored credentials are sealed
   with the key's id (`seal(…, keyId)`, envelope v3); backup files stay v2.

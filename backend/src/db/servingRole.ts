@@ -5,7 +5,7 @@ import { ControlPlaneError } from '../services/controlPlaneErrors.js';
 import { createLogger } from '../utils/logger.js';
 import { oneRow } from '../utils/present.js';
 import { configFor } from '../config.js';
-import { optionalSecret } from '../utils/docker-secrets.js';
+import { optionalSecret, refusedVariable } from '../utils/docker-secrets.js';
 
 const logger = createLogger({ service: 'ServingRole' });
 
@@ -30,9 +30,12 @@ export function servingRolePassword(
   if (migrationRole && migrationRole === servingRole) return ownerPassword;
   if (secrets.appDbPassword) return secrets.appDbPassword;
   if (!migrationRole) return ownerPassword;
+  const refused = refusedVariable('APP_DB_PASSWORD', env);
   throw new Error(
     `DB_USER "${servingRole}" is not the migration role "${migrationRole}", so it needs its own password: ` +
-      'set the app_db_password Docker secret (or, outside production, APP_DB_PASSWORD).'
+      (refused
+        ? `${refused}: put it in the app_db_password Docker secret file and remove the variable.`
+        : 'set the app_db_password Docker secret (or, outside production, APP_DB_PASSWORD).')
   );
 }
 

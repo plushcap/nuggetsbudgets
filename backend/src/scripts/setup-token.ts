@@ -17,6 +17,14 @@
 // eslint-disable-next-line no-restricted-syntax -- set before the logger loads, which reads it through config()
 process.env.LOG_LEVEL ??= 'warn';
 
+// As the server does, refuse a secret in the environment in production (before db.js reads them).
+const { secretsInEnvironment } = await import('../utils/docker-secrets.js');
+const refused = secretsInEnvironment();
+if (refused.length > 0) {
+  process.stderr.write(`Fix the configuration first:\n${refused.map((p) => `  - ${p}`).join('\n')}\n`);
+  process.exit(1);
+}
+
 const { default: pool, db } = await import('../db.js');
 const { issueSetupToken } = await import('../services/SetupTokenService.js');
 const { createLogger } = await import('../utils/logger.js');

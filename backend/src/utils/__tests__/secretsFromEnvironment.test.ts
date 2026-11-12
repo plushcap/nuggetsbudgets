@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import {
   SECRET_VARIABLES,
+  copySecretsIntoEnvironment,
   loadSecrets,
   optionalSecret,
   readDockerSecret,
@@ -11,6 +12,7 @@ import {
 } from '../docker-secrets.js';
 import { getOwnerCredentials } from '../../db/dbConfig.js';
 import { servingRolePassword } from '../../db/servingRole.js';
+import { getDirname } from '../esm-compat.js';
 
 /**
  * Production reads a secret only from its Docker secret file and refuses to start with one
@@ -26,6 +28,9 @@ describe('secrets and the environment', () => {
     DB_PASSWORD: process.env.DB_PASSWORD,
     SESSION_SECRET: process.env.SESSION_SECRET,
     CSRF_SECRET: process.env.CSRF_SECRET,
+    APP_DB_PASSWORD: process.env.APP_DB_PASSWORD,
+    MIGRATION_DB_PASSWORD: process.env.MIGRATION_DB_PASSWORD,
+    BACKUP_DB_PASSWORD: process.env.BACKUP_DB_PASSWORD,
   };
 
   beforeEach(() => {
@@ -95,6 +100,44 @@ describe('secrets and the environment', () => {
     expect(() => loadSecrets()).toThrow(
       /Missing required secrets: db_password, jwt_secret \(JWT_SECRET is set in the environment, which production never reads a secret from: put it in this file and remove the variable\), session_secret, csrf_secret\. Mount each as a Docker secret file/
     );
+  });
+
+  it("doesn't take the secrets startup copied from their files for ones a stack set", () => {
+    process.env.NODE_ENV = 'production';
+    for (const name of ['APP_DB_PASSWORD', 'MIGRATION_DB_PASSWORD', 'BACKUP_DB_PASSWORD']) delete process.env[name];
+    copySecretsIntoEnvironment({ dbPassword: 'a', appDbPassword: 'b', jwtSecret: 'c', sessionSecret: 'd', csrfSecret: 'e' });
+    expect(process.env.JWT_SECRET).toBe('c');
+    expect(secretsInEnvironment()).toEqual([]);
+    // APP_DB_PASSWORD isn't copied, so one in the environment is still a stack's.
+    expect(secretsInEnvironment({ ...process.env, APP_DB_PASSWORD: 'made-up' })).toEqual([
+      expect.stringMatching(/^APP_DB_PASSWORD is set in the environment/),
+    ]);
+  });
+
+  it('refuses an optional secret file that is there but can\'t be read, rather than sign in another way', () => {
+    mkdirSync(path.join(dir, 'migration_db_password')); // a directory reads as EISDIR, even for root
+    expect(() => optionalSecret('MIGRATION_DB_PASSWORD', { NODE_ENV: 'production', SECRETS_PATH: dir })).toThrow(
+      /^The migration_db_password secret file \(.*\) can't be read: EISDIR$/
+    );
+  });
+
+  it('says why a separate serving role has no password when APP_DB_PASSWORD is set in production', () => {
+    const env = { NODE_ENV: 'production', SECRETS_PATH: dir, DB_USER: 'nuggets_app', MIGRATION_DB_USER: 'owner', APP_DB_PASSWORD: 'made-up' };
+    expect(() => servingRolePassword({ dbPassword: 'db', appDbPassword: '' }, env)).toThrow(
+      /APP_DB_PASSWORD is set in the environment, which production never reads a secret from: put it in the app_db_password Docker secret file/
+    );
+  });
+
+  it('is checked by every command that runs in production, the server before it copies the files', () => {
+    const src = path.join(getDirname(import.meta.url), '..', '..');
+    const read = (file: string) => readFileSync(path.join(src, file), 'utf8');
+    for (const file of ['scripts/migrate.ts', 'scripts/restore.ts', 'scripts/rewrap-secrets.ts', 'scripts/setup-token.ts']) {
+      expect(read(file), file).toMatch(/secretsInEnvironment\(\)/);
+    }
+    const index = read('index.ts');
+    const check = index.indexOf('secretsInEnvironment()');
+    expect(check).toBeGreaterThan(-1);
+    expect(index.indexOf('copySecretsIntoEnvironment(')).toBeGreaterThan(check);
   });
 
   it("doesn't fall back to a secret's variable in production", () => {

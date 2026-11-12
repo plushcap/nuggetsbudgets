@@ -33,12 +33,15 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
   `SESSION_SECRET`, `CSRF_SECRET`, `MIGRATION_DB_PASSWORD` or `BACKUP_DB_PASSWORD`. The
   error names the variable and the file it belongs in. The two owner-password overrides
   have files of their own now, `migration_db_password` and `backup_db_password` (optional).
-  Development and the tests still take the variables.
+  Production always reads the files now, whatever `USE_DOCKER_SECRETS` says, and the
+  `restore`, `rewrap-secrets` and `setup-token` commands refuse a variable too. Development
+  and the tests still take the variables (a file, when there is one, wins).
 
   **Upgrading:** nothing to do with the provided compose files, which pass no secret in the
   environment. If your stack or `.env` sets one of those variables, put its value in the
   secret file named after it (`jwt_secret` for `JWT_SECRET`) and remove the variable; the
-  server won't start until you do.
+  server won't start until you do. The compose files mount neither optional file: to use one,
+  add it to the backend's `secrets:` as the others are.
 
 ### Fixed
 

@@ -15,7 +15,8 @@ const logger = createLogger({ service: 'MigrationPool' });
  * Migrations still need the owner, so the migration runner uses its OWN
  * credential here:
  *
- *   MIGRATION_DB_USER / MIGRATION_DB_PASSWORD   (fall back to DB_USER / db password)
+ *   MIGRATION_DB_USER / the migration_db_password secret   (fall back to DB_USER / db_password;
+ *   outside production MIGRATION_DB_PASSWORD stands in for the file)
  *
  * The fallback is for a single-role setup, where DB_USER is the owner.
  * This pool also drops the serving statement/query timeouts because DDL,

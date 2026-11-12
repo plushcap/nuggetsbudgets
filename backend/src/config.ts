@@ -216,7 +216,7 @@ export const SETTINGS = {
   }),
   USE_DOCKER_SECRETS: setting({
     group: 'Server',
-    description: '`true` checks the secrets read from `/run/secrets` at startup with the rest of the configuration',
+    description: '`true` checks the secrets read from `/run/secrets` at startup with the rest of the configuration. Production always does',
     defaultText: '`false`',
     parse: exactFlag(),
   }),

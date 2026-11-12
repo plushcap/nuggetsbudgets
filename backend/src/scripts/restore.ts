@@ -27,6 +27,7 @@ import { readFile } from 'fs/promises';
 import * as path from 'path';
 import { getDirname } from '../utils/esm-compat.js';
 import { config, configProblems } from '../config.js';
+import { secretsInEnvironment } from '../utils/docker-secrets.js';
 // Neither loads the logger.
 import { BASELINE } from '../db/baseline.js';
 import { driftLines } from '../db/schemaFingerprint.js';
@@ -76,8 +77,9 @@ if (!options.file || options.verify === options.yes || (options.keyFile === '' &
   process.exit(2);
 }
 
-// As the server does, refuse a setting that can't be used rather than take its default.
-const problems = configProblems();
+// As the server does, refuse a setting that can't be used rather than take its default, and
+// in production a secret in the environment.
+const problems = [...configProblems(), ...secretsInEnvironment()];
 if (problems.length > 0) {
   process.stderr.write(`Fix the configuration first:\n${problems.map((p) => `  - ${p}`).join('\n')}\n`);
   process.exit(1);
