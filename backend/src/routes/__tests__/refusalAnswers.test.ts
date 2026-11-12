@@ -2,8 +2,6 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 
 vi.hoisted(() => {
   process.env.LOG_LEVEL ??= 'silent';
-  // The backup and OneDrive routers build their services when mounted (see apiContract.test.ts).
-  process.env.ENCRYPTION_KEY ??= 'refusal-answers-test-encryption-key-0123456789';
 });
 
 import request from 'supertest';

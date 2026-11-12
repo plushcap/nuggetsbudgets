@@ -11,7 +11,6 @@ import express, { Express, type NextFunction, type Request, type Response } from
  */
 
 const SECRET = vi.hoisted(() => {
-  process.env.ENCRYPTION_KEY ??= 'internal-error-text-signed-in-test-key-0123456789';
   return 'internal_secret_xyz';
 });
 

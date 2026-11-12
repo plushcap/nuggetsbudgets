@@ -46,12 +46,8 @@ describe('a server without a data encryption key', () => {
   let dir: string;
 
   beforeAll(async () => {
-    // Nor the development fallback.
-    delete process.env.ENCRYPTION_KEY;
     dir = await mkdtemp(path.join(os.tmpdir(), 'no-data-key-'));
     process.env.BACKUP_LOCATION = dir;
-    process.env.ONEDRIVE_CLIENT_ID = 'client-id';
-    process.env.ONEDRIVE_CLIENT_SECRET = 'client-secret';
   });
 
   afterAll(async () => {
@@ -90,6 +86,9 @@ describe('a server without a data encryption key', () => {
     // As routes.ts mounts it, behind the (mocked) sign-in.
     const { Kysely, PostgresDialect } = await import('kysely');
     const oneDriveService = new OneDriveService({ db: new Kysely<DB>({ dialect: new PostgresDialect({ pool }) }) });
+    // The app registration as if saved on the Backup page before the key went missing (reading
+    // it back needs the key too, which isn't what this test is about).
+    vi.spyOn(oneDriveService, 'isConfigured').mockResolvedValue(true);
     app.use('/api/onedrive', authenticateToken, createOneDriveRoutes({ oneDriveService, backupService: new BackupService(pool), config: config() }));
 
     const unavailable = (res: request.Response) => {

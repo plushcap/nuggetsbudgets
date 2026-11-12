@@ -44,7 +44,6 @@ export interface RouteHarness {
 /** `deps`: services to mount the routes with in place of the stubs and new ones (a lifecycle that fails, say). */
 export async function startRouteHarness(label: string, deps: Partial<MountDependencies> = {}): Promise<RouteHarness> {
   const connectionString = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
-  process.env.ENCRYPTION_KEY ??= 'route-harness-test-encryption-key-0123456789abcdef';
   const app = createApp();
   mountRoutes(app, { lifecycleService: lifecycleStub, ...deps });
   const server = http.createServer(app);

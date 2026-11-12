@@ -290,9 +290,6 @@ describeDb('Route authorization matrix', () => {
   let memberReadToken: string; // a read-only personal access token of the member, for this ledger
 
   beforeAll(async () => {
-    // OneDriveService needs a key at construction when no Docker secret is present.
-    process.env.ENCRYPTION_KEY ??= 'route-authorization-test-encryption-key-0123456789';
-
     const built = buildApp(lifecycleStub);
     endpoints = built.endpoints;
     createAppRoutes = built.createAppRoutes;

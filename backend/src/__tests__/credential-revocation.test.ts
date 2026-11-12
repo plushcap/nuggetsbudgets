@@ -95,8 +95,6 @@ describeDb('Credential revocation and session lifetime', () => {
   const passwordHash = bcrypt.hashSync(OLD_PASSWORD, 4);
 
   beforeAll(async () => {
-    // OneDriveService needs a key at construction when no Docker secret is present.
-    process.env.ENCRYPTION_KEY ??= 'credential-revocation-test-encryption-key-0123456789';
     const app = createApp();
     mountRoutes(app, { lifecycleService: lifecycleStub });
     server = http.createServer(app);

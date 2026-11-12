@@ -55,7 +55,6 @@ describeDb('Error answers and request ids', () => {
   let lines: Array<Record<string, unknown>> = [];
 
   beforeAll(async () => {
-    process.env.ENCRYPTION_KEY ??= 'error-responses-test-encryption-key-0123456789';
     tenant = await createTestTenant('Error responses');
     app = createApp();
     const probe = express.Router();

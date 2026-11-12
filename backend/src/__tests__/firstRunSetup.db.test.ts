@@ -76,8 +76,6 @@ describeDb('first-run setup on an empty deployment', () => {
       baselinePath: path.join(BACKEND, 'init.sql'),
     }).migrate();
 
-    // OneDriveService needs a key at construction when no Docker secret is present.
-    process.env.ENCRYPTION_KEY ??= 'first-run-setup-test-encryption-key-0123456789';
     const app = createApp();
     mountRoutes(app, { lifecycleService: lifecycleStub });
     server = http.createServer(app);

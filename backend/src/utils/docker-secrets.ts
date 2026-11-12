@@ -65,8 +65,8 @@ export const readDockerSecret = (secretName: string, fallbackEnvVar?: string): s
 /**
  * A secret as the environment holds it, or undefined when it is unset or empty: one
  * index.ts copied there from its Docker secret at startup (JWT_SECRET, DB_PASSWORD,
- * SESSION_SECRET, CSRF_SECRET), or one only ever set as a variable (ONEDRIVE_CLIENT_SECRET,
- * ENCRYPTION_KEY). config() leaves secrets out, so code reads them here or with
+ * SESSION_SECRET, CSRF_SECRET), or an override of the owner's password for one task
+ * (MIGRATION_DB_PASSWORD, BACKUP_DB_PASSWORD). config() leaves secrets out, so code reads them here or with
  * readDockerSecret, never from process.env itself (eslint.config.mjs). A function
  * that takes an environment to read (its tests pass another) passes it as `env`.
  */

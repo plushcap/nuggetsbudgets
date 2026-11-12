@@ -33,11 +33,6 @@ const ALLOWED_MENTIONS: ReadonlyArray<{ file: string; text: string; reason: stri
     text: 'system_settings',
     reason: "kysely-codegen's key for the table in the DB interface: a type, which no query is",
   },
-  {
-    file: 'services/OneDriveService.ts',
-    text: "'Failed to load OneDrive config from system_settings; using env fallback'",
-    reason: 'a log message; the config is read through systemSettings.ts above it',
-  },
 ];
 
 /** The tokens a name can be in: identifiers, and every kind of string, template and regex text. */

@@ -58,7 +58,6 @@ describe('A NUL character in a request body', () => {
   const credentialId = `nul-text-${Date.now()}`;
 
   beforeAll(async () => {
-    process.env.ENCRYPTION_KEY ??= 'nul-text-test-encryption-key-0123456789abcdef';
     tenant = await createTestTenant('NUL text');
     const app = createApp();
     // An upload, as a route's multer takes one after the body parsers.

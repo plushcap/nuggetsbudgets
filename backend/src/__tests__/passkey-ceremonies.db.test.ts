@@ -232,7 +232,6 @@ describeDb('Passkey ceremonies', () => {
   };
 
   beforeAll(async () => {
-    process.env.ENCRYPTION_KEY ??= 'passkey-ceremonies-test-encryption-key-0123456789';
     delete process.env.WEBAUTHN_USER_VERIFICATION;
     resetPasskeyConfig();
     const app = createApp();

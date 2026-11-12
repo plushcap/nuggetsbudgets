@@ -406,23 +406,30 @@ export class BackupScheduler implements Scheduler {
     logger.info({ fileName: result.fileName }, 'Automatic backup created');
 
     // Auto-upload to OneDrive for all users with auto-sync enabled
-    if (await this.oneDriveService.isConfigured()) {
-      try {
-        const userIds = await this.oneDriveService.getUserIdsWithAutoSync();
-
-        if (userIds.length > 0) {
-          for (const userId of userIds) {
-            try {
-              await this.oneDriveService.uploadFile(userId, result.filePath, result.fileName);
-              logger.info({ userId, fileName: result.fileName }, 'Scheduled backup auto-uploaded to OneDrive');
-            } catch (error) {
-              logger.error({ err: error, userId, fileName: result.fileName }, 'Failed to auto-upload scheduled backup to OneDrive');
-            }
+    try {
+      if (await this.oneDriveService.isConfigured()) {
+        for (const userId of await this.oneDriveService.getUserIdsWithAutoSync()) {
+          try {
+            await this.oneDriveService.uploadFile(userId, result.filePath, result.fileName);
+            logger.info({ userId, fileName: result.fileName }, 'Scheduled backup auto-uploaded to OneDrive');
+          } catch (error) {
+            logger.error({ err: error, userId, fileName: result.fileName }, 'Failed to auto-upload scheduled backup to OneDrive');
           }
         }
-      } catch (error) {
-        logger.warn({ err: error }, 'OneDrive auto-upload check failed during scheduled backup');
+      } else {
+        // Copies were asked for but there is no app registration to use: none saved (a stack
+        // that set it in the environment, which is no longer read), or it can't be read. Say
+        // so rather than skip them in silence.
+        const waiting = (await this.oneDriveService.getUserIdsWithAutoSync()).length;
+        if (waiting > 0) {
+          logger.warn(
+            { users: waiting, fileName: result.fileName },
+            "Scheduled backup not copied to OneDrive: its app registration isn't set up (Settings → Database Backup)"
+          );
+        }
       }
+    } catch (error) {
+      logger.warn({ err: error }, 'OneDrive auto-upload check failed during scheduled backup');
     }
   }
 

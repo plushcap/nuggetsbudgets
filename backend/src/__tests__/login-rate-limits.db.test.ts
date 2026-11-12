@@ -49,7 +49,6 @@ describeDb('Sign-in rate limits per address', () => {
     // them inside their timeout on a loaded machine (the cost itself is tested elsewhere).
     previousRounds = process.env.BCRYPT_ROUNDS;
     process.env.BCRYPT_ROUNDS = '10';
-    process.env.ENCRYPTION_KEY ??= 'rate-limits-test-encryption-key-0123456789abcdef';
     const app = createApp();
     mountRoutes(app, { lifecycleService: lifecycleStub });
     server = http.createServer(app);

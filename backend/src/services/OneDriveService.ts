@@ -13,7 +13,6 @@ import { randomBytes } from 'crypto';
 import * as path from 'path';
 import { getDirname } from '../utils/esm-compat.js';
 import { config } from '../config.js';
-import { envSecret } from '../utils/docker-secrets.js';
 
 const __dirname = getDirname(import.meta.url);
 
@@ -44,6 +43,21 @@ const AUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const pendingAuthStates = new Map<string, { userId: number; expiresAt: number }>();
 
 /**
+ * This server's OAuth callback on the origin the browser uses (CLIENT_URL, else DOMAIN_URL):
+ * the sign-in's state cookie is set there, so Microsoft must send the browser back there.
+ * '' without either.
+ */
+function defaultRedirectUri(): string {
+  const origin = config().CLIENT_URL || config().DOMAIN_URL;
+  if (!origin) return '';
+  try {
+    return new URL('/api/onedrive/callback', origin).href;
+  } catch {
+    return '';
+  }
+}
+
+/**
  * OneDrive, where backups are copied: the app registration (system_settings, encrypted)
  * and each deployment admin's tokens (onedrive_tokens). Both are control-plane tables,
  * read and written on globalDb; one instance is shared by the routes and the backup
@@ -51,9 +65,6 @@ const pendingAuthStates = new Map<string, { userId: number; expiresAt: number }>
  */
 export class OneDriveService {
   private readonly db: Kysely<DB>;
-  private clientId: string;
-  private clientSecret: string;
-  private redirectUri: string;
   /**
    * The AES-256 key the stored tokens are sealed with, derived from the data encryption
    * secret via HKDF and used with the shared authenticated-encryption envelope,
@@ -66,44 +77,22 @@ export class OneDriveService {
   /** @param options.db where its rows are: globalDb, or a test's stand-in. */
   constructor(options: { db?: Kysely<DB> | undefined } = {}) {
     this.db = options.db ?? globalDb;
-
-    // Load environment variables
-    this.clientId = config().ONEDRIVE_CLIENT_ID;
-    this.clientSecret = envSecret('ONEDRIVE_CLIENT_SECRET') ?? '';
-    this.redirectUri = config().ONEDRIVE_REDIRECT_URI;
-
-    if (!this.clientId || !this.clientSecret) {
-      logger.warn('OneDrive client ID or secret not configured - OneDrive sync will be disabled');
-    }
   }
 
   /**
-   * The token key (see tokenKeyCache): from the data encryption secret (the same secret
-   * backups use), else, for development, the ENCRYPTION_KEY variable. Throws
-   * EncryptionKeyUnavailableError (a 503) when there is neither, or the variable is too short.
+   * The token key (see tokenKeyCache): from the data encryption secret, the same secret
+   * backups and the app registration use (development gets one from `npm run setup`). Throws
+   * EncryptionKeyUnavailableError (a 503) when there is none.
    */
   private tokenKey(): { key: Buffer; keyId: number } {
     if (this.tokenKeyCache) return this.tokenKeyCache;
-    let material: string | Buffer;
+    let material: string;
     try {
       material = readDataEncryptionSecretSync();
       logger.info('OneDrive encryption key loaded from Docker secret');
     } catch (secretError) {
-      const encryptionKeyEnv = envSecret('ENCRYPTION_KEY');
-      if (!encryptionKeyEnv) {
-        logger.error({ err: secretError }, 'OneDrive is unavailable: there is no data encryption key to seal its tokens with');
-        throw new EncryptionKeyUnavailableError({ cause: secretError });
-      }
-      // In development, assume it's a hex string or UTF-8 string.
-      material = encryptionKeyEnv.length === 64
-        ? Buffer.from(encryptionKeyEnv, 'hex')  // 64 hex chars = 32 bytes
-        : Buffer.from(encryptionKeyEnv, 'utf8');  // Direct string
-      if (material.length < 32) {
-        const tooShort = new Error(`Encryption key must be at least 32 bytes (found ${material.length})`);
-        logger.error({ err: tooShort }, 'OneDrive is unavailable: ENCRYPTION_KEY is too short to seal its tokens with');
-        throw new EncryptionKeyUnavailableError({ cause: tooShort });
-      }
-      logger.warn('OneDrive using environment variable for encryption (development mode)');
+      logger.error({ err: secretError }, 'OneDrive is unavailable: there is no data encryption key to seal its tokens with');
+      throw new EncryptionKeyUnavailableError({ cause: secretError });
     }
     this.tokenKeyCache = { key: deriveKey(material, DOMAIN.onedrive), keyId: keyIdOf(material) };
     return this.tokenKeyCache;
@@ -118,16 +107,17 @@ export class OneDriveService {
   }
 
   /**
-   * Resolve the OneDrive app-registration config. The DB (`system_settings`,
-   * set via the UI) is the source of truth; the `ONEDRIVE_*` env vars are a
-   * bootstrap/legacy fallback used only when a key isn't stored. The client id
-   * and secret are encrypted at rest (credential-domain key, like the SMTP
-   * password / SimpleFin access URL); the redirect URI is non-secret plaintext.
+   * Resolve the OneDrive app-registration config: what the Backup page saved in
+   * `system_settings`, and nothing else. A secret is never read from the environment, so a
+   * deployment's variables can't hold it. The client id and secret are encrypted at rest
+   * (credential-domain key, like the SMTP password / SimpleFin access URL); the redirect URI
+   * is non-secret plaintext, and until one is saved it is this server's own callback
+   * (defaultRedirectUri), the address the app registration needs.
    */
   private async resolveClientConfig(): Promise<{ clientId: string; clientSecret: string; redirectUri: string }> {
-    let clientId = this.clientId;         // env fallbacks
-    let clientSecret = this.clientSecret;
-    let redirectUri = this.redirectUri;
+    let clientId = '';
+    let clientSecret = '';
+    let redirectUri = defaultRedirectUri();
     try {
       const stored = await readSystemSettings(['onedrive_client_id', 'onedrive_client_secret', 'onedrive_redirect_uri'] as const, this.db);
       const enc = new EncryptionService();
@@ -135,13 +125,13 @@ export class OneDriveService {
       if (stored.onedrive_client_secret) clientSecret = await enc.decryptString(stored.onedrive_client_secret);
       if (stored.onedrive_redirect_uri) redirectUri = stored.onedrive_redirect_uri;
     } catch (err) {
-      logger.error({ err }, 'Failed to load OneDrive config from system_settings; using env fallback');
+      logger.error({ err }, 'Failed to load the saved OneDrive app registration');
     }
     return { clientId, clientSecret, redirectUri };
   }
 
   /**
-   * Check if OneDrive is configured (client id + secret present, from DB or env).
+   * Check if OneDrive is configured (a client id and secret saved on the Backup page).
    */
   public async isConfigured(): Promise<boolean> {
     const { clientId, clientSecret } = await this.resolveClientConfig();

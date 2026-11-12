@@ -107,8 +107,6 @@ describeDb('Admin user edits under concurrency', { timeout: 30_000 }, () => {
   const passwordHash = bcrypt.hashSync(OLD_PASSWORD, 4);
 
   beforeAll(async () => {
-    // OneDriveService needs a key at construction when no Docker secret is present.
-    process.env.ENCRYPTION_KEY ??= 'admin-user-edit-races-test-encryption-key-0123456789';
     const realRevoke = sessionService.revokeAllUserSessions.bind(sessionService);
     vi.spyOn(sessionService, 'revokeAllUserSessions').mockImplementation(async (userId, reason, executor) => {
       await revocationGate.pass(userId, executor);

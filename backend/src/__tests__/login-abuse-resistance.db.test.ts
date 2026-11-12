@@ -84,7 +84,6 @@ describeDb('Login abuse resistance and password policy', () => {
   const passwordHash = bcrypt.hashSync(PASSWORD, 4);
 
   beforeAll(async () => {
-    process.env.ENCRYPTION_KEY ??= 'login-abuse-test-encryption-key-0123456789abcdef';
     server = await listen();
     owner = new Pool({ connectionString, max: 4 });
     tenant = await createTestTenant('Login abuse');

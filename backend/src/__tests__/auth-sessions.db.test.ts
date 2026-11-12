@@ -117,7 +117,6 @@ describeDb('Sessions, the active ledger, MCP tokens and passkey removal through 
     previousRounds = process.env.BCRYPT_ROUNDS;
     process.env.BCRYPT_ROUNDS = '10';
     passwordHash = bcrypt.hashSync(PASSWORD, 10);
-    process.env.ENCRYPTION_KEY ??= 'auth-sessions-test-encryption-key-0123456789abcdef';
     const app = createApp();
     mountRoutes(app, { lifecycleService: lifecycleStub });
     server = http.createServer(app);
