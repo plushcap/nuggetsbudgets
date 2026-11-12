@@ -3,13 +3,9 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vites
 // Real VAPID key generation and payload encryption; only the network send is stubbed.
 const { sendNotification } = vi.hoisted(() => ({ sendNotification: vi.fn() }));
 vi.mock('web-push', async (importOriginal) => {
-  // CommonJS module: the service uses the default export.
-  const actual = await importOriginal<{ default: typeof import('web-push') }>();
-  return {
-    ...actual.default,
-    default: { ...actual.default, sendNotification },
-    sendNotification,
-  };
+  // An ES module with named exports only: the service imports sendNotification by name.
+  const actual = await importOriginal<typeof import('web-push')>();
+  return { ...actual, sendNotification };
 });
 
 // Every line the service logs, as JSON, to check what a failure logs.
