@@ -28,7 +28,8 @@
     "html-minifier": "npm:html-minifier-terser@^7.2.0",
     "jws": "^4.0.1",
     "lodash": "^4.17.23",
-    "minimatch": "^9.0.5",
+    "glob": "^14.0.2",
+    "minimatch": "^11.0.5",
     "validator": "^13.15.22",
     "eslint-plugin-jsx-a11y": {
       "eslint": "^10.13.0",

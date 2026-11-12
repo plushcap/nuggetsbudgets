@@ -18,9 +18,14 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
 
   **Upgrading:** if your stack set any of the `ONEDRIVE_*` variables, open Settings →
   Database Backup. If OneDrive shows as not set up, enter the same three values there: its
-  sign-in carries on, and the backups already copied to it stay. Until then scheduled backups aren't
-  copied to OneDrive, and each one logs a warning saying so. Then delete the `ONEDRIVE_*`
-  and `ENCRYPTION_KEY` variables from your stack or `.env`.
+  sign-in carries on, and the backups already copied to it stay. Until then scheduled
+  backups aren't copied to OneDrive, and each one logs a warning saying so. Then delete the
+  `ONEDRIVE_*` and `ENCRYPTION_KEY` variables from your stack or `.env`.
+- minimatch 11 and glob 14, which fix two moderate advisories: minimatch could be made to
+  build huge numbers of patterns from one glob (a denial of service), and glob kept walking
+  the filesystem after its AbortSignal had cancelled it. An old dependency override held
+  minimatch at 9 for every package; it now raises it to 11. Nuggets never matches a pattern
+  it was sent: they come from its code (ESLint's settings, the backup's uploads folder).
 
 ### Fixed
 
