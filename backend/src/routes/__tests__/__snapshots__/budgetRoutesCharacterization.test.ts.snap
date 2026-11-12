@@ -1653,6 +1653,101 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
 }
 `;
 
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: archive April 1`] = `
+{
+  "after": {
+    "events": 10,
+    "events_net": "970.50",
+    "goal_accounts": 1,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 8,
+    "periods": 2,
+    "rules": 1,
+    "transactions_in_periods": 9,
+  },
+  "body": {
+    "message": "Budget period "April 2024" archived",
+    "period": {
+      "archived_at": "<instant>",
+      "created_at": "<instant>",
+      "end_date": "2024-04-30",
+      "id": "<period:2>",
+      "month": "April",
+      "month_number": 4,
+      "name": "April 2024",
+      "start_date": "2024-04-01",
+      "status": "upcoming",
+      "tenant_id": "<tenant:1>",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:10>",
+      "year": 2024,
+    },
+    "success": true,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: archive April again 1`] = `
+{
+  "after": {
+    "events": 10,
+    "events_net": "970.50",
+    "goal_accounts": 1,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 8,
+    "periods": 2,
+    "rules": 1,
+    "transactions_in_periods": 9,
+  },
+  "body": {
+    "message": "Budget period "April 2024" archived",
+    "period": {
+      "archived_at": "<instant>",
+      "created_at": "<instant>",
+      "end_date": "2024-04-30",
+      "id": "<period:2>",
+      "month": "April",
+      "month_number": 4,
+      "name": "April 2024",
+      "start_date": "2024-04-01",
+      "status": "upcoming",
+      "tenant_id": "<tenant:1>",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:10>",
+      "year": 2024,
+    },
+    "success": true,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: archive one that is not there 1`] = `
+{
+  "after": {
+    "events": 10,
+    "events_net": "970.50",
+    "goal_accounts": 1,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 8,
+    "periods": 2,
+    "rules": 1,
+    "transactions_in_periods": 9,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Budget period not found",
+    "message": "Budget period not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
 exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: create March 1`] = `
 {
   "after": {
@@ -1667,6 +1762,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "transactions_in_periods": 2,
   },
   "body": {
+    "archived_at": null,
     "budgetItemsCreated": 3,
     "created_at": "<instant>",
     "end_date": "2024-03-31",
@@ -1737,27 +1833,27 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
 }
 `;
 
-exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: delete April 1`] = `
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: delete April, which has transactions 1`] = `
 {
   "after": {
-    "events": 2,
-    "events_net": "450.00",
+    "events": 10,
+    "events_net": "970.50",
     "goal_accounts": 1,
     "goal_envelopes": 0,
     "items": 4,
-    "period_items": 4,
-    "periods": 1,
+    "period_items": 8,
+    "periods": 2,
     "rules": 1,
-    "transactions_in_periods": 2,
+    "transactions_in_periods": 9,
   },
   "body": {
-    "budget_items_deleted": 4,
-    "budget_transactions_deleted": 8,
-    "message": "Budget period "April 2024" deleted successfully",
-    "success": true,
-    "transactions_unassociated": 7,
+    "code": "BUDGET_PERIOD_HAS_TRANSACTIONS",
+    "error": "April 2024 has 7 transactions, so it can't be deleted. Archive it to hide it instead.",
+    "message": "April 2024 has 7 transactions, so it can't be deleted. Archive it to hide it instead.",
+    "requestId": "<request>",
+    "transaction_count": 7,
   },
-  "status": 200,
+  "status": 409,
 }
 `;
 
@@ -1779,7 +1875,6 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "budget_transactions_deleted": 2,
     "message": "Budget period "May 2024" deleted successfully",
     "success": true,
-    "transactions_unassociated": 0,
   },
   "status": 200,
 }
@@ -1813,6 +1908,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
   "after": undefined,
   "body": [
     {
+      "archived_at": null,
       "created_at": "<instant>",
       "end_date": "2024-03-31",
       "id": "<period:1>",
@@ -1827,6 +1923,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
       "year": 2024,
     },
     {
+      "archived_at": null,
       "created_at": "<instant>",
       "end_date": "2024-04-30",
       "id": "<period:2>",
@@ -1841,6 +1938,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
       "year": 2024,
     },
     {
+      "archived_at": null,
       "created_at": "<instant>",
       "end_date": "2024-05-31",
       "id": "<period:3>",
@@ -1852,6 +1950,45 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
       "tenant_id": "<tenant:1>",
       "updated_at": "<instant>",
       "uuid": "<uuid:11>",
+      "year": 2024,
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: list with April archived 1`] = `
+{
+  "after": undefined,
+  "body": [
+    {
+      "archived_at": null,
+      "created_at": "<instant>",
+      "end_date": "2024-03-31",
+      "id": "<period:1>",
+      "month": "March",
+      "month_number": 3,
+      "name": "March 2024",
+      "start_date": "2024-03-01",
+      "status": "upcoming",
+      "tenant_id": "<tenant:1>",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:9>",
+      "year": 2024,
+    },
+    {
+      "archived_at": "<instant>",
+      "created_at": "<instant>",
+      "end_date": "2024-04-30",
+      "id": "<period:2>",
+      "month": "April",
+      "month_number": 4,
+      "name": "April 2024",
+      "start_date": "2024-04-01",
+      "status": "upcoming",
+      "tenant_id": "<tenant:1>",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:10>",
       "year": 2024,
     },
   ],
@@ -1994,6 +2131,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
   "body": {
     "periods": [
       {
+        "archived_at": null,
         "budget_item_count": "3",
         "budget_transaction_count": "2",
         "end_date": "2024-03-31",
@@ -2006,6 +2144,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
         "year": 2024,
       },
       {
+        "archived_at": null,
         "budget_item_count": "3",
         "budget_transaction_count": "2",
         "end_date": "2024-04-30",
@@ -2018,6 +2157,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
         "year": 2024,
       },
       {
+        "archived_at": null,
         "budget_item_count": "3",
         "budget_transaction_count": "2",
         "end_date": "2024-05-31",
@@ -2037,6 +2177,65 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     },
   },
   "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: restore April 1`] = `
+{
+  "after": {
+    "events": 10,
+    "events_net": "970.50",
+    "goal_accounts": 1,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 8,
+    "periods": 2,
+    "rules": 1,
+    "transactions_in_periods": 9,
+  },
+  "body": {
+    "message": "Budget period "April 2024" restored",
+    "period": {
+      "archived_at": null,
+      "created_at": "<instant>",
+      "end_date": "2024-04-30",
+      "id": "<period:2>",
+      "month": "April",
+      "month_number": 4,
+      "name": "April 2024",
+      "start_date": "2024-04-01",
+      "status": "upcoming",
+      "tenant_id": "<tenant:1>",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:10>",
+      "year": 2024,
+    },
+    "success": true,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: restore one that is not there 1`] = `
+{
+  "after": {
+    "events": 10,
+    "events_net": "970.50",
+    "goal_accounts": 1,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 8,
+    "periods": 2,
+    "rules": 1,
+    "transactions_in_periods": 9,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Budget period not found",
+    "message": "Budget period not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
 }
 `;
 

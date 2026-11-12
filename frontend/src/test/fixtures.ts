@@ -153,6 +153,7 @@ export function budgetPeriod(year: number, month: number, overrides: Partial<Bud
     start_date: `${year}-${mm}-01`,
     end_date: `${year}-${mm}-${lastDay}`,
     status: 'active',
+    archived_at: null,
     created_at: STAMP,
     updated_at: STAMP,
     ...overrides,

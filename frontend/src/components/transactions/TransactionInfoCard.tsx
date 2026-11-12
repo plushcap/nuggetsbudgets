@@ -13,7 +13,7 @@ import {
 } from '@nuggets/shared';
 import type { BudgetItem, BudgetPeriod, MerchantLite, User } from '../../services/api';
 import type { EditTransactionFormData } from '../../types/forms';
-import { periodsNewestFirst } from '../../utils/budgetPeriods';
+import { periodChoices } from '../../utils/budgetPeriods';
 import { DateUtils } from '../../utils/dateUtils';
 import { TRANSACTION_TYPE_OPTIONS } from '../../utils/vocabularyOptions';
 import RadixDatePicker from '../RadixDatePicker';
@@ -107,7 +107,7 @@ export const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
           value={idOrNone(values.budget_period_id)}
           options={[
             { value: NONE, label: 'No budget period' },
-            ...periodsNewestFirst(budgetPeriods).map((period) => ({ value: period.id.toString(), label: period.name })),
+            ...periodChoices(budgetPeriods, values.budget_period_id).map((period) => ({ value: period.id.toString(), label: period.name })),
           ]}
           placeholder="No budget period"
           onChange={(value) => changeField('budget_period_id', idFromChoice(value), true)}

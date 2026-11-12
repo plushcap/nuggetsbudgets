@@ -94,6 +94,8 @@ export const budgetPeriodResponseSchema = z.object({
   start_date: dayText,
   end_date: dayText,
   status: storedValue(['active', 'closed', 'upcoming'] as const).nullable(),
+  /** When a member archived it, which hides it from the period pickers; null while it is shown. */
+  archived_at: nullableInstant,
   created_at: instant,
   updated_at: nullableInstant,
 });
@@ -357,6 +359,7 @@ export const budgetPeriodManagementRowResponseSchema = z.object({
   month_number: z.number().int(),
   start_date: dayText,
   end_date: dayText,
+  archived_at: nullableInstant,
   transaction_count: countText,
   budget_item_count: countText,
   budget_transaction_count: countText,
@@ -390,7 +393,13 @@ export const budgetPeriodDeletedResponseSchema = z.object({
   message: z.string(),
   budget_items_deleted: z.number().int(),
   budget_transactions_deleted: z.number().int(),
-  transactions_unassociated: z.number().int(),
+});
+
+/** POST /api/budget-periods/:uuid/archive and …/restore: the period's row as it now is. */
+export const budgetPeriodArchiveResponseSchema = z.object({
+  success: z.literal(true),
+  message: z.string(),
+  period: budgetPeriodResponseSchema,
 });
 
 /** GET /api/budgets/periods/:uuid/envelope-transfers (`data`): the envelope account's transfers in the period. */

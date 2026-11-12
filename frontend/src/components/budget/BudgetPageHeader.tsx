@@ -2,7 +2,7 @@ import React from 'react';
 import { Button, Card, Flex, Heading, Select, Text } from '@radix-ui/themes';
 import { Archive, Plus } from 'lucide-react';
 import type { BudgetItem, BudgetPeriod } from '../../services/api';
-import { periodKey, periodsNewestFirst } from '../../utils/budgetPeriods';
+import { periodChoices, periodKey } from '../../utils/budgetPeriods';
 
 /** A period's name in the picker ("October 2026"). */
 const periodLabel = (period: BudgetPeriod) =>
@@ -54,7 +54,7 @@ const BudgetPageHeader: React.FC<{
         >
           <Select.Trigger className="min-w-[180px]" aria-label="Budget period" />
           <Select.Content>
-            {periodsNewestFirst(budgetPeriods).map((period) => (
+            {periodChoices(budgetPeriods, currentPeriod.id).map((period) => (
               <Select.Item key={period.id} value={periodKey(period)}>{periodLabel(period)}</Select.Item>
             ))}
           </Select.Content>

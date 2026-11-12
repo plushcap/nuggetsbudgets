@@ -120,6 +120,27 @@ describe('BudgetPage period selection', () => {
     await waitFor(() => expect(location).toBe('?period=2026-01'));
   });
 
+  // An archived period (Settings → Budget Periods) leaves the picker, but a URL can still
+  // name it, and the picker then lists it, as the period shown.
+  it("leaves an archived period out of the picker, unless it's the one shown", async () => {
+    query.periods = periods.map((p) => (p.month_number === 2 ? { ...p, archived_at: '2026-11-01T12:00:00.000Z' } : p));
+    const options = async () => {
+      await userEvent.click(shownPeriod());
+      const names = (await screen.findAllByRole('option')).map((option) => option.textContent);
+      await userEvent.keyboard('{Escape}');
+      return names;
+    };
+
+    const first = renderAt('/budgets?period=2026-01');
+    await waitFor(() => expect(shownPeriod()).toHaveTextContent('January 2026'));
+    expect(await options()).toEqual(['March 2026', 'January 2026']);
+    first.unmount();
+
+    renderAt('/budgets?period=2026-02');
+    await waitFor(() => expect(shownPeriod()).toHaveTextContent('February 2026'));
+    expect(await options()).toEqual(['March 2026', 'February 2026', 'January 2026']);
+  });
+
   it('a chosen period goes into the URL and the session', async () => {
     renderAt('/budgets?period=2026-01');
     await waitFor(() => expect(shownPeriod()).toHaveTextContent('January 2026'));

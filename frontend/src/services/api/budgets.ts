@@ -26,6 +26,7 @@ import {
   budgetItemResponseSchema,
   budgetItemTransferResponseSchema,
   budgetItemUsageResponseSchema,
+  budgetPeriodArchiveResponseSchema,
   budgetPeriodCreatedResponseSchema,
   budgetPeriodDeletedResponseSchema,
   budgetPeriodItemsQuery,
@@ -115,9 +116,28 @@ export const getBudgetPeriods = async (): Promise<BudgetPeriod[]> =>
 export const createBudgetPeriod = async (year: number, month: number): Promise<BudgetPeriod & { budgetItemsCreated: number }> =>
   parseAnswer(budgetPeriodCreatedResponseSchema, await apiPost<unknown>('/budgets/periods', { year, month }), 'budget period');
 
-/** Delete a budget period: its items and events go, its transactions stay, with no period. */
+/**
+ * Delete a budget period that has no transactions: its items and budget events go with it. One
+ * that has transactions is refused, 409 BUDGET_PERIOD_HAS_TRANSACTIONS: archive it instead.
+ */
 export const deleteBudgetPeriod = async (periodUuid: string): Promise<z.infer<typeof budgetPeriodDeletedResponseSchema>> =>
   parseAnswer(budgetPeriodDeletedResponseSchema, await apiDelete<unknown>(`/budget-periods/${periodUuid}`), 'budget period deleted');
+
+/** Archive a budget period: hidden from the period pickers, its transactions and budget kept. */
+export const archiveBudgetPeriod = async (periodUuid: string): Promise<BudgetPeriod> =>
+  parseAnswer(
+    budgetPeriodArchiveResponseSchema,
+    await apiPost<unknown>(`/budget-periods/${encodeURIComponent(periodUuid)}/archive`, {}),
+    'budget period archived',
+  ).period;
+
+/** Restore an archived budget period to the period pickers. */
+export const restoreBudgetPeriod = async (periodUuid: string): Promise<BudgetPeriod> =>
+  parseAnswer(
+    budgetPeriodArchiveResponseSchema,
+    await apiPost<unknown>(`/budget-periods/${encodeURIComponent(periodUuid)}/restore`, {}),
+    'budget period restored',
+  ).period;
 
 /**
  * Get budget periods with management metadata (counts + stats).

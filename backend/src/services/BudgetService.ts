@@ -8,7 +8,7 @@ import { centsToAmount, centsToNumber, numericToCents, toCents } from '../utils/
 import { ControlPlaneError } from './controlPlaneErrors.js';
 import { DomainError, type RefusalStatus } from './domainErrors.js';
 import { isLockConflict, lockRowsForDelete, lockTransactions } from './transactions/locks.js';
-import { transferItemsNotInPeriod } from './budgetPeriods/BudgetPeriodError.js';
+import { budgetPeriodHasTransactions, transferItemsNotInPeriod } from './budgetPeriods/BudgetPeriodError.js';
 import { budgetPeriodItemIdOf, budgetPeriodOf } from './budgetPeriods/periodLookups.js';
 import { notTakenOut } from './budgetPeriods/takenOut.js';
 import { budgetEventType, budgetItemStatus } from '@nuggets/shared';
@@ -511,43 +511,45 @@ export class BudgetService {
     }
 
     /**
-     * Delete the period `uuid` names (DELETE /api/budget-periods/:uuid): its transactions
-     * leave it (they keep their budget item), and its budget events, its items and the
-     * period itself are deleted. A period that isn't the ledger's is a 404.
+     * Delete the period `uuid` names (DELETE /api/budget-periods/:uuid): its budget events, its
+     * items and the period itself. Only a period no transaction is in: one that has any is
+     * refused, 409 BUDGET_PERIOD_HAS_TRANSACTIONS, and nothing is deleted (a member archives it
+     * instead, {@link archivePeriod}), so a delete never leaves transactions without the period
+     * they were in. A period that isn't the ledger's is a 404.
      *
-     * The lock order: the transactions first, in id order, as every write of
-     * several transactions locks them; then the period's own row FOR UPDATE, as a
-     * budget item merge share-locks the periods it writes into before their items (one waits
-     * for the other, and a merge can't add an item between this delete's steps); then the
-     * period's items, in id order, before anything of theirs is deleted: the deletes took them
-     * in the order they scanned them, and a note written on two of them (a manual resolve,
-     * which locks them in id order, FOR KEY SHARE) could hold one this waited for while it
-     * waited for one this had deleted, a deadlock. A wait past the pool's lock_timeout is a
-     * 409 to try again, nothing deleted.
+     * The lock order: the period's own row FOR UPDATE first. A write that puts a transaction in
+     * the period takes the row FOR KEY SHARE (the foreign key's check), so one under way finishes
+     * before the count below and is counted, and one after waits for this delete, then finds the
+     * period gone. A budget item merge share-locks the periods it writes into before their items,
+     * so it can't add an item between this delete's steps either. Then the period's items, in id
+     * order, before anything of theirs is deleted: the deletes took them in the order they
+     * scanned them, and a note written on two of them (a manual resolve, which locks them in id
+     * order, FOR KEY SHARE) could hold one this waited for while it waited for one this had
+     * deleted, a deadlock. A wait past the pool's lock_timeout is a 409 to try again, nothing
+     * deleted.
      */
     async deletePeriod(uuid: string): Promise<{
         name: string;
-        transactionsUnassociated: number;
         budgetItemsDeleted: number;
         budgetTransactionsDeleted: number;
     }> {
         const trx = getDb();
         const period = await budgetPeriodOf(uuid);
         const periodId = period.id;
-        logger.info({ periodId }, 'Deleting budget period');
 
-        await lockTransactions((eb) => eb('budget_period_id', '=', periodId));
-        const unassociated = await trx
-            .updateTable('transactions')
-            .set({ budget_period_id: null, updated_at: sql<Date>`CURRENT_TIMESTAMP` })
+        await lockRowsForDelete('this budget period', () =>
+            trx.selectFrom('budget_period').select('id').where('id', '=', periodId).forUpdate().execute());
+        const { count } = await trx
+            .selectFrom('transactions')
+            .select((eb) => eb.fn.countAll<string>().as('count'))
             .where('budget_period_id', '=', periodId)
-            .executeTakeFirst();
-        const transactionsUnassociated = Number(unassociated.numUpdatedRows ?? 0);
+            .executeTakeFirstOrThrow();
+        const transactionCount = Number(count);
+        if (transactionCount > 0) throw budgetPeriodHasTransactions(period.name, transactionCount);
 
-        await lockRowsForDelete('this budget period', async () => {
-            await trx.selectFrom('budget_period').select('id').where('id', '=', periodId).forUpdate().execute();
-            await trx.selectFrom('budget_period_items').select('id').where('budget_period_id', '=', periodId).orderBy('id').forUpdate().execute();
-        });
+        logger.info({ periodId }, 'Deleting budget period');
+        await lockRowsForDelete('this budget period', () =>
+            trx.selectFrom('budget_period_items').select('id').where('budget_period_id', '=', periodId).orderBy('id').forUpdate().execute());
 
         const events = await trx
             .deleteFrom('budget_period_transactions')
@@ -560,9 +562,44 @@ export class BudgetService {
         const budgetItemsDeleted = Number(items.numDeletedRows ?? 0);
 
         await trx.deleteFrom('budget_period').where('id', '=', periodId).executeTakeFirst();
-        logger.info({ periodId, transactionsUnassociated, budgetItemsDeleted, budgetTransactionsDeleted }, 'Budget period deleted');
+        logger.info({ periodId, budgetItemsDeleted, budgetTransactionsDeleted }, 'Budget period deleted');
 
-        return { name: period.name, transactionsUnassociated, budgetItemsDeleted, budgetTransactionsDeleted };
+        return { name: period.name, budgetItemsDeleted, budgetTransactionsDeleted };
+    }
+
+    /**
+     * Archive the period `uuid` names (POST /api/budget-periods/:uuid/archive): it leaves the
+     * period pickers, and its transactions, budget events and items stay as they are, so its
+     * figures and every later envelope balance are unchanged. Archiving an archived period keeps
+     * the time it was first archived. The period's row; a period that isn't the ledger's is a 404.
+     */
+    async archivePeriod(uuid: string): Promise<Selectable<DB['budget_period']>> {
+        const period = await budgetPeriodOf(uuid);
+        const archived = await getDb()
+            .updateTable('budget_period')
+            .set({ archived_at: sql<Date>`COALESCE(archived_at, CURRENT_TIMESTAMP)`, updated_at: sql<Date>`CURRENT_TIMESTAMP` })
+            .where('id', '=', period.id)
+            .returningAll()
+            .executeTakeFirstOrThrow();
+        logger.info({ periodId: period.id }, 'Budget period archived');
+        return archived;
+    }
+
+    /**
+     * Restore an archived period (POST /api/budget-periods/:uuid/restore): it shows in the
+     * period pickers again. One that isn't archived is left as it is. The period's row; a
+     * period that isn't the ledger's is a 404.
+     */
+    async restorePeriod(uuid: string): Promise<Selectable<DB['budget_period']>> {
+        const period = await budgetPeriodOf(uuid);
+        const restored = await getDb()
+            .updateTable('budget_period')
+            .set({ archived_at: null, updated_at: sql<Date>`CURRENT_TIMESTAMP` })
+            .where('id', '=', period.id)
+            .returningAll()
+            .executeTakeFirstOrThrow();
+        logger.info({ periodId: period.id }, 'Budget period restored');
+        return restored;
     }
 
     /**

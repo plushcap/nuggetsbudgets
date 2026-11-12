@@ -15,7 +15,7 @@ import { useConfirmation } from '../../hooks/useConfirmation';
 import ConfirmationDialog from '../ConfirmationDialog';
 import CurrencyInput from '../CurrencyInput';
 import { nullableAmountInput, refuseAmountPastColumn } from '../forms/optionalAmount';
-import { periodsNewestFirst } from '../../utils/budgetPeriods';
+import { periodChoices } from '../../utils/budgetPeriods';
 import { isCalendarDateInRange, todayLocal } from '../../utils/dateUtils';
 import { apiErrorMessage } from '../../utils/errors';
 import { focusFirstError } from '../../utils/focusFirstError';
@@ -298,7 +298,7 @@ const TransferForm: React.FC<TransferFormProps> = ({
                   <Select.Trigger id={ids.period} placeholder="No budget period" />
                   <Select.Content>
                     <Select.Item value="null">No budget period</Select.Item>
-                    {periodsNewestFirst(budgetPeriods).map((period) => (
+                    {periodChoices(budgetPeriods, field.value).map((period) => (
                       <Select.Item key={period.id} value={period.id.toString()}>
                         {period.name}
                       </Select.Item>

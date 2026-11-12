@@ -27,6 +27,8 @@ interface ManagedBudgetPeriodRow {
   month_number: number;
   start_date: string;
   end_date: string;
+  /** When it was archived (pg reads a timestamptz as a Date), null while it is shown. */
+  archived_at: Date | null;
   transaction_count: string;
   budget_item_count: string;
   budget_transaction_count: string;
@@ -167,6 +169,7 @@ export async function budgetPeriodsForManagement() {
       bp.month_number,
       bp.start_date,
       bp.end_date,
+      bp.archived_at,
       COALESCE(t_count.transaction_count, 0) as transaction_count,
       COALESCE(bpi_count.budget_item_count, 0) as budget_item_count,
       COALESCE(bpt_count.budget_transaction_count, 0) as budget_transaction_count

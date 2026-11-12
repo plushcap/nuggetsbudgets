@@ -109,6 +109,8 @@ member          GET    /api/budget-items/:uuid/history
 member          POST   /api/budget-periods
 member          POST   /api/budget-periods/:periodUuid/transfer
 member          DELETE /api/budget-periods/:uuid
+member          POST   /api/budget-periods/:uuid/archive
+member          POST   /api/budget-periods/:uuid/restore
 member          GET    /api/budget-periods/items/:budgetPeriodItemUuid/budget-activity
 member          GET    /api/budget-periods/items/:budgetPeriodItemUuid/transactions
 member          GET    /api/budget-periods/management

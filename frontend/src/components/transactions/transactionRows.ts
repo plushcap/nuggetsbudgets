@@ -36,8 +36,9 @@ export const reviewStatusWords = (transaction: Transaction): string =>
 /** An amount's colour: red going out, green coming in (amounts are pre-signed). */
 export const amountColor = (amount: number): 'red' | 'green' => (amount < 0 ? 'red' : 'green');
 
-/** The periods the quick actions offer: the three latest, newest first (the list is oldest first). */
-export const latestBudgetPeriods = (budgetPeriods: BudgetPeriod[]): BudgetPeriod[] => budgetPeriods.slice(-3).reverse();
+/** The periods the quick actions offer: the three latest not archived, newest first (the list is oldest first). */
+export const latestBudgetPeriods = (budgetPeriods: BudgetPeriod[]): BudgetPeriod[] =>
+  budgetPeriods.filter((period) => !period.archived_at).slice(-3).reverse();
 
 /** A tag's chosen icon, or the plain tag icon. */
 export const tagIconComponent = (tag: { icon?: string | null | undefined }): IconComponent =>

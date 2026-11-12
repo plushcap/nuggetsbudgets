@@ -9,7 +9,7 @@ export function registerBudgetPeriodTools(server: McpServer, ctx: ToolContext): 
     name: 'list_budget_periods',
     title: 'List budget periods',
     description:
-      'Return every budget period (monthly or custom), with status and dates. Use this to find the current/active period id before classifying.',
+      'Return every budget period (monthly or custom), with status and dates. Use this to find the current/active period id before classifying. A period with archived_at set was archived by a member: the app hides it from its period pickers, so prefer the others.',
     inputSchema: {},
     readOnly: true,
     handler: async (_args, { client }) => client.get('/api/budget-periods/management'),

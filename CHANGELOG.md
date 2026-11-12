@@ -28,6 +28,22 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
   minimatch to 11 and glob to 14. The server never matches a glob: only ESLint and mjml's
   command-line tool do.
 
+### Changed
+
+- A budget period with transactions can no longer be deleted, which left its transactions
+  without a period. **Settings → Budget Periods** offers to archive it instead: an archived
+  period leaves the period pickers (the Budget and Close-Out pages, a transaction's period,
+  the filters, transfers and exports), and its transactions, budget and every envelope balance
+  stay as they are. The page hides archived periods until **Show archived** is pressed, and
+  restores one with a click. A period with no transactions is still deleted, with its budget.
+  A picker still shows the period it holds, archived or not (a transaction's period, the
+  period a link opens).
+
+  The API refuses such a delete with 409 `BUDGET_PERIOD_HAS_TRANSACTIONS` (with
+  `transaction_count`), and its answer no longer has `transactions_unassociated`. Periods carry
+  `archived_at`; `POST /api/budget-periods/:uuid/archive` and `…/restore` set and clear it. The
+  database migration that adds the column runs when the server starts.
+
 ### Fixed
 
 - The plain-text part of notification emails reads as the email does: apostrophes, `=` and

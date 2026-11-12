@@ -31,12 +31,13 @@ import { createBudgetRoutes } from '../budgets.js';
 import { createTestTenant, type TestTenant } from '../../test/testTenant.js';
 
 /**
- * A budget item's merge and a budget period's delete at once. The delete locks
- * the period's transactions, then its period items, then deletes its budget events; the merge
- * moved the merged item's budget events (row locks, and a key share on the target's period
- * item) before it locked the transactions, so the two waited on each other and Postgres ended
- * the merge with a deadlock, a 500. The merge now locks its transactions first, as every write
- * of several transactions does, so it waits for the delete, or the delete for it.
+ * A budget item's merge and a budget period's delete at once. The delete locks the period's
+ * row, then its period items, then deletes its budget events; the merge moved the merged item's
+ * budget events (row locks, and a key share on the target's period item) before it locked the
+ * transactions, and the two waited on each other until Postgres ended the merge with a
+ * deadlock, a 500. A period with transactions isn't deleted at all (409
+ * BUDGET_PERIOD_HAS_TRANSACTIONS, before it waits for anything), so the race is between a merge
+ * and the delete of a period that has only budget events.
  *
  * A gate holds another item's budget event in the period, so the delete stops in its DELETE
  * of the budget events, having taken its locks, before it reaches the merged item's.
@@ -72,16 +73,14 @@ describe('A budget item merge and a budget period delete at once', () => {
     }
   };
 
-  // Whether the target item has a row in the period, and whether the merged item has spending
-  // there (or only budget events): with no spending there, the two shared no transaction lock
-  // and still deadlocked (the merge's event move waited for the target's row the delete held),
-  // and a target row the merge added was committed between the delete's steps.
+  // Whether the target item has a row in the period. The merged item has spending, but in no
+  // period: the two shared no transaction lock and still deadlocked (the merge's event move
+  // waited for the target's row the delete held), and a target row the merge added was
+  // committed between the delete's steps.
   it.each([
-    { targetRow: true, spending: true, year: 2016 },
-    { targetRow: false, spending: true, year: 2013 },
-    { targetRow: true, spending: false, year: 2011 },
-    { targetRow: false, spending: false, year: 2012 },
-  ])('both succeed, one after the other (target row: $targetRow, spending in the period: $spending)', async ({ targetRow, spending, year }) => {
+    { targetRow: true, year: 2011 },
+    { targetRow: false, year: 2012 },
+  ])('both succeed, one after the other (target row: $targetRow)', async ({ targetRow, year }) => {
     const period = await one<{ id: number; uuid: string }>(
       `INSERT INTO budget_period (name, month, month_number, year, start_date, end_date)
        VALUES ($1, 'July', 7, $2, make_date($2, 7, 1), make_date($2, 7, 31)) RETURNING id, uuid`,
@@ -103,11 +102,11 @@ describe('A budget item merge and a budget period delete at once', () => {
       [itemRow.id, item.id]
     );
     const account = await one<{ id: number }>(`INSERT INTO accounts (name, account_type, account_group, type) VALUES ('Checking', 'checking', 'cash', 'Asset') RETURNING id`);
-    // Spending in the period, or (without) in no period at all, so the merge still has some.
+    // Spending in no period at all, so the merge still has some, and the period can be deleted.
     await one(
       `INSERT INTO transactions (account_id, amount, transaction_date, type, description, budget_item_id, budget_period_id)
        VALUES ($1, -3, make_date($2, 7, 4), 'expense', 'Groceries', $3, $4) RETURNING id`,
-      [account.id, year, item.id, spending ? period.id : null]
+      [account.id, year, item.id, null]
     );
 
     const gate: PoolClient = await tenant.pool.connect();
@@ -131,4 +130,34 @@ describe('A budget item merge and a budget period delete at once', () => {
     const [deleted, merged] = await Promise.all([deleting!, merging!]);
     expect([`${deleted.status} ${deleted.body.code ?? ''}`.trim(), `${merged.status} ${merged.body.code ?? ''}`.trim()]).toEqual(['200', '200']);
   }, 30_000);
+
+  it('refuses to delete a period the merged item has spending in, and the merge goes through', async () => {
+    const year = 2016;
+    const period = await one<{ id: number; uuid: string }>(
+      `INSERT INTO budget_period (name, month, month_number, year, start_date, end_date)
+       VALUES ($1, 'July', 7, $2, make_date($2, 7, 1), make_date($2, 7, 31)) RETURNING id, uuid`,
+      [`July ${year}`, year]
+    );
+    const item = await one<{ id: number; uuid: string }>(`INSERT INTO budget_items (name, expense_type, rollover) VALUES ('Spent item', 'Expense', false) RETURNING id, uuid`);
+    const into = await one<{ id: number; uuid: string }>(`INSERT INTO budget_items (name, expense_type, rollover) VALUES ('Spent target', 'Expense', false) RETURNING id, uuid`);
+    await one(`INSERT INTO budget_period_items (budget_period_id, budget_item_id) VALUES ($1, $2) RETURNING id`, [period.id, item.id]);
+    const account = await one<{ id: number }>(`INSERT INTO accounts (name, account_type, account_group, type) VALUES ('Spent checking', 'checking', 'cash', 'Asset') RETURNING id`);
+    const spent = await one<{ id: number }>(
+      `INSERT INTO transactions (account_id, amount, transaction_date, type, description, budget_item_id, budget_period_id)
+       VALUES ($1, -3, make_date($2, 7, 4), 'expense', 'Groceries', $3, $4) RETURNING id`,
+      [account.id, year, item.id, period.id]
+    );
+
+    const [deleted, merged] = await Promise.all([
+      request(app).delete(`/api/budget-periods/${period.uuid}`),
+      request(app).post(`/api/budgets/items/${item.uuid}/merge`).send({ into_uuid: into.uuid }),
+    ]);
+    expect(deleted.status, JSON.stringify(deleted.body)).toBe(409);
+    expect(deleted.body).toMatchObject({ code: 'BUDGET_PERIOD_HAS_TRANSACTIONS', transaction_count: 1 });
+    expect(merged.status, JSON.stringify(merged.body)).toBe(200);
+    expect(await one('SELECT budget_period_id, budget_item_id FROM transactions WHERE id = $1', [spent.id])).toEqual({
+      budget_period_id: period.id,
+      budget_item_id: into.id,
+    });
+  });
 });

@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
 import { logger } from '../utils/logger';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, Search, Plus, Trash2, Calendar } from 'lucide-react';
+import { RefreshCw, Search, Plus, Trash2, Calendar, Archive, ArchiveRestore } from 'lucide-react';
 import { useConfirmation } from '../hooks/useConfirmation';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import SettingsPageHeader from '../components/SettingsPageHeader';
 import { toast } from 'react-hot-toast';
-import { useBudgetPeriodsManagementQuery, useDeleteBudgetPeriodMutation } from '../hooks/queries';
+import {
+  useArchiveBudgetPeriodMutation,
+  useBudgetPeriodsManagementQuery,
+  useDeleteBudgetPeriodMutation,
+  useRestoreBudgetPeriodMutation,
+} from '../hooks/queries';
 import type { BudgetPeriodManagement } from '../services/api';
 import { calendarMonthKey, formatCalendarDate } from '../utils/dateUtils';
 import { Card, Box, Flex, Grid, Text, Button, TextField, IconButton, Table, Badge } from '@radix-ui/themes';
@@ -20,12 +25,60 @@ const BudgetPeriodsPage: React.FC = () => {
   const budgetPeriods = data?.periods ?? [];
   const stats = data?.stats ?? null;
   const deletePeriodMutation = useDeleteBudgetPeriodMutation();
+  const archivePeriodMutation = useArchiveBudgetPeriodMutation();
+  const restorePeriodMutation = useRestoreBudgetPeriodMutation();
   const [searchTerm, setSearchTerm] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
+  const archivedCount = budgetPeriods.filter((period) => period.archived_at).length;
+
+  const archivePeriod = async (period: BudgetPeriodManagement) => {
+    try {
+      await archivePeriodMutation.mutateAsync(period.uuid);
+      toast.success(`"${period.name}" archived: it no longer shows in the period pickers`);
+    } catch (error) {
+      logger.error({ err: error, periodUuid: period.uuid }, 'Failed to archive budget period');
+      toast.error(apiErrorMessage(error, 'Failed to archive budget period'));
+    }
+  };
+
+  const restorePeriod = async (period: BudgetPeriodManagement) => {
+    try {
+      await restorePeriodMutation.mutateAsync(period.uuid);
+      toast.success(`"${period.name}" restored to the period pickers`);
+    } catch (error) {
+      logger.error({ err: error, periodUuid: period.uuid }, 'Failed to restore budget period');
+      toast.error(apiErrorMessage(error, 'Failed to restore budget period'));
+    }
+  };
+
+  // A period with transactions can't be deleted (the server refuses it): it can be archived,
+  // which hides it and keeps its transactions and budget.
+  const offerArchive = async (period: BudgetPeriodManagement) => {
+    const count = Number(period.transaction_count);
+    const confirmed = await confirmAsync({
+      title: "This period can't be deleted",
+      message: `"${period.name}" has ${count} ${count === 1 ? 'transaction' : 'transactions'}, so it can't be deleted.${
+        period.archived_at ? '' : ' Archive it to hide it from the period pickers instead.'
+      }`,
+      variant: 'warning',
+      confirmText: period.archived_at ? 'OK' : 'Archive Period',
+      cancelText: period.archived_at ? 'Close' : 'Keep Period',
+      icon: <Archive size={24} />,
+      details: period.archived_at
+        ? ['It is archived already: it doesn\'t show in the period pickers']
+        : ['Its transactions stay in it', 'Its budget and every envelope balance stay as they are', 'You can restore it at any time'],
+    });
+    if (confirmed && !period.archived_at) await archivePeriod(period);
+  };
 
   const handleDeletePeriod = async (period: BudgetPeriodManagement) => {
+    if (Number(period.transaction_count) > 0) {
+      await offerArchive(period);
+      return;
+    }
     // An envelope's balance is a running total over the periods up to each one, so a
-    // later period's balance includes this one's budgets and spending.
-    const hasActivity = Number(period.transaction_count) > 0 || Number(period.budget_transaction_count) > 0;
+    // later period's balance includes this one's budgets.
+    const hasActivity = Number(period.budget_transaction_count) > 0;
     const monthOf = (p: BudgetPeriodManagement) => calendarMonthKey(p.start_date) ?? '';
     const laterPeriod = budgetPeriods.some((other) => monthOf(other) > monthOf(period));
     const confirmed = await confirmAsync({
@@ -36,11 +89,10 @@ const BudgetPeriodsPage: React.FC = () => {
       cancelText: 'Keep Period',
       icon: <Trash2 size={24} />,
       details: [
-        `${period.transaction_count} transactions will be unassociated (not deleted)`,
         `${period.budget_item_count} budget period items will be removed`,
         `${period.budget_transaction_count} budget period transactions will be deleted`,
         ...(hasActivity && laterPeriod
-          ? ["Envelope balances in later periods include this period's budgets and spending, so they will change"]
+          ? ["Envelope balances in later periods include this period's budgets, so they will change"]
           : []),
         'This action cannot be undone'
       ]
@@ -58,9 +110,24 @@ const BudgetPeriodsPage: React.FC = () => {
   };
 
   const filteredPeriods = budgetPeriods.filter(period =>
-    period.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    period.year.toString().includes(searchTerm)
+    (showArchived || !period.archived_at) &&
+    (period.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      period.year.toString().includes(searchTerm))
   );
+
+  /** Archive, or restore an archived period: one button. */
+  const archiveButton = (period: BudgetPeriodManagement, size: '2' | '3') =>
+    period.archived_at ? (
+      <IconButton onClick={() => restorePeriod(period)} color="gray" variant="ghost" size={size} aria-label={`Restore ${period.name}`}>
+        <ArchiveRestore size={size === '3' ? 20 : 16} />
+      </IconButton>
+    ) : (
+      <IconButton onClick={() => archivePeriod(period)} color="gray" variant="ghost" size={size} aria-label={`Archive ${period.name}`}>
+        <Archive size={size === '3' ? 20 : 16} />
+      </IconButton>
+    );
+  const archivedBadge = (period: BudgetPeriodManagement) =>
+    period.archived_at ? <Badge color="gray" variant="soft">Archived</Badge> : null;
 
   // A period's first and last days are calendar dates, not UTC instants.
   const formatDateRange = (startDate: string, endDate: string) =>
@@ -111,7 +178,13 @@ const BudgetPeriodsPage: React.FC = () => {
               </TextField.Slot>
             </TextField.Root>
           </Box>
-          <Flex align="center" justify={{ initial: 'between', sm: 'start' }} gap="4">
+          <Flex align="center" justify={{ initial: 'between', sm: 'start' }} gap="4" wrap="wrap">
+            {archivedCount > 0 && (
+              <Button variant="soft" color="gray" aria-pressed={showArchived} onClick={() => setShowArchived((shown) => !shown)}>
+                <Archive size={16} />
+                {showArchived ? 'Hide archived' : `Show archived (${archivedCount})`}
+              </Button>
+            )}
             <Text size="2" color="gray">
               Total: <Text weight="medium" color="gray" highContrast>{filteredPeriods.length}</Text>
             </Text>
@@ -158,21 +231,26 @@ const BudgetPeriodsPage: React.FC = () => {
                   {/* Header */}
                   <Flex align="start" justify="between" mb="3">
                     <Flex direction="column" gap="1" flexGrow="1" minWidth="0">
-                      <Text size="3" weight="bold" className="truncate">{period.name}</Text>
+                      <Flex align="center" gap="2" minWidth="0">
+                        <Text size="3" weight="bold" className="truncate">{period.name}</Text>
+                        {archivedBadge(period)}
+                      </Flex>
                       <Text size="2" color="gray">
                         {period.month_number}/{period.year}
                       </Text>
                     </Flex>
-                    <IconButton
-                      onClick={() => handleDeletePeriod(period)}
-                      color="red"
-                      variant="ghost"
-                      size="3"
-                      aria-label={`Delete ${period.name}`}
-                      className="shrink-0"
-                    >
-                      <Trash2 size={20} />
-                    </IconButton>
+                    <Flex gap="3" flexShrink="0">
+                      {archiveButton(period, '3')}
+                      <IconButton
+                        onClick={() => handleDeletePeriod(period)}
+                        color="red"
+                        variant="ghost"
+                        size="3"
+                        aria-label={`Delete ${period.name}`}
+                      >
+                        <Trash2 size={20} />
+                      </IconButton>
+                    </Flex>
                   </Flex>
 
                   {/* Date Range */}
@@ -230,7 +308,10 @@ const BudgetPeriodsPage: React.FC = () => {
                   <Table.Row key={period.id}>
                     <Table.Cell>
                       <Flex direction="column" gap="1">
-                        <Text size="2" weight="medium">{period.name}</Text>
+                        <Flex align="center" gap="2">
+                          <Text size="2" weight="medium">{period.name}</Text>
+                          {archivedBadge(period)}
+                        </Flex>
                         <Text size="1" color="gray">
                           {period.year}-{period.month_number.toString().padStart(2, '0')}
                         </Text>
@@ -262,15 +343,18 @@ const BudgetPeriodsPage: React.FC = () => {
                       </Badge>
                     </Table.Cell>
                     <Table.Cell justify="end">
-                      <IconButton
-                        onClick={() => handleDeletePeriod(period)}
-                        color="red"
-                        variant="ghost"
-                        size="2"
-                        aria-label={`Delete ${period.name}`}
-                      >
-                        <Trash2 size={16} />
-                      </IconButton>
+                      <Flex gap="3" justify="end">
+                        {archiveButton(period, '2')}
+                        <IconButton
+                          onClick={() => handleDeletePeriod(period)}
+                          color="red"
+                          variant="ghost"
+                          size="2"
+                          aria-label={`Delete ${period.name}`}
+                        >
+                          <Trash2 size={16} />
+                        </IconButton>
+                      </Flex>
                     </Table.Cell>
                   </Table.Row>
                 ))}

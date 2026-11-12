@@ -8,7 +8,7 @@ import { toast } from 'react-hot-toast';
 import { logger } from '../utils/logger';
 import { todayLocal } from '../utils/dateUtils';
 import PageHeader from '../components/PageHeader';
-import { periodsNewestFirst } from '../utils/budgetPeriods';
+import { periodChoices } from '../utils/budgetPeriods';
 import { escapeCsvValue } from '@nuggets/shared';
 import { saveBlob } from '../utils/saveBlob';
 import PageContainer from '../components/PageContainer';
@@ -450,7 +450,7 @@ const DataExportPage: React.FC = () => {
                 <Select.Trigger id="export-budget-period" placeholder="Choose a budget period..." />
                 <Select.Content>
                   <Select.Item value="null">No budget period</Select.Item>
-                  {periodsNewestFirst(budgetPeriods).map(period => (
+                  {periodChoices(budgetPeriods, selectedBudgetPeriodUuid).map(period => (
                     <Select.Item key={period.uuid} value={period.uuid}>
                       {period.year}-{period.month_number.toString().padStart(2, '0')} ({period.status})
                     </Select.Item>
