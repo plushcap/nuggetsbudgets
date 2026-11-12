@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { Control, FieldErrors, FieldValues, Path, Resolver } from 'react-hook-form';
+import type { Control, FieldErrors, FieldValues, Path, ResolverResult } from 'react-hook-form';
 import type { z } from 'zod';
 import type { Security } from '@nuggets/shared';
 import type { Account } from '../../services/api';
@@ -257,9 +257,12 @@ export function fieldIssueMessage(issue: { code: string; message: string }, key:
 
 /**
  * The form's resolver: refuses a submit with investmentEventProblems' messages, by control id,
- * in order (the first is the one to focus). Its context is the config's lookups.
+ * in order (the first is the one to focus). Its context is the config's lookups. It reads only
+ * the values and the context, so it takes no third argument (react-hook-form's options).
  */
-export function investmentEventResolver<T extends FieldValues, C, B>(config: InvestmentEventConfig<T, C, B>): Resolver<T, C> {
+export function investmentEventResolver<T extends FieldValues, C, B>(
+  config: InvestmentEventConfig<T, C, B>
+): (values: T, context: C | undefined) => Promise<ResolverResult<T>> {
   return async (values, context) => {
     const problems = investmentEventProblems(config, values, context as C);
     if (problems.length === 0) return { values, errors: {} };

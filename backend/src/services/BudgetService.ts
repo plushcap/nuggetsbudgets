@@ -169,7 +169,7 @@ export class BudgetService {
                 const currentCents = numericToCents(currentResult.rows[0]?.current_budget);
 
                 // Record the budget change event
-                const eventResult = await sql<{ event_uuid: string }>`SELECT record_budget_change_event(${budgetPeriodItemId}, ${periodItem.budget_item_id}, ${centsToAmount(newCents)}, ${centsToAmount(currentCents)}, ${description || `Budget updated to ${newAmount}`}, ${userId}, ${null}) as event_uuid`.execute(trx);
+                const eventResult = await sql<{ event_uuid: string }>`SELECT record_budget_change_event(${budgetPeriodItemId}, ${periodItem.budget_item_id}, ${centsToAmount(newCents)}, ${centsToAmount(currentCents)}, ${description || `Budget updated to ${newAmount}`}, ${userId}, NULL) as event_uuid`.execute(trx);
 
                 return {
                     success: true,
@@ -351,7 +351,7 @@ export class BudgetService {
         const description = previousCents === 0
             ? `Starting balance for ${item.name}: ${centsToAmount(nextCents)}`
             : `Starting balance for ${item.name} changed from ${centsToAmount(previousCents)} to ${centsToAmount(nextCents)}`;
-        const { rows } = await sql<{ event_uuid: string }>`SELECT record_budget_change_event(${periodItemId}::int, ${item.id}::int, ${centsToAmount(nextCents)}::numeric, ${centsToAmount(previousCents)}::numeric, ${description}, ${userId ?? null}::int, ${null}::uuid, 'starting_balance') AS event_uuid`.execute(trx);
+        const { rows } = await sql<{ event_uuid: string }>`SELECT record_budget_change_event(${periodItemId}::int, ${item.id}::int, ${centsToAmount(nextCents)}::numeric, ${centsToAmount(previousCents)}::numeric, ${description}, ${userId ?? null}::int, NULL::uuid, 'starting_balance') AS event_uuid`.execute(trx);
         logger.info({ budgetItemId: item.id, periodItemId }, 'Recorded a starting balance change');
         return oneRow(rows, 'record_budget_change_event').event_uuid;
     }

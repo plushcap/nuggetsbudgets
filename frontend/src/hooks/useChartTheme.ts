@@ -116,9 +116,12 @@ const toHex = (value: string): string => {
   }
   if (!probe || !value) return value;
   probe.clearRect(0, 0, 1, 1);
-  probe.fillStyle = '#000';
+  // Drawn from the canvas's default state, black: a colour the canvas can't read, which it
+  // ignores, comes out black, not as the colour drawn before it.
+  probe.save();
   probe.fillStyle = value;
   probe.fillRect(0, 0, 1, 1);
+  probe.restore();
   // A 1px image's data is its 4 bytes (RGBA).
   const [r = 0, g = 0, b = 0] = probe.getImageData(0, 0, 1, 1).data;
   return `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
