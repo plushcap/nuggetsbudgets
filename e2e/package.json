@@ -1,0 +1,20 @@
+{
+  "name": "nuggets-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "End-to-end tests: Playwright drives the built frontend against the built backend. Run them with e2e/run.sh, whose header says what it needs.",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "^26.6.6",
+    "typescript": "^5.8.3"
+  }
+}

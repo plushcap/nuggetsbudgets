@@ -1,0 +1,81 @@
+# Monthly dependency updates, in as few pull requests as possible: every pull request
+# runs the full CI suite, which costs Actions minutes. Security updates don't wait for
+# the schedule.
+#
+# The npm entry lists every package directory, so each group is one pull request across
+# all of them: one for every minor and patch update in the repo, one for a vitest major,
+# and so on. The packages are an npm workspace: its root, /, holds the one
+# package-lock.json for shared, mcp, backend, frontend and e2e, and Dependabot updates their
+# package.json files and that lockfile together from it. /frontend/static-server is a
+# package of its own, with its own lockfile. A major outside a group comes as one pull
+# request per dependency and directory. The open pull request limit covers the whole entry,
+# so it is high enough for a month's groups and majors; past it, the rest wait for the next
+# run.
+#
+# Packages that must move together share a group, which takes every update type, so a
+# major arrives as one pull request rather than one per package that can't install
+# alone (vitest 5 with @vitest/coverage-v8 4, or @typescript-eslint/eslint-plugin 8
+# with parser 6, failed npm ci). A dependency matching several groups goes to the most
+# specific one, and Dependabot ranks a group without patterns above a wildcard like
+# "@vitest/*", so the catch-all groups say patterns: ["*"], which ranks lowest.
+#
+# Majors that are whole-project moves are ignored here and made deliberately:
+# - Node (26 today): the runtime is pinned in .nvmrc, engines, the Dockerfiles, ci-cd.yml
+#   and docker-images.yml together (CLAUDE.md), so neither the node image's major nor
+#   @types/node's moves alone. Patch and digest updates within the major still come.
+# - PostgreSQL: a new major needs the data directory upgraded and the backend's
+#   postgresql-client-18 moved with it.
+# - typescript 7 (the native compiler) and Express 6 are migrations, not bumps.
+#
+# Images are pinned as tag@digest. Dependabot moves both: a new digest for the same tag
+# (the monthly rebuild with OS security fixes) or a newer tag. Each image entry has one
+# group for every update it doesn't ignore, so the month's image updates are one pull
+# request per entry; changes to the Dockerfiles and compose files also run the image
+# build and smoke test (docker-images.yml).
+version: 2
+updates:
+  # / is the workspace (every package but the static server); /frontend/static-server
+  # holds the frontend image's static file server (`serve`).
+  - package-ecosystem: npm
+    directories: [/, /frontend/static-server]
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 10
+    groups:
+      typescript-eslint: { patterns: ["@typescript-eslint/*", "typescript-eslint"] }
+      vitest: { patterns: ["vitest", "@vitest/*"] }
+      minor-and-patch: { patterns: ["*"], update-types: [minor, patch] }
+    ignore:
+      - { dependency-name: "@types/node", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "typescript", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "express", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "@types/express", update-types: ["version-update:semver-major"] }
+  # Base images in Dockerfile.postgres (/), backend/Dockerfile.* and frontend/Dockerfile.*.
+  - package-ecosystem: docker
+    directories: [/, /backend, /frontend]
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 5
+    groups:
+      base-images: { patterns: ["*"] }
+    ignore:
+      - { dependency-name: "node", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "postgres", update-types: ["version-update:semver-major"] }
+  # Images the compose files run as they are: postgres in docker-compose.yml, Dozzle and
+  # the socket proxy in docker-compose.yml and docker-compose.portainer.yml. The Nuggets
+  # images' tag is ${NUGGETS_IMAGE_TAG:-latest}, which Dependabot leaves alone.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 5
+    groups:
+      compose-images: { patterns: ["*"] }
+    ignore:
+      - { dependency-name: "postgres", update-types: ["version-update:semver-major"] }
+  # The workflows pin each action to a full commit SHA with its version as a comment
+  # (`uses: actions/checkout@<sha> # v7.0.1`; ci-cd.yml's deploy-lint checks it), and
+  # Dependabot updates the SHA and the comment together. The linter images deploy-lint runs
+  # with `docker run` (shellcheck, hadolint, actionlint) are bumped by hand.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+    groups:
+      actions: { patterns: ["*"] }

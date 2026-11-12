@@ -1,0 +1,35 @@
+# Override for scripts/smoke-test.sh, applied on top of docker-compose.portainer.yml so
+# the smoke test runs the deployment manifest itself, beside anything else on the host:
+# no fixed container or network names (the compose project scopes them), no external
+# networks to create first, and the ports the test talks to published on loopback only.
+services:
+  postgres:
+    container_name: !reset null
+  backend:
+    container_name: !reset null
+    ports:
+      - "127.0.0.1:${SMOKE_BACKEND_PORT:-15000}:${BACKENDPORT:-5000}"
+  frontend:
+    container_name: !reset null
+    ports:
+      - "127.0.0.1:${SMOKE_FRONTEND_PORT:-13000}:${FRONTENDPORT:-3000}"
+  socket-proxy:
+    container_name: !reset null
+    environment:
+      # Listen on IPv4 only: the default [::] listener fails where Docker has no IPv6
+      # (some CI and sandbox hosts). Nothing here tests IPv6.
+      DISABLE_IPV6: "1"
+  dozzle:
+    container_name: !reset null
+    ports: !override
+      - "127.0.0.1:${SMOKE_DOZZLE_PORT:-13200}:8080"
+
+networks:
+  frontend:
+    external: !reset false
+    name: !reset null
+  admin:
+    external: !reset false
+    name: !reset null
+  nuggets:
+    name: !reset null

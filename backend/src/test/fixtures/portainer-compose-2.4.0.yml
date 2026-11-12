@@ -1,0 +1,572 @@
+# PORTAINER DEPLOYMENT CONFIGURATION
+# This file is optimized for Portainer stack deployment
+#
+# INSTRUCTIONS FOR PORTAINER:
+# 1. While the images are private, give Portainer access to the GitHub Container Registry
+#    (Registries > Add Registry; docs/DEPLOYMENT.md §6)
+# 2. Create the external networks ONCE on the host (compose will not create them):
+#      docker network create frontend
+#      docker network create admin
+# 3. Create a new stack in Portainer
+# 4. Copy and paste this entire file into the web editor
+# 5. Configure environment variables in the Portainer environment variables section
+# 6. Deploy the stack
+#
+# REQUIRED ENVIRONMENT VARIABLES IN PORTAINER:
+# - SECRETS_BASE_PATH (example: /opt/nuggets/secrets)
+# - POSTGRES_DATA_PATH (example: /opt/nuggets/data/postgres)
+# - DOMAIN_URL (example: https://your-domain.com)
+# - UPLOADS_PATH (example: /opt/nuggets/data/uploads)
+# - BACKUPS_PATH (example: /opt/nuggets/data/backups)
+# - TEMP_PATH (example: /opt/nuggets/data/temp)
+# - LOGS_PATH (example: /opt/nuggets/data/logs)
+#
+# OPTIONAL: BACKENDPORT (default 5000), FRONTENDPORT (default 3000), and every backend
+# setting in docs/DEPLOYMENT.md §7: the backend's environment: block below passes each one
+# from the stack's environment, with its default.
+#
+# LOGGING:
+# Every container's logs use the json-file driver (rotated: max-size 20m x max-file 10
+# per service) and are viewed in real time with Dozzle, published on DOZZLEPORT
+# (default 3200) and on the external `admin` network (reverse-proxy/admin plane).
+# Dozzle reads the Docker API through the read-only `socket-proxy` allowlist —
+# no container in this stack mounts the raw socket except the proxy itself.
+# No Loki/Promtail/Grafana stack.
+#
+# Dozzle shows ALL container logs (emails, IPs, security events), so it asks for a
+# sign-in: its users are the ${SECRETS_BASE_PATH}/dozzle_users.yml secret, which must
+# exist before the stack deploys, like the other secret files (docs/DEPLOYMENT.md §5,
+# §12): without it the stack does not deploy.
+#
+# OPTIONAL DOZZLE ENVIRONMENT VARIABLE:
+# - DOZZLEPORT (default: 3200)
+#
+# IMAGE VERSION:
+# - NUGGETS_IMAGE_TAG (default: latest) — the tag of the three Nuggets images. Set it to
+#   a release (e.g. 1.4.2) to run that version until you change it: "Re-pull image and
+#   redeploy" then re-pulls that tag, not whatever `latest` has become. Each release
+#   tag v1.4.2 publishes the images as 1.4.2, 1.4 (moves with each patch release) and latest
+#   (the release tagged last); each build is also sha-<commit>, and `main` is the newest build of
+#   main. Going back to an earlier release takes rolling back its migrations first
+#   (docs/DEPLOYMENT.md §15.2). The other images in this file are pinned by version and digest.
+#
+# OPTIONAL RESOURCE LIMITS (defaults in parentheses):
+# A per-container cpus limit above the host's vCPU count is REJECTED at deploy
+# ("range of CPUs is from 0.01 to N.00"). On a small host (one vCPU,
+# say) set POSTGRES_CPU_LIMIT=1.
+# - POSTGRES_CPU_LIMIT (2.0) / POSTGRES_MEM_LIMIT (2G)
+# - BACKEND_CPU_LIMIT (1.0)  / BACKEND_MEM_LIMIT (1G)
+# - FRONTEND_CPU_LIMIT (0.5) / FRONTEND_MEM_LIMIT (512M)
+#
+# OPTIONAL POSTGRES TUNING (defaults in parentheses, sized for POSTGRES_MEM_LIMIT=2G;
+# with less memory, keep shared_buffers near a quarter of the limit, DEPLOYMENT.md §7):
+# - POSTGRES_SHARED_BUFFERS (512MB) / POSTGRES_EFFECTIVE_CACHE_SIZE (1536MB)
+# - POSTGRES_WORK_MEM (16MB) / POSTGRES_MAINTENANCE_WORK_MEM (128MB)
+# - POSTGRES_LOG_MIN_DURATION (500ms): log statements slower than this
+
+secrets:
+  # Data-at-rest key: backups, the SimpleFin access URL, and OneDrive tokens.
+  # Renamed from backup_encryption_key for accuracy (the backend still reads the
+  # old mount path as a deprecated fallback).
+  data_encryption_key:
+    file: ${SECRETS_BASE_PATH}/data_encryption_key.txt
+  db_password:
+    file: ${SECRETS_BASE_PATH}/db_password.txt
+  # Serving role (nuggets_app) password — the unprivileged, RLS-enforced DB role the app
+  # connects as (multi-tenancy role split, ADR 0001 §5.1/§D). Provision a non-empty value
+  # in ${SECRETS_BASE_PATH}/app_db_password.txt before updating the stack (DEPLOYMENT.md §5).
+  app_db_password:
+    file: ${SECRETS_BASE_PATH}/app_db_password.txt
+  jwt_secret:
+    file: ${SECRETS_BASE_PATH}/jwt_secret.txt
+  session_secret:
+    file: ${SECRETS_BASE_PATH}/session_secret.txt
+  csrf_secret:
+    file: ${SECRETS_BASE_PATH}/csrf_secret.txt
+  smtp_password:
+    file: ${SECRETS_BASE_PATH}/smtp_password.txt
+  # Dozzle's sign-in: its users and their bcrypt password hashes, written with
+  # `dozzle generate` (docs/DEPLOYMENT.md §5).
+  dozzle_users:
+    file: ${SECRETS_BASE_PATH}/dozzle_users.yml
+
+services:
+  postgres:
+    # Postgres with the baseline schema (backend/init.sql) baked into
+    # /docker-entrypoint-initdb.d/ — no init.sql bind mount needed, so a fresh
+    # deploy initializes on any method (Web editor, Repository, plain compose).
+    # Built + published by .github/workflows (Dockerfile.postgres).
+    image: ghcr.io/previous-owner/nuggets-postgres:${NUGGETS_IMAGE_TAG:-latest}
+    container_name: nuggets_postgres
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+
+    # USER SECURITY: Run as nuggets_postgres user
+    user: "${POSTGRES_USER_ID:-1999}:${POSTGRES_USER_ID:-1999}"
+
+    # FILESYSTEM SECURITY: PostgreSQL needs write access to data
+    read_only: false
+
+    # TEMPORARY FILESYSTEMS: Memory-based temp directories
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+      - /var/run/postgresql:noexec,nosuid,size=100m
+
+    # PROCESS SECURITY: Prevent privilege escalation
+    security_opt:
+      - no-new-privileges:true
+
+    # CAPABILITY RESTRICTIONS: Minimal required capabilities
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nuggets_db}
+      POSTGRES_USER: ${POSTGRES_USER:-nuggetsApp_user}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      # Every container runs UTC (initdb takes the cluster's default zone from TZ). The
+      # household's time zone, which decides what "today" is, is the application_timezone
+      # setting in General Settings, not TZ (DEPLOYMENT.md, Time zones).
+      TZ: UTC
+
+    # Server settings: memory for a small host instead of the stock 128MB, slow
+    # statements logged (without their parameters, which can be personal data), lock
+    # waits logged, pg_stat_statements collecting (DEPLOYMENT.md §12 says how to read
+    # it), and a server-wide end to a transaction left idle (the backend sets its own,
+    # 5 min). Every value can be overridden with the variables in the header.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=${POSTGRES_SHARED_BUFFERS:-512MB}
+      - -c
+      - effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-1536MB}
+      - -c
+      - work_mem=${POSTGRES_WORK_MEM:-16MB}
+      - -c
+      - maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-128MB}
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - log_min_duration_statement=${POSTGRES_LOG_MIN_DURATION:-500ms}
+      - -c
+      - log_parameter_max_length=0
+      - -c
+      - log_lock_waits=on
+      - -c
+      - "log_line_prefix=%m [%p] %q%u@%d %a: "
+      - -c
+      - idle_in_transaction_session_timeout=10min
+      - -c
+      - timezone=UTC
+
+    # Docker's default 64MB /dev/shm is too small for parallel queries' shared memory.
+    shm_size: 256mb
+
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ${BACKUPS_PATH}:/backups
+      # No init.sql mount — the baseline schema is baked into the postgres image
+      # above (Dockerfile.postgres) and runs on a fresh data dir automatically.
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nuggetsApp_user} -d ${POSTGRES_DB:-nuggets_db}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    secrets:
+      - db_password
+
+    networks:
+       - nuggets
+    deploy:
+      resources:
+        limits:
+          # Override on small hosts, e.g. a 1-vCPU host: set POSTGRES_CPU_LIMIT=1.
+          # A per-container cpus limit ABOVE the host's vCPU count is rejected at deploy.
+          memory: ${POSTGRES_MEM_LIMIT:-2G}
+          cpus: '${POSTGRES_CPU_LIMIT:-2.0}'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+
+  backend:
+    # GitHub Container Registry: a login is needed while the packages are private
+    # (docs/DEPLOYMENT.md §6).
+    image: ghcr.io/previous-owner/nuggets-backend:${NUGGETS_IMAGE_TAG:-latest}
+    container_name: nuggets_backend
+    restart: unless-stopped
+    # Time to let a running backup or restore finish, or stop it cleanly, before Docker
+    # kills the container (Docker's default is 10 s; the backend waits up to 55 s).
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+
+    # USER SECURITY: Run as nuggets user
+    user: "${NUGGETS_USER_ID:-1001}:${NUGGETS_USER_ID:-1001}"
+
+    # FILESYSTEM SECURITY: Backend needs write access for uploads
+    read_only: false
+
+    # TEMPORARY FILESYSTEMS: Memory-based temp directories
+    tmpfs:
+      - /tmp:noexec,nosuid,size=200m
+      - /var/tmp:noexec,nosuid,size=200m
+
+    # PROCESS SECURITY: Prevent privilege escalation
+    security_opt:
+      - no-new-privileges:true
+
+    # CAPABILITY RESTRICTIONS: Minimal required capabilities
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - FOWNER
+      - DAC_OVERRIDE
+
+    # Every backend setting in docs/DEPLOYMENT.md §7, taken from the stack's environment with
+    # its default (docker-compose.prod.yml has the same block; config.test.ts fails when a
+    # setting is missing from either). A container gets only the variables named here.
+    environment:
+      # ---- Server ----
+      NODE_ENV: production
+      PORT: ${BACKENDPORT:-5000}
+      DOMAIN_URL: ${DOMAIN_URL}
+      CLIENT_URL: ${CLIENT_URL:-${DOMAIN_URL}}
+      # Proxies in front of the backend: true (1, Caddy), 2 behind a CDN too, or their CIDRs.
+      TRUST_PROXY: "${TRUST_PROXY:-true}"
+      # Production cookies are always Secure: "false" is ignored, with a warning.
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
+      HSTS_INCLUDE_SUBDOMAINS: ${HSTS_INCLUDE_SUBDOMAINS:-false}
+      HSTS_PRELOAD: ${HSTS_PRELOAD:-false}
+      # Leave false: the test-data generator's "delete" wipes the whole active ledger.
+      ENABLE_TEST_DATA: ${ENABLE_TEST_DATA:-false}
+      USE_DOCKER_SECRETS: "true"
+      # Auto-apply pending DB migrations on container start (set to "false" to
+      # boot without migrating — e.g. as a recovery kill switch).
+      RUN_MIGRATIONS: "${RUN_MIGRATIONS:-true}"
+      TZ: UTC
+      # ---- Passwords and sessions ----
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      MIN_PASSWORD_LENGTH: ${MIN_PASSWORD_LENGTH:-12}
+      REQUIRE_PASSWORD_COMPLEXITY: ${REQUIRE_PASSWORD_COMPLEXITY:-false}
+      PASSWORD_BREACH_CHECK: ${PASSWORD_BREACH_CHECK:-false}
+      # Sign-in sessions end after this many hours unused, and this many days after
+      # sign-in however often they are used (DEPLOYMENT.md, Application).
+      SESSION_IDLE_HOURS: ${SESSION_IDLE_HOURS:-72}
+      SESSION_ABSOLUTE_DAYS: ${SESSION_ABSOLUTE_DAYS:-30}
+      # ---- Passkeys ----
+      WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Nuggets}
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-}  # default: the host of DOMAIN_URL
+      WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-}  # default: the origin of DOMAIN_URL
+      # required: a passkey must check a PIN or biometric; preferred also takes keys without one.
+      WEBAUTHN_USER_VERIFICATION: ${WEBAUTHN_USER_VERIFICATION:-required}
+      # ---- Rate limits ----
+      # Formerly useAPIRateLimiting, still honoured for one release.
+      API_RATE_LIMITING: ${API_RATE_LIMITING:-${useAPIRateLimiting:-true}}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-300000}
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-500}
+      # Its old name, still read for one release (and, when set, it wins).
+      APIRateLimit: ${APIRateLimit:-}
+      RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-10}
+      RATE_LIMIT_AUTH_WINDOW_MS: ${RATE_LIMIT_AUTH_WINDOW_MS:-900000}
+      RATE_LIMIT_PASSKEY_OPTIONS_MAX: ${RATE_LIMIT_PASSKEY_OPTIONS_MAX:-30}
+      # ---- Database ----
+      # The stack's postgres service; another server's for an external one (DEPLOYMENT.md §14.1).
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-}  # default: POSTGRES_DB
+      # The database the postgres service creates, and the one the backend uses unless DB_NAME says.
+      POSTGRES_DB: ${POSTGRES_DB:-nuggets_db}
+      # Serving role: the unprivileged, RLS-enforced nuggets_app role (multi-tenancy role
+      # split — ADR 0001 §5.1/§D). RLS only enforces when the app connects as a NOSUPERUSER
+      # NOBYPASSRLS role; the bootstrap owner (POSTGRES_USER) is a superuser and bypasses RLS.
+      # Its password is the app_db_password secret. Requires app_db_password.txt to exist.
+      DB_USER: ${DB_USER:-nuggets_app}
+      # Migration/DDL/backup role — the schema owner (superuser). Runs migrations and
+      # whole-DB pg_dump/restore (a superuser dump captures every tenant's rows). Defaults to
+      # the bootstrap owner; set explicitly if you customized POSTGRES_USER.
+      MIGRATION_DB_USER: ${MIGRATION_DB_USER:-nuggetsApp_user}
+      BACKUP_DB_USER: ${BACKUP_DB_USER:-}  # default: MIGRATION_DB_USER
+      DB_MAINTENANCE_NAME: ${DB_MAINTENANCE_NAME:-postgres}
+      # Leave unset. "true" starts the backend even as a role that bypasses RLS, but only
+      # while there is at most one ledger (DEPLOYMENT.md, Database).
+      ALLOW_RLS_BYPASS_ROLE: ${ALLOW_RLS_BYPASS_ROLE:-}
+      DB_POOL_MAX: ${DB_POOL_MAX:-20}
+      DB_LOCK_TIMEOUT_MS: ${DB_LOCK_TIMEOUT_MS:-15000}
+      PGOPTIONS: ${PGOPTIONS:-}
+      # ---- Migrations ----
+      DB_WAIT_ATTEMPTS: ${DB_WAIT_ATTEMPTS:-30}
+      MIGRATION_LOCK_TIMEOUT: ${MIGRATION_LOCK_TIMEOUT:-5s}
+      MIGRATION_LOCK_RETRIES: ${MIGRATION_LOCK_RETRIES:-4}
+      MIGRATION_LOCK_WAIT_SECONDS: ${MIGRATION_LOCK_WAIT_SECONDS:-600}
+      # ---- Files and backups ----
+      BACKUP_MAX_FILE_SIZE_MB: ${BACKUP_MAX_FILE_SIZE_MB:-4096}
+      # ---- Integrations ----
+      SIMPLEFIN_ALLOWED_HOSTS: ${SIMPLEFIN_ALLOWED_HOSTS:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}  # default: the origin of an https CLIENT_URL
+      ONEDRIVE_CLIENT_ID: ${ONEDRIVE_CLIENT_ID:-}
+      ONEDRIVE_CLIENT_SECRET: ${ONEDRIVE_CLIENT_SECRET:-}
+      ONEDRIVE_REDIRECT_URI: ${ONEDRIVE_REDIRECT_URI:-}
+      # ---- Data retention (days) ----
+      RETENTION_SESSION_DAYS: ${RETENTION_SESSION_DAYS:-30}
+      RETENTION_NOTIFICATION_DAYS: ${RETENTION_NOTIFICATION_DAYS:-90}
+      RETENTION_NOTIFICATION_DELIVERY_DAYS: ${RETENTION_NOTIFICATION_DELIVERY_DAYS:-365}
+      RETENTION_SYNC_LOG_DAYS: ${RETENTION_SYNC_LOG_DAYS:-180}
+      # ---- Shutdown (below stop_grace_period, 60s) ----
+      SHUTDOWN_TIMEOUT_MS: ${SHUTDOWN_TIMEOUT_MS:-55000}
+      SHUTDOWN_DRAIN_MS: ${SHUTDOWN_DRAIN_MS:-2000}
+      # ---- Logging ----
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+    volumes:
+      - ${UPLOADS_PATH}:/app/uploads:rw
+      - ${BACKUPS_PATH}:/app/backups:rw
+      - ${TEMP_PATH}:/app/temp:rw
+      - ${LOGS_PATH}:/app/logs:rw
+
+    secrets:
+      - data_encryption_key
+      - db_password
+      - app_db_password
+      - jwt_secret
+      - session_secret
+      - csrf_secret
+      - smtp_password
+
+    # Readiness, not liveness: healthy only while the backend can serve (its database
+    # answers, its migrations are applied, its schedulers started, it isn't shutting
+    # down). The start period covers the entrypoint's wait for the database (up to 90 s).
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -fsS -o /dev/null http://localhost:$$PORT/api/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+    networks:
+      - nuggets
+      - frontend
+
+    depends_on:
+      - postgres
+
+    deploy:
+      resources:
+        limits:
+          memory: ${BACKEND_MEM_LIMIT:-1G}
+          cpus: '${BACKEND_CPU_LIMIT:-1.0}'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  frontend:
+    # GitHub Container Registry: a login is needed while the packages are private
+    # (docs/DEPLOYMENT.md §6).
+    image: ghcr.io/previous-owner/nuggets-frontend:${NUGGETS_IMAGE_TAG:-latest}
+    container_name: nuggets_frontend
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+
+    # USER SECURITY: Run as nuggets user
+    user: "${NUGGETS_USER_ID:-1001}:${NUGGETS_USER_ID:-1001}"
+
+    # FILESYSTEM SECURITY: Frontend serves static files only
+    read_only: true
+
+    # TEMPORARY FILESYSTEMS: Simple temp space for static server
+    tmpfs:
+      - /tmp:noexec,nosuid,size=50m
+
+    # PROCESS SECURITY: Prevent privilege escalation
+    security_opt:
+      - no-new-privileges:true
+
+    # CAPABILITY RESTRICTIONS: No special capabilities needed
+    cap_drop:
+      - ALL
+
+    environment:
+      NODE_ENV: production
+      TZ: UTC
+      PORT: ${FRONTENDPORT:-3000}
+
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -f http://localhost:$$PORT/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # `frontend` only: the static server talks to nothing (the browser reaches the API
+    # through the reverse proxy), so it has no way to the database on `nuggets`.
+    networks:
+      - frontend
+
+    depends_on:
+      - backend
+
+    deploy:
+      resources:
+        limits:
+          memory: ${FRONTEND_MEM_LIMIT:-512M}
+          cpus: '${FRONTEND_CPU_LIMIT:-0.5}'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+
+  # Socket proxy — the ONLY thing that touches /var/run/docker.sock. The raw
+  # socket is root-equivalent regardless of :ro (the mount flag restricts the
+  # file, not the API), so Dozzle talks to this allowlist proxy instead and is
+  # limited to the read-only endpoints it actually needs. The proxy speaks
+  # UNAUTHENTICATED tcp/2375 — it must never publish a port and lives only on
+  # the internal `dockersock` network, shared with Dozzle alone (NOT the app
+  # networks, or the app containers would inherit a log-reading API).
+  socket-proxy:
+    # Pinned by version and digest; Dependabot proposes updates monthly.
+    image: lscr.io/linuxserver/socket-proxy:3.4.7@sha256:4e5e59efd3338205561c54262581992036e5a36ccca97d487b1d4ec41f9adc58
+    container_name: nuggets_socket_proxy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+
+    # Deny-by-default allowlist; POST=0 keeps it read-only.
+    environment:
+      - CONTAINERS=1   # list and inspect containers, stats
+      - ALLOW_LOGS=1   # log streams, what Dozzle shows: denied without it since 3.4.3-ls93
+      - EVENTS=1       # container start/stop notifications
+      - INFO=1         # host/daemon info shown in Dozzle's header
+      - PING=1
+      - VERSION=1
+      - POST=0
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+    # Per the linuxserver/socket-proxy docs: read-only rootfs with /run on tmpfs.
+    # (No cap_drop here — the s6 init needs setuid/setgid to drop privileges.)
+    read_only: true
+    tmpfs:
+      - /run
+    security_opt:
+      - no-new-privileges:true
+
+    networks:
+      - dockersock
+
+
+  # Dozzle - lightweight real-time log viewer (replaces Loki/Promtail/Grafana).
+  # Reads container stdout/stderr via the Docker API — through the socket-proxy
+  # allowlist above (DOCKER_HOST), never the raw socket, so a compromised Dozzle
+  # can read logs/metadata but is no longer root-equivalent.
+  #
+  # SIGN-IN: Dozzle's own (DOZZLE_AUTH_PROVIDER=simple), with the users in the
+  # dozzle_users secret. It applies however Dozzle is reached: the published port,
+  # or a reverse proxy on the `admin` network.
+  #
+  # ACCESS: published on ${DOZZLEPORT:-3200} and joined to the external `admin`
+  # network (reverse-proxy/admin plane — create it once with
+  # `docker network create admin`). Deliberately NOT on `frontend`/`nuggets`,
+  # so app containers cannot reach the UI laterally.
+  dozzle:
+    # Pinned by version and digest; Dependabot proposes updates monthly.
+    image: amir20/dozzle:v11.4.0@sha256:d23d23ce02c8cc96416dfbad4a7de225d01fdc03ad310203d64d580034dd120d
+    container_name: nuggets_dozzle
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+
+    # USER SECURITY: plain app user — no docker-group gid needed anymore, since
+    # the socket is only touched by socket-proxy.
+    user: "${NUGGETS_USER_ID:-1001}:${NUGGETS_USER_ID:-1001}"
+
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=50m
+      # Signed-in users' settings and the sign-in session key. In memory, so they
+      # reset when the container restarts (and everyone signs in again).
+      - /data:noexec,nosuid,size=10m,uid=${NUGGETS_USER_ID:-1001},gid=${NUGGETS_USER_ID:-1001},mode=0700
+
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+    environment:
+      DOZZLE_NO_ANALYTICS: "true"
+      # Sign in as a user from /data/users.yml, the dozzle_users secret.
+      DOZZLE_AUTH_PROVIDER: simple
+      # No avatars: Dozzle would fetch each user's from Gravatar, by email hash.
+      DOZZLE_DISABLE_AVATARS: "true"
+      DOCKER_HOST: tcp://socket-proxy:2375
+      # The log viewer's zone only (its timestamps); UTC like every other container unless set.
+      TZ: ${TZ:-UTC}
+
+    secrets:
+      - source: dozzle_users
+        target: /data/users.yml
+
+    ports:
+      - ${DOZZLEPORT:-3200}:8080
+
+    networks:
+      - admin
+      - dockersock
+
+    depends_on:
+      - socket-proxy
+
+
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${POSTGRES_DATA_PATH}
+
+networks:
+  frontend:
+    external: true
+    name: frontend
+  # Admin plane: reverse proxy ↔ admin UIs (Dozzle here; Portainer joins it too).
+  # External so the separately-managed proxy can attach: `docker network create admin`.
+  admin:
+    external: true
+    name: admin
+  # App ↔ database. Internal: no route off the host, so Postgres, on this network alone,
+  # can neither reach out nor be reached from outside. The backend's outbound calls
+  # (SimpleFin, security prices, SMTP, Web Push, OneDrive) leave through `frontend`.
+  nuggets:
+    name: nuggets
+    internal: true
+  # Socket-proxy ↔ Dozzle only. Internal: no outbound routing, never shared.
+  dockersock:
+    internal: true

@@ -1,0 +1,14 @@
+// The tests and their helpers (src/**/__tests__, *.test.ts(x), src/test), with the source
+// they import. exactOptionalPropertyTypes and noUncheckedIndexedAccess are off here by
+// design: a test's wrong index or missing field already fails the test, and
+// `rows[0].x` reads plainly. tsconfig.app.json checks the source with both on;
+// `npm run type-check` runs both.
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["src"],
+  "exclude": []
+}

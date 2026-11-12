@@ -1,0 +1,193 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CSV exports: whole downloads > downloads every transaction, and a date range of them > all 1`] = `
+{
+  "body": "uuid,transaction_date,description,merchant_name,amount,type,account_name,budget_period_name,budget_item_name,assigned_to,tags,status,review_status,notes,pending,import_description,import_posted_date,import_transacted_at,import_provider,import_transaction_id,import_imported_at,created_at,updated_at
+<uuid:1>,2025-03-25,Split purchase,Corner Cafe,-20.00,expense,Joint Checking #1,,Groceries,,Coffee,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:2>,2025-03-25,Split purchase,Corner Cafe,-30.00,expense,Joint Checking #1,,Groceries,,Coffee,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:3>,2025-03-25,Split purchase,Corner Cafe,-50.00,expense,Joint Checking #1,,,,Coffee,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:4>,2025-03-20,Same day,,-12.00,expense,Joint Checking #1,,,,,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:5>,2025-03-20,Refund,,0.10,income,Joint Checking #1,,,,,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:6>,2025-03-10,"Coffee, ""large""",Corner Cafe,-0.20,expense,Joint Checking #1,March 2025,Groceries,Pat Doe,"Coffee, Weekend",cleared,reviewed,'=1+2,true,'@coffee,2025-03-11T08:30:00.000Z,2025-03-10T17:45:12.000Z,simplefin,TXN-1,,<instant>,<instant>
+<uuid:7>,2025-03-01,Opening,,1000.10,starting balance,Joint Checking #1,,,,,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:8>,2025-02-14,Gift,,250.00,income,Old Savings,,,,,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>",
+  "contentType": "text/csv",
+  "disposition": "attachment; filename="transactions_all_to_all_<today>.csv"; filename*=UTF-8''transactions_all_to_all_<today>.csv",
+  "status": 200,
+}
+`;
+
+exports[`CSV exports: whole downloads > downloads every transaction, and a date range of them > bad date 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "start_date",
+        "message": "start_date and end_date must be dates in YYYY-MM-DD form, from 1800 to 2999",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "start_date and end_date must be dates in YYYY-MM-DD form, from 1800 to 2999",
+    "requestId": "<requestId>",
+  },
+  "contentType": "application/json; charset=utf-8",
+  "disposition": null,
+  "status": 400,
+}
+`;
+
+exports[`CSV exports: whole downloads > downloads every transaction, and a date range of them > from 1`] = `
+{
+  "body": "uuid,transaction_date,description,merchant_name,amount,type,account_name,budget_period_name,budget_item_name,assigned_to,tags,status,review_status,notes,pending,import_description,import_posted_date,import_transacted_at,import_provider,import_transaction_id,import_imported_at,created_at,updated_at
+<uuid:1>,2025-03-25,Split purchase,Corner Cafe,-20.00,expense,Joint Checking #1,,Groceries,,Coffee,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:2>,2025-03-25,Split purchase,Corner Cafe,-30.00,expense,Joint Checking #1,,Groceries,,Coffee,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:3>,2025-03-25,Split purchase,Corner Cafe,-50.00,expense,Joint Checking #1,,,,Coffee,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>",
+  "contentType": "text/csv",
+  "disposition": "attachment; filename="transactions_2025-03-21_to_all_<today>.csv"; filename*=UTF-8''transactions_2025-03-21_to_all_<today>.csv",
+  "status": 200,
+}
+`;
+
+exports[`CSV exports: whole downloads > downloads every transaction, and a date range of them > none 1`] = `
+{
+  "body": "uuid,transaction_date,description,merchant_name,amount,type,account_name,budget_period_name,budget_item_name,assigned_to,tags,status,review_status,notes,pending,import_description,import_posted_date,import_transacted_at,import_provider,import_transaction_id,import_imported_at,created_at,updated_at
+",
+  "contentType": "text/csv",
+  "disposition": "attachment; filename="transactions_all_to_2025-02-01_<today>.csv"; filename*=UTF-8''transactions_all_to_2025-02-01_<today>.csv",
+  "status": 200,
+}
+`;
+
+exports[`CSV exports: whole downloads > downloads every transaction, and a date range of them > range 1`] = `
+{
+  "body": "uuid,transaction_date,description,merchant_name,amount,type,account_name,budget_period_name,budget_item_name,assigned_to,tags,status,review_status,notes,pending,import_description,import_posted_date,import_transacted_at,import_provider,import_transaction_id,import_imported_at,created_at,updated_at
+<uuid:4>,2025-03-20,Same day,,-12.00,expense,Joint Checking #1,,,,,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:5>,2025-03-20,Refund,,0.10,income,Joint Checking #1,,,,,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:6>,2025-03-10,"Coffee, ""large""",Corner Cafe,-0.20,expense,Joint Checking #1,March 2025,Groceries,Pat Doe,"Coffee, Weekend",cleared,reviewed,'=1+2,true,'@coffee,2025-03-11T08:30:00.000Z,2025-03-10T17:45:12.000Z,simplefin,TXN-1,,<instant>,<instant>",
+  "contentType": "text/csv",
+  "disposition": "attachment; filename="transactions_2025-03-10_to_2025-03-20_<today>.csv"; filename*=UTF-8''transactions_2025-03-10_to_2025-03-20_<today>.csv",
+  "status": 200,
+}
+`;
+
+exports[`CSV exports: whole downloads > downloads one account's transactions with their running balance > all 1`] = `
+{
+  "body": "uuid,transaction_date,description,merchant_name,amount,running_balance,type,budget_period_name,budget_item_name,assigned_to,tags,status,review_status,notes,pending,import_description,import_posted_date,import_transacted_at,import_provider,import_transaction_id,import_imported_at,created_at,updated_at
+<uuid:1>,2025-03-25,Split purchase,Corner Cafe,-20.00,938.00,expense,,Groceries,,Coffee,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:2>,2025-03-25,Split purchase,Corner Cafe,-30.00,938.00,expense,,Groceries,,Coffee,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:3>,2025-03-25,Split purchase,Corner Cafe,-50.00,938.00,expense,,,,Coffee,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:4>,2025-03-20,Same day,,-12.00,988.00,expense,,,,,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:5>,2025-03-20,Refund,,0.10,1000.00,income,,,,,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:6>,2025-03-10,"Coffee, ""large""",Corner Cafe,-0.20,999.90,expense,March 2025,Groceries,Pat Doe,"Coffee, Weekend",cleared,reviewed,'=1+2,true,'@coffee,2025-03-11T08:30:00.000Z,2025-03-10T17:45:12.000Z,simplefin,TXN-1,,<instant>,<instant>
+<uuid:7>,2025-03-01,Opening,,1000.10,1000.10,starting balance,,,,,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>",
+  "contentType": "text/csv",
+  "disposition": "attachment; filename="Joint_Checking__1_transactions_all_to_all_<today>.csv"; filename*=UTF-8''Joint_Checking__1_transactions_all_to_all_<today>.csv",
+  "status": 200,
+}
+`;
+
+exports[`CSV exports: whole downloads > downloads one account's transactions with their running balance > bad date 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "end_date",
+        "message": "start_date and end_date must be dates in YYYY-MM-DD form, from 1800 to 2999",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "start_date and end_date must be dates in YYYY-MM-DD form, from 1800 to 2999",
+    "requestId": "<requestId>",
+  },
+  "contentType": "application/json; charset=utf-8",
+  "disposition": null,
+  "status": 400,
+}
+`;
+
+exports[`CSV exports: whole downloads > downloads one account's transactions with their running balance > closed account 1`] = `
+{
+  "body": "uuid,transaction_date,description,merchant_name,amount,running_balance,type,budget_period_name,budget_item_name,assigned_to,tags,status,review_status,notes,pending,import_description,import_posted_date,import_transacted_at,import_provider,import_transaction_id,import_imported_at,created_at,updated_at
+<uuid:8>,2025-02-14,Gift,,250.00,250.00,income,,,,,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>",
+  "contentType": "text/csv",
+  "disposition": "attachment; filename="Old_Savings_transactions_all_to_all_<today>.csv"; filename*=UTF-8''Old_Savings_transactions_all_to_all_<today>.csv",
+  "status": 200,
+}
+`;
+
+exports[`CSV exports: whole downloads > downloads one account's transactions with their running balance > malformed account 1`] = `
+{
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Not found",
+    "requestId": "<requestId>",
+  },
+  "contentType": "application/json; charset=utf-8",
+  "disposition": null,
+  "status": 404,
+}
+`;
+
+exports[`CSV exports: whole downloads > downloads one account's transactions with their running balance > range 1`] = `
+{
+  "body": "uuid,transaction_date,description,merchant_name,amount,running_balance,type,budget_period_name,budget_item_name,assigned_to,tags,status,review_status,notes,pending,import_description,import_posted_date,import_transacted_at,import_provider,import_transaction_id,import_imported_at,created_at,updated_at
+<uuid:1>,2025-03-25,Split purchase,Corner Cafe,-20.00,938.00,expense,,Groceries,,Coffee,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:2>,2025-03-25,Split purchase,Corner Cafe,-30.00,938.00,expense,,Groceries,,Coffee,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:3>,2025-03-25,Split purchase,Corner Cafe,-50.00,938.00,expense,,,,Coffee,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:4>,2025-03-20,Same day,,-12.00,988.00,expense,,,,,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>
+<uuid:5>,2025-03-20,Refund,,0.10,1000.00,income,,,,,pending,needs review,,false,,,,simplefin,,,<instant>,<instant>",
+  "contentType": "text/csv",
+  "disposition": "attachment; filename="Joint_Checking__1_transactions_2025-03-20_to_2025-03-31_<today>.csv"; filename*=UTF-8''Joint_Checking__1_transactions_2025-03-20_to_2025-03-31_<today>.csv",
+  "status": 200,
+}
+`;
+
+exports[`CSV exports: whole downloads > downloads one account's transactions with their running balance > unknown account 1`] = `
+{
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Account not found",
+    "message": "Account not found",
+    "requestId": "<requestId>",
+  },
+  "contentType": "application/json; charset=utf-8",
+  "disposition": null,
+  "status": 404,
+}
+`;
+
+exports[`CSV exports: whole downloads > downloads the budget items, the accounts and the merchants > accounts 1`] = `
+{
+  "body": "uuid,name,account_type,account_group,type,subtype,institution_name,account_number,routing_number,balance,import_balance,import_available_balance,import_balance_date,exclude_account_balance,hide_account,hide_transactions,close_account,is_envelope_account,require_zero_balance,custom_sort,notes,created_at,updated_at
+<uuid:11>,Joint Checking #1,checking,cash,Asset,Checking,First Bank,000123,123456789,938.00,1500.10,1400.05,2025-03-31T12:00:00.000Z,false,false,false,false,false,false,2,'=SUM(A1),<instant>,<instant>
+<uuid:12>,Old Savings,savings,cash,Asset,,,,,250.00,,,,false,true,false,true,false,false,,,<instant>,<instant>",
+  "contentType": "text/csv",
+  "disposition": "attachment; filename="accounts_<today>.csv"; filename*=UTF-8''accounts_<today>.csv",
+  "status": 200,
+}
+`;
+
+exports[`CSV exports: whole downloads > downloads the budget items, the accounts and the merchants > budget items 1`] = `
+{
+  "body": "uuid,name,expense_type,priority,type,subtype,description,category_name,merchant_name,rollover,rollover_target_amount,rollover_target_date,rollover_starting_balance,rollover_starting_balance_date,default_budget_amount,isbill,recurring_payment,recurring_payment_amount,recurring_payment_frequency,recurring_last_payment_date,recurring_next_payment_date,recurring_amount_varies,goal_target_amount,goal_target_date,icon,color,status,tags,created_at,updated_at
+<uuid:9>,Groceries,Expense,Optional,Fixed,Fixed,'+cmd,Food,Corner Cafe,true,0.00,2026-12-31,0.00,,123.45,true,true,99.99,1,,2025-04-01,false,5000.55,2027-06-30,cart,#336699,active,Weekend,<instant>,<instant>
+<uuid:10>,Salary,Income,Optional,Fixed,Fixed,,,,false,0.00,,0.00,,0.00,false,false,0.00,12,,,false,,,CreditCard,#3B82F6,archived,,<instant>,<instant>",
+  "contentType": "text/csv",
+  "disposition": "attachment; filename="budget_items_<today>.csv"; filename*=UTF-8''budget_items_<today>.csv",
+  "status": 200,
+}
+`;
+
+exports[`CSV exports: whole downloads > downloads the budget items, the accounts and the merchants > merchants 1`] = `
+{
+  "body": "id,uuid,name,merchant_website,merchant_accountid,merchant_image,notes,instructions,auto_tag_name,transaction_count,total_transaction_amount,first_transaction_date,last_transaction_date,rule_count,matching_rules,created_at,updated_at
+<merchant:1>,<uuid:13>,Corner Cafe,https://cafe.example,,,"Line one
+line ""two""",'-cmd,Coffee,2,-50.20,2025-03-10,2025-03-25,2,contains:CAFE | exact:CAFE 123,<instant>,<instant>
+<merchant:2>,<uuid:14>,Quiet Shop,,,,,,,0,0.00,,,0,,<instant>,<instant>",
+  "contentType": "text/csv",
+  "disposition": "attachment; filename="merchants_<today>.csv"; filename*=UTF-8''merchants_<today>.csv",
+  "status": 200,
+}
+`;

@@ -1,0 +1,51 @@
+name: Bug report
+description: Something doesn't work as it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. **If it's a security problem, don't file it here:** see SECURITY.md.
+        Please leave out real financial data, account numbers and secrets.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to …
+        2. Click …
+        3. See …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The release, image tag or commit you're running.
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Your role
+      description: Who were you signed in as?
+      options:
+        - Ledger member
+        - Ledger admin
+        - Organization admin
+        - Deployment admin
+        - Not signed in
+        - MCP client (token)
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant backend log lines (from `docker logs nuggets_backend` or Dozzle). Remove anything sensitive first.
+      render: text

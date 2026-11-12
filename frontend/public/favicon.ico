@@ -1,0 +1,36 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nuggetGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFD700"/>
+      <stop offset="50%" stop-color="#FFA500"/>
+      <stop offset="100%" stop-color="#FF8C00"/>
+    </linearGradient>
+    <linearGradient id="highlightGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFF00"/>
+      <stop offset="100%" stop-color="#FFD700"/>
+    </linearGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#FF8C00" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Main nugget shape -->
+  <ellipse cx="16" cy="16" rx="14" ry="13" 
+           fill="url(#nuggetGradient)" 
+           filter="url(#shadow)"
+           style="transform: rotate(15deg); transform-origin: 16px 16px;"/>
+  
+  <!-- Gold highlight -->
+  <ellipse cx="12" cy="10" rx="3" ry="2.5" 
+           fill="url(#highlightGradient)" 
+           opacity="0.7"/>
+  
+  <!-- Dollar sign -->
+  <text x="16" y="20" 
+        text-anchor="middle" 
+        font-family="Arial, sans-serif" 
+        font-size="13" 
+        font-weight="bold" 
+        fill="#8B4513"
+        style="text-shadow: 1px 1px 1px rgba(0,0,0,0.3);">$</text>
+</svg>

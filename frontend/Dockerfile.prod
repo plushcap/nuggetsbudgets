@@ -1,0 +1,78 @@
+# Production Dockerfile for the frontend.
+#
+# Build context is the REPO ROOT (not ./frontend): the builder installs the npm workspace
+# there (package.json's workspaces, one package-lock.json), as backend/Dockerfile.prod does,
+# and builds @nuggets/shared, then the frontend, which depends on it by name.
+#
+# Base images are pinned by digest, with the tag kept for readers and for Dependabot,
+# which bumps both monthly (.github/dependabot.yml).
+#
+# Multi-arch strategy (same approach as backend/Dockerfile.prod):
+# the builder runs on $BUILDPLATFORM (native, no qemu) and does every
+# `npm` / `node` invocation. The production stage only does OS package
+# installs and COPY — no `npm ci` / `npm install` under qemu, which was
+# SIGILLing (exit code 132) on multi-arch builds.
+
+ARG BUILDPLATFORM
+FROM --platform=$BUILDPLATFORM node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94 AS builder
+
+# The static file server the production stage runs: `serve`, at the version
+# frontend/static-server/package-lock.json pins (npm ci checks each package's
+# integrity hash). Pure JS, so building it here on $BUILDPLATFORM serves every arch.
+WORKDIR /opt/static-server
+COPY frontend/static-server/package.json frontend/static-server/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev --prefer-offline --no-audit --no-fund
+
+# The workspace at /app: its lockfile and shared's and the frontend's manifests first, so
+# the install layer stays cached until one of their dependencies changes. --workspace
+# installs only their dependencies, hoisted to /app/node_modules, with one Zod for the app
+# and @nuggets/shared.
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY shared/package.json shared/
+COPY frontend/package.json frontend/
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefer-offline --no-audit --no-fund --workspace shared --workspace frontend
+
+COPY shared/tsconfig.json shared/
+COPY shared/src shared/src
+COPY frontend/. frontend/
+
+# Build-time env vars for the React/Vite bundle.
+ARG REACT_APP_API_URL
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+# @nuggets/shared, then the frontend: its bundle is /app/frontend/build.
+RUN npm run build -w shared && npm run build -w frontend
+
+# ============================================================================
+# Production stage — runs on $TARGETPLATFORM. COPY only, no npm.
+# ============================================================================
+FROM node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94 AS production
+
+ENV NODE_ENV=production
+
+# curl for the healthchecks (the image's and the compose files'), dumb-init as PID 1.
+# `apk upgrade` takes the Alpine security fixes published since the pinned base image.
+RUN apk upgrade --no-cache && apk add --no-cache \
+    curl \
+    dumb-init
+
+RUN addgroup -g 1001 -S nuggets && \
+    adduser -S nuggets -u 1001 -G nuggets
+
+WORKDIR /app
+
+COPY --from=builder --chown=nuggets:nuggets /app/frontend/build ./build
+COPY --from=builder --chown=nuggets:nuggets /opt/static-server /opt/static-server
+
+# Numeric, so a runtime can tell it isn't root without reading /etc/passwd.
+USER 1001:1001
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD ["sh", "-c", "curl -fsS -o /dev/null http://localhost:${PORT:-3000}/ || exit 1"]
+
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["sh", "-c", "exec /opt/static-server/node_modules/.bin/serve -s /app/build -l ${PORT:-3000}"]

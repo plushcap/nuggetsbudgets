@@ -1,0 +1,50 @@
+# Secret scanning. CI runs gitleaks on the tree and on a pull request's commits
+# (.github/workflows/repository-checks.yml, every PR). Its default rules apply; below are the
+# exceptions that can't sit beside the value. A made-up value in a test or a workflow is
+# marked on its own line with a `gitleaks:allow` comment instead, so the reason is where the
+# value is. Never allowlist a real secret: remove it, and rotate it (it is in the history).
+title = "Nuggets"
+
+[extend]
+useDefault = true
+
+# init.sql is generated (backend/scripts/regen-init-sql.sh), so it takes no comments. Its
+# schema_migrations rows carry each migration's SHA-256 checksum, which the generic rule takes
+# for a key when the migration's name says "token" or "passkey". Allowed by the row's shape
+# alone: a `paths` entry here would skip the whole file in a directory scan (`condition` isn't
+# applied there), and a key pasted on any other line of it would pass.
+[[allowlists]]
+description = "Migration checksums in the generated baseline"
+regexTarget = "line"
+regexes = ['''^\s*\('\d{14}', '[^']*', '[0-9a-f]{64}'\)[,;]?\s*$''']
+
+# The Web Push content encoding's name, in prose.
+[[allowlists]]
+description = "Encoding names in the docs"
+stopwords = ["aes128gcm"]
+
+# The default rules don't read a password in a connection URL (postgresql://user:pass@host),
+# or in a basic-auth one (https://user:pass@host: a SimpleFin access URL is one). The password
+# runs to the URL's last @ before its host, as connection-string parsers read it, and has no
+# `/` (a URL's userinfo can't; http://localhost:5173/@vite/client has none). A whole
+# placeholder ($DB_PASSWORD, ${DB_PASSWORD:-changeme}, {password}, %(password)s, <password>,
+# ***, PASSWORD, REPLACE_ME) and the test databases' test_password don't count.
+[[rules]]
+id = "connection-url-password"
+description = "A password in a database, broker or basic-auth URL"
+regex = '''(?i)\b(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|rediss?|amqps?|https?)://[^:@\s/'"`]*:([^\s'"`/]+)@[^@\s/'"`]+'''
+secretGroup = 1
+entropy = 2
+keywords = ["postgres", "mysql", "mariadb", "mongodb", "redis", "amqp", "http"]
+
+[[rules.allowlists]]
+regexTarget = "secret"
+regexes = [
+  '''^\$[A-Z_][A-Z0-9_]*$''',
+  '''^\$\{[A-Z_][A-Z0-9_]*(:?[-=?+][^}]*)?\}$''',
+  '''^\{\w+\}$''',
+  '''^%\(\w+\)s$''',
+  '''^<[^>]+>$''',
+  '''^\*+$''',
+  '''(?i)^(password|passwd|pass|pw|secret|changeme|replace[_-]?me|your[_-]?password|test_password|\.\.\.)$''',
+]

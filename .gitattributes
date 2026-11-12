@@ -1,0 +1,17 @@
+# Text files are checked out with LF line endings on every platform, whatever
+# core.autocrlf says. A CRLF checkout breaks the shell scripts the containers run
+# (`/bin/sh^M`) and the SQL migrations whose checksums schema_migrations holds.
+* text=auto eol=lf
+
+# Binary: never converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+*.zip binary
+*.gz binary

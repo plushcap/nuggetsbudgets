@@ -1,0 +1,14 @@
+// A solution file (as the frontend's): it checks nothing itself and names the two
+// projects, so an editor opens each file in the project that holds it, a test with the
+// tests' settings rather than in a project of its own it would infer.
+// - tsconfig.build.json: the source (src/), with noUncheckedIndexedAccess on; what
+//   `npm run build` compiles.
+// - tsconfig.test.json: the tests (__tests__/) with the source they import, with that flag off.
+// `npm run type-check` checks both; a bare `tsc --noEmit` here checks nothing.
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.build.json" },
+    { "path": "./tsconfig.test.json" }
+  ]
+}

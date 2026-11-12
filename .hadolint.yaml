@@ -1,0 +1,13 @@
+# hadolint configuration, read by CI's deploy-lint job (.github/workflows/ci-cd.yml).
+#
+# Warnings and errors fail the check; info-level findings are printed only.
+failure-threshold: warning
+
+ignored:
+  # Pin versions in apt-get install / apk add. The base images are pinned by digest and
+  # bumped monthly by Dependabot; the OS packages installed on top (curl, dumb-init,
+  # ca-certificates, postgresql-client-18) come from the distribution's and PGDG's live
+  # repositories, which drop a version once its successor ships. A pinned version would
+  # break every build after the next security update rather than make one reproducible.
+  - DL3008
+  - DL3018

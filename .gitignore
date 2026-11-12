@@ -1,0 +1,107 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+.env.prod
+*.env*
+
+# Generated secrets (NEVER COMMIT)
+.env.generated
+
+# Exception: allow committed env TEMPLATES (must contain NO real secrets)
+!.env.example
+!deploy/production.env.example
+
+# Secrets and sensitive data
+secrets/
+*.key
+*.key.pub
+*.pem
+*.p12
+# Password files: Postgres's (psql, pg_dump), and the one curl and ftp read
+.pgpass
+pgpass.conf
+.netrc
+_netrc
+
+# Local test/debug artifacts (NEVER COMMIT)
+cookies.txt
+*.pfx
+
+# Build outputs
+dist/
+build/
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker
+.docker/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+# Windows download metadata (alternate data streams) copied out through WSL;
+# a ":" in a path breaks checkout on Windows
+*:Zone.Identifier
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp
+
+# Data
+*.csv
+
+# Database backups and data files (NEVER COMMIT)
+backups/
+*.sql
+# Exception: Allow schema initialization and migration files, the v2.4.0 cutover and the
+# v2.4.0 install the upgrade check loads
+!backend/init.sql
+!backend/migrations/*.sql
+!backend/upgrade/*.sql
+!backend/src/test/fixtures/v2.4.0-install.sql
+*.sql.gz
+*.dump
+*.backup
+# Encrypted backups (the backup service's nuggets_backup_*.enc)
+*.enc
+
+# Local data directories (configurable volume storage)
+data/
+
+.ds-sync/
+ds-bundle/
+# The design-sync tool's local state and config (its config names a third-party project);
+# nothing in the build or the app reads it.
+.design-sync/
+frontend/.ds-styles.bundled.css
+
+# Personal Claude Code settings (permissions and paths on one machine)
+.claude/settings.local.json
+.claude/worktrees/
+
+# User uploads (images are stored in the database; files here are legacy copies)
+backend/uploads/

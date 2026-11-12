@@ -1,0 +1,56 @@
+/* Modal scroll lock styles */
+.modal-scroll-lock {
+  overflow: hidden !important;
+  /* Prevent layout shift by maintaining the space for scrollbar */
+  padding-right: var(--scrollbar-width, 0px) !important;
+  /* Ensure the body doesn't move */
+  position: relative !important;
+}
+
+.modal-scroll-lock-fixed {
+  position: fixed !important;
+  top: var(--scroll-y, 0) !important;
+  left: var(--scroll-x, 0) !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  padding-right: 0 !important;
+}
+
+/* Prevent touch scrolling on mobile when modal is open */
+.modal-open {
+  touch-action: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Ensure modal positioning is always viewport-relative */
+.modal-backdrop {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 9999;
+}
+
+.modal-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 16px;
+  pointer-events: none;
+}
+
+.modal-dialog {
+  pointer-events: auto;
+  max-height: 90vh;
+  max-width: 448px;
+  width: 100%;
+  margin: 0;
+}

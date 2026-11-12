@@ -1,0 +1,16 @@
+{
+  // The tests with the source they import. noUncheckedIndexedAccess is off here by
+  // design: a test's wrong index already fails the test. The source is
+  // checked with the flag on by tsconfig.build.json; `npm run type-check` runs both.
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "noUncheckedIndexedAccess": false,
+    "rootDir": ".",
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": ["src/**/*", "__tests__/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

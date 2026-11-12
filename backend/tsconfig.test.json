@@ -1,0 +1,14 @@
+{
+  // The tests and their helpers (src/**/__tests__, *.test.ts, src/test), with the source
+  // they import. noUncheckedIndexedAccess is off here by design: a
+  // test's wrong index already fails the test, and `rows[0].x` reads plainly. The source is
+  // checked with the flag on by tsconfig.build.json; `npm run type-check` runs both.
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node", "vitest/globals"],
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

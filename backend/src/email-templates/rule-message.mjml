@@ -1,0 +1,46 @@
+<mjml>
+  <mj-head>
+    <mj-title>{{subject}}</mj-title>
+    <mj-preview>{{subject}}</mj-preview>
+    <mj-attributes>
+      <mj-all font-family="'Atkinson Hyperlegible', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" />
+      <mj-text padding="10px 25px" font-size="16px" line-height="24px" color="#374151" />
+      <mj-section padding="20px 0" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#f3f4f6">
+    <mj-wrapper padding="20px" background-color="#ffffff">
+
+      {{> header}}
+
+      <mj-section padding="10px 0">
+        <mj-column>
+          <mj-text font-size="24px" font-weight="700" color="#111827" padding="10px 25px 20px 25px">
+            {{heading}}
+          </mj-text>
+          {{#each paragraphs}}
+          <mj-text padding="0 25px 14px 25px">{{this}}</mj-text>
+          {{/each}}
+        </mj-column>
+      </mj-section>
+
+      <mj-section padding="10px 0 20px 0">
+        <mj-column>
+          {{> button-cta}}
+        </mj-column>
+      </mj-section>
+
+      <mj-section padding="0 0 10px 0">
+        <mj-column>
+          <mj-text align="center" padding="0 25px" font-size="13px" color="#6b7280">
+            From {{fromName}} in Nuggets.
+            <a href="{{unsubscribeUrl}}" style="color: #6b7280;">Stop these emails</a>
+          </mj-text>
+        </mj-column>
+      </mj-section>
+
+      {{> footer}}
+
+    </mj-wrapper>
+  </mj-body>
+</mjml>

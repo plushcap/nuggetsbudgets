@@ -1,0 +1,3856 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Transaction routes: whole answers > answers every route as before > attachments 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "attachments": [],
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > attachments: none 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "error": "Transaction not found",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > bulk create 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 5,
+  },
+  "body": {
+    "created": 2,
+    "dry_run": false,
+    "failed": 2,
+    "results": [
+      {
+        "index": 0,
+        "status": "created",
+        "transaction_uuid": "<uuid:18>",
+      },
+      {
+        "index": 1,
+        "reason": "duplicate external_transaction_id (an earlier row of this request)",
+        "status": "skipped",
+      },
+      {
+        "index": 2,
+        "reason": "duplicate external_transaction_id",
+        "status": "skipped",
+        "transaction_uuid": "<uuid:10>",
+      },
+      {
+        "index": 3,
+        "reason": "account not found; merchant not found",
+        "status": "failed",
+      },
+      {
+        "index": 4,
+        "reason": "amount must have at most 2 decimal places",
+        "status": "failed",
+      },
+      {
+        "index": 5,
+        "status": "created",
+        "transaction_uuid": "<uuid:19>",
+      },
+    ],
+    "skipped": 2,
+    "total": 6,
+  },
+  "status": 201,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > bulk create: again 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 5,
+  },
+  "body": {
+    "created": 0,
+    "dry_run": false,
+    "failed": 0,
+    "results": [
+      {
+        "index": 0,
+        "reason": "duplicate external_transaction_id",
+        "status": "skipped",
+        "transaction_uuid": "<uuid:18>",
+      },
+    ],
+    "skipped": 1,
+    "total": 1,
+  },
+  "status": 201,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > bulk create: dry run 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "created": 2,
+    "dry_run": true,
+    "failed": 2,
+    "results": [
+      {
+        "index": 0,
+        "status": "created",
+      },
+      {
+        "index": 1,
+        "reason": "duplicate external_transaction_id (an earlier row of this request)",
+        "status": "skipped",
+      },
+      {
+        "index": 2,
+        "reason": "duplicate external_transaction_id",
+        "status": "skipped",
+        "transaction_uuid": "<uuid:10>",
+      },
+      {
+        "index": 3,
+        "reason": "account not found; merchant not found",
+        "status": "failed",
+      },
+      {
+        "index": 4,
+        "reason": "amount must have at most 2 decimal places",
+        "status": "failed",
+      },
+      {
+        "index": 5,
+        "status": "created",
+      },
+    ],
+    "skipped": 2,
+    "total": 6,
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > bulk create: invalid 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 5,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "transactions",
+        "message": "Too small: expected array to have >=1 items",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Too small: expected array to have >=1 items",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > bulk edit: assignee outside the ledger 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "INVALID_ASSIGNEE",
+    "error": "assigned_to must be a user with access to this tenant",
+    "message": "assigned_to must be a user with access to this tenant",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > bulk edit: bad status 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "Invalid status. Must be one of: pending, cleared, reconciled",
+    "message": "Invalid status. Must be one of: pending, cleared, reconciled",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > bulk edit: budget item of no row 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "INVALID_REFERENCE",
+    "error": "budget_item_id does not name a budget item in this tenant",
+    "field": "budget_item_id",
+    "message": "budget_item_id does not name a budget item in this tenant",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > bulk edit: no allowed field 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "No valid fields to update",
+    "message": "No valid fields to update",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > bulk edit: no transaction found 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "No valid transactions found",
+    "message": "No valid transactions found",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > bulk edit: no updates 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "updates",
+        "message": "updates object is required",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "updates object is required",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > bulk edit: no uuids 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "transactionUuids",
+        "message": "transactionUuids array is required",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "transactionUuids array is required",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > bulk edit: review and assign 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "transactions": [
+      {
+        "id": "<transaction:1>",
+        "review_status": "flagged",
+        "status": "cleared",
+        "uuid": "<uuid:10>",
+      },
+      {
+        "id": "<transaction:2>",
+        "review_status": "flagged",
+        "status": "pending",
+        "uuid": "<uuid:11>",
+      },
+    ],
+    "updated": 2,
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > create: a tag id that is not one 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 1,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "tag_ids.1",
+        "message": "tag_ids must be a list of tag ids (whole numbers)",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "tag_ids must be a list of tag ids (whole numbers)",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > create: budget item id of no row 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "INVALID_REFERENCE",
+    "error": "budget_item_id does not name a budget item in this tenant",
+    "field": "budget_item_id",
+    "message": "budget_item_id does not name a budget item in this tenant",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > create: expense by uuids, tags by uuid and id 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 1,
+  },
+  "body": {
+    "message": "Transaction created successfully",
+    "transaction": {
+      "account_id": "<account:1>",
+      "account_name": "Answers checking",
+      "account_uuid": "<uuid:1>",
+      "amount": -42.5,
+      "budget_item_id": "<budget_item:1>",
+      "budget_item_name": "Groceries",
+      "budget_period_id": "<period:1>",
+      "budget_period_name": "June 2026",
+      "created_at": "<instant>",
+      "description": "Weekly shop",
+      "institution_transaction_status": null,
+      "merchant_id": "<merchant:1>",
+      "merchant_name": "Corner Market",
+      "review_status": "needs review",
+      "status": "cleared",
+      "transaction_date": "2026-06-12",
+      "type": "expense",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:10>",
+    },
+  },
+  "status": 201,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > create: income by numeric ids as strings 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 2,
+  },
+  "body": {
+    "message": "Transaction created successfully",
+    "transaction": {
+      "account_id": "<account:1>",
+      "account_name": "Answers checking",
+      "account_uuid": "<uuid:1>",
+      "amount": 1000,
+      "budget_item_id": "<budget_item:2>",
+      "budget_item_name": "Dining",
+      "budget_period_id": "<period:1>",
+      "budget_period_name": "June 2026",
+      "created_at": "<instant>",
+      "description": null,
+      "institution_transaction_status": null,
+      "merchant_id": "<merchant:1>",
+      "merchant_name": "Corner Market",
+      "review_status": "reviewed",
+      "status": "pending",
+      "transaction_date": "2026-06-01",
+      "type": "income",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:11>",
+    },
+  },
+  "status": 201,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > create: missing fields 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "account_uuid",
+        "message": "account_uuid is required",
+      },
+      {
+        "field": "amount",
+        "message": "amount is required and must be non-zero",
+      },
+      {
+        "field": "transaction_date",
+        "message": "transaction_date is required",
+      },
+      {
+        "field": "type",
+        "message": "type is required",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "account_uuid is required",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > create: payment keeps its sign 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "message": "Transaction created successfully",
+    "transaction": {
+      "account_id": "<account:2>",
+      "account_name": "Answers savings",
+      "account_uuid": "<uuid:2>",
+      "amount": -5,
+      "budget_item_id": null,
+      "budget_item_name": null,
+      "budget_period_id": null,
+      "budget_period_name": null,
+      "created_at": "<instant>",
+      "description": "",
+      "institution_transaction_status": null,
+      "merchant_id": null,
+      "merchant_name": null,
+      "review_status": "needs review",
+      "status": "cleared",
+      "transaction_date": "2026-06-20",
+      "type": "payment",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:12>",
+    },
+  },
+  "status": 201,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > create: three decimals 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "INVALID_AMOUNT",
+    "error": "amount must be a number with at most 2 decimal places",
+    "message": "amount must be a number with at most 2 decimal places",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > create: unknown account 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Account not found",
+    "message": "Account not found",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > create: unknown budget item uuid 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Budget item not found for budget_item_uuid",
+    "message": "Budget item not found for budget_item_uuid",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > create: unknown merchant uuid 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Merchant not found for merchant_uuid",
+    "message": "Merchant not found for merchant_uuid",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > create: unknown period uuid 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Budget period not found for budget_period_uuid",
+    "message": "Budget period not found for budget_period_uuid",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > create: unknown type 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "Invalid transaction type. Must be: income, expense, payment, transfer, starting balance, or balance adjustment",
+    "message": "Invalid transaction type. Must be: income, expense, payment, transfer, starting balance, or balance adjustment",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > delete: a transfer side 1`] = `
+{
+  "after": {
+    "merchants": 4,
+    "taggings": 2,
+    "transactions": 11,
+  },
+  "body": {
+    "message": "Transaction deleted successfully",
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > delete: none 1`] = `
+{
+  "after": {
+    "merchants": 4,
+    "taggings": 2,
+    "transactions": 13,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Transaction not found",
+    "message": "Transaction not found",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > delete: one split 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 6,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "This is one split of a transaction. Change the splits on that transaction, or unsplit it, instead.",
+    "message": "This is one split of a transaction. Change the splits on that transaction, or unsplit it, instead.",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > delete: the income 1`] = `
+{
+  "after": {
+    "merchants": 4,
+    "taggings": 2,
+    "transactions": 10,
+  },
+  "body": {
+    "message": "Transaction deleted successfully",
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: assignee outside the ledger 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "INVALID_ASSIGNEE",
+    "error": "assigned_to must be a user with access to this tenant",
+    "message": "assigned_to must be a user with access to this tenant",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: back to expense 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "account_id": "<account:1>",
+    "account_name": "Answers checking",
+    "account_uuid": "<uuid:1>",
+    "amount": "-40.00",
+    "assigned_to": null,
+    "budget_item_id": "<budget_item:2>",
+    "budget_item_name": "Dining",
+    "budget_matching_confidence": null,
+    "budget_matching_method": null,
+    "budget_matching_rule_id": null,
+    "budget_period_cleared_from": null,
+    "budget_period_cleared_start": null,
+    "budget_period_id": "<period:1>",
+    "budget_period_item_id": "<period_item:2>",
+    "budget_period_name": "June 2026",
+    "created_at": "<instant>",
+    "description": null,
+    "external_link": "https://example.com/r/1",
+    "external_transaction_id": "stmt-1",
+    "id": "<transaction:1>",
+    "import_amount": null,
+    "import_description": null,
+    "import_extra": null,
+    "import_imported_at": null,
+    "import_payee": null,
+    "import_pending": false,
+    "import_posted_date": null,
+    "import_provider": "simplefin",
+    "import_transacted_at": null,
+    "import_transaction_id": null,
+    "institution_transaction_status": null,
+    "is_import": false,
+    "is_split_parent": false,
+    "merchant_id": "<merchant:1>",
+    "merchant_name": "Corner Market",
+    "notes": "note",
+    "parent_transaction_id": null,
+    "review_status": "flagged",
+    "status": "cleared",
+    "synced_amount": "0.00",
+    "synced_category": null,
+    "synced_description": null,
+    "synced_location": null,
+    "synced_name": null,
+    "synced_transactiondate": "<instant>",
+    "tenant_id": "<tenant:1>",
+    "transaction_date": "2026-06-12",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": null,
+    "type": "expense",
+    "updated_at": "<instant>",
+    "uuid": "<uuid:10>",
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: bad link 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "external_link must be a valid http(s) URL",
+    "message": "external_link must be a valid http(s) URL",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: bad status 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "Invalid review_status. Must be one of: needs review, reviewed, flagged",
+    "message": "Invalid review_status. Must be one of: needs review, reviewed, flagged",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: bad type 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "Invalid transaction type. Must be: income, expense, payment, transfer, starting balance, or balance adjustment",
+    "message": "Invalid transaction type. Must be: income, expense, payment, transfer, starting balance, or balance adjustment",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: link with a user name 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "external_link must be a valid http(s) URL",
+    "message": "external_link must be a valid http(s) URL",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: merchant of no row 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "INVALID_REFERENCE",
+    "error": "merchant_id does not name a merchant in this tenant",
+    "field": "merchant_id",
+    "message": "merchant_id does not name a merchant in this tenant",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: none 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Transaction not found",
+    "message": "Transaction not found",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: nothing allowed 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "No valid fields to update",
+    "message": "No valid fields to update",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: one split amount 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 6,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "This is one split of a transaction. Change the splits on that transaction instead.",
+    "message": "This is one split of a transaction. Change the splits on that transaction instead.",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: one split budget item 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 6,
+  },
+  "body": {
+    "account_id": "<account:1>",
+    "account_name": "Answers checking",
+    "account_uuid": "<uuid:1>",
+    "amount": "-10.00",
+    "assigned_to": null,
+    "budget_item_id": "<budget_item:1>",
+    "budget_item_name": "Groceries",
+    "budget_matching_confidence": null,
+    "budget_matching_method": null,
+    "budget_matching_rule_id": null,
+    "budget_period_cleared_from": null,
+    "budget_period_cleared_start": null,
+    "budget_period_id": null,
+    "budget_period_item_id": null,
+    "budget_period_name": null,
+    "created_at": "<instant>",
+    "description": null,
+    "external_link": null,
+    "external_transaction_id": null,
+    "id": "<transaction:6>",
+    "import_amount": null,
+    "import_description": null,
+    "import_extra": null,
+    "import_imported_at": null,
+    "import_payee": null,
+    "import_pending": false,
+    "import_posted_date": null,
+    "import_provider": "simplefin",
+    "import_transacted_at": null,
+    "import_transaction_id": null,
+    "institution_transaction_status": null,
+    "is_import": false,
+    "is_split_parent": false,
+    "merchant_id": "<merchant:1>",
+    "merchant_name": "Corner Market",
+    "notes": null,
+    "parent_transaction_id": "<transaction:1>",
+    "review_status": "flagged",
+    "status": "cleared",
+    "synced_amount": "0.00",
+    "synced_category": null,
+    "synced_description": null,
+    "synced_location": null,
+    "synced_name": null,
+    "synced_transactiondate": "<instant>",
+    "tenant_id": "<tenant:1>",
+    "transaction_date": "2026-06-12",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": null,
+    "type": "expense",
+    "updated_at": "<instant>",
+    "uuid": "<uuid:15>",
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: one transfer side amount 1`] = `
+{
+  "after": {
+    "merchants": 3,
+    "taggings": 2,
+    "transactions": 9,
+  },
+  "body": {
+    "account_id": "<account:1>",
+    "account_name": "Answers checking",
+    "account_uuid": "<uuid:1>",
+    "amount": "-30.00",
+    "assigned_to": null,
+    "budget_item_id": null,
+    "budget_item_name": null,
+    "budget_matching_confidence": null,
+    "budget_matching_method": null,
+    "budget_matching_rule_id": null,
+    "budget_period_cleared_from": null,
+    "budget_period_cleared_start": null,
+    "budget_period_id": "<period:1>",
+    "budget_period_item_id": null,
+    "budget_period_name": "June 2026",
+    "created_at": "<instant>",
+    "description": null,
+    "external_link": null,
+    "external_transaction_id": null,
+    "id": "<transaction:9>",
+    "import_amount": null,
+    "import_description": null,
+    "import_extra": null,
+    "import_imported_at": null,
+    "import_payee": null,
+    "import_pending": false,
+    "import_posted_date": null,
+    "import_provider": "simplefin",
+    "import_transacted_at": null,
+    "import_transaction_id": null,
+    "institution_transaction_status": null,
+    "is_import": false,
+    "is_split_parent": false,
+    "merchant_id": "<merchant:2>",
+    "merchant_name": "Transfer: Answers savings",
+    "notes": null,
+    "parent_transaction_id": null,
+    "review_status": "reviewed",
+    "status": "pending",
+    "synced_amount": "0.00",
+    "synced_category": null,
+    "synced_description": null,
+    "synced_location": null,
+    "synced_name": null,
+    "synced_transactiondate": "<instant>",
+    "tenant_id": "<tenant:1>",
+    "transaction_date": "2026-06-16",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": "<transaction:10>",
+    "type": "transfer",
+    "updated_at": "<instant>",
+    "uuid": "<uuid:22>",
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: split parent amount 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 6,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "This transaction is split. To change its amount or type, change its splits or unsplit it first.",
+    "message": "This transaction is split. To change its amount or type, change its splits or unsplit it first.",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: split parent budget item 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 6,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "This transaction is split. Change the budget item on each split instead.",
+    "message": "This transaction is split. Change the budget item on each split instead.",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: text, link, amount and envelope 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "account_id": "<account:1>",
+    "account_name": "Answers checking",
+    "account_uuid": "<uuid:1>",
+    "amount": "-40.00",
+    "assigned_to": null,
+    "budget_item_id": "<budget_item:2>",
+    "budget_item_name": "Dining",
+    "budget_matching_confidence": null,
+    "budget_matching_method": null,
+    "budget_matching_rule_id": null,
+    "budget_period_cleared_from": null,
+    "budget_period_cleared_start": null,
+    "budget_period_id": "<period:1>",
+    "budget_period_item_id": "<period_item:2>",
+    "budget_period_name": "June 2026",
+    "created_at": "<instant>",
+    "description": null,
+    "external_link": "https://example.com/r/1",
+    "external_transaction_id": "stmt-1",
+    "id": "<transaction:1>",
+    "import_amount": null,
+    "import_description": null,
+    "import_extra": null,
+    "import_imported_at": null,
+    "import_payee": null,
+    "import_pending": false,
+    "import_posted_date": null,
+    "import_provider": "simplefin",
+    "import_transacted_at": null,
+    "import_transaction_id": null,
+    "institution_transaction_status": null,
+    "is_import": false,
+    "is_split_parent": false,
+    "merchant_id": "<merchant:1>",
+    "merchant_name": "Corner Market",
+    "notes": "note",
+    "parent_transaction_id": null,
+    "review_status": "flagged",
+    "status": "cleared",
+    "synced_amount": "0.00",
+    "synced_category": null,
+    "synced_description": null,
+    "synced_location": null,
+    "synced_name": null,
+    "synced_transactiondate": "<instant>",
+    "tenant_id": "<tenant:1>",
+    "transaction_date": "2026-06-12",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": null,
+    "type": "expense",
+    "updated_at": "<instant>",
+    "uuid": "<uuid:10>",
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: three decimals 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "INVALID_AMOUNT",
+    "error": "amount must be a number with at most 2 decimal places",
+    "message": "amount must be a number with at most 2 decimal places",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: transfer side to expense 1`] = `
+{
+  "after": {
+    "merchants": 3,
+    "taggings": 2,
+    "transactions": 9,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "This transaction is one side of a transfer, so its type can only be payment or transfer.",
+    "message": "This transaction is one side of a transfer, so its type can only be payment or transfer.",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: transfer sides to payment 1`] = `
+{
+  "after": {
+    "merchants": 3,
+    "taggings": 2,
+    "transactions": 9,
+  },
+  "body": {
+    "account_id": "<account:1>",
+    "account_name": "Answers checking",
+    "account_uuid": "<uuid:1>",
+    "amount": "-30.00",
+    "assigned_to": null,
+    "budget_item_id": null,
+    "budget_item_name": null,
+    "budget_matching_confidence": null,
+    "budget_matching_method": null,
+    "budget_matching_rule_id": null,
+    "budget_period_cleared_from": null,
+    "budget_period_cleared_start": null,
+    "budget_period_id": "<period:1>",
+    "budget_period_item_id": null,
+    "budget_period_name": "June 2026",
+    "created_at": "<instant>",
+    "description": null,
+    "external_link": null,
+    "external_transaction_id": null,
+    "id": "<transaction:9>",
+    "import_amount": null,
+    "import_description": null,
+    "import_extra": null,
+    "import_imported_at": null,
+    "import_payee": null,
+    "import_pending": false,
+    "import_posted_date": null,
+    "import_provider": "simplefin",
+    "import_transacted_at": null,
+    "import_transaction_id": null,
+    "institution_transaction_status": null,
+    "is_import": false,
+    "is_split_parent": false,
+    "merchant_id": "<merchant:2>",
+    "merchant_name": "Transfer: Answers savings",
+    "notes": null,
+    "parent_transaction_id": null,
+    "review_status": "reviewed",
+    "status": "pending",
+    "synced_amount": "0.00",
+    "synced_category": null,
+    "synced_description": null,
+    "synced_location": null,
+    "synced_name": null,
+    "synced_transactiondate": "<instant>",
+    "tenant_id": "<tenant:1>",
+    "transaction_date": "2026-06-16",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": "<transaction:10>",
+    "type": "payment",
+    "updated_at": "<instant>",
+    "uuid": "<uuid:22>",
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > edit: type to income re-signs 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "account_id": "<account:1>",
+    "account_name": "Answers checking",
+    "account_uuid": "<uuid:1>",
+    "amount": "40.00",
+    "assigned_to": null,
+    "budget_item_id": "<budget_item:2>",
+    "budget_item_name": "Dining",
+    "budget_matching_confidence": null,
+    "budget_matching_method": null,
+    "budget_matching_rule_id": null,
+    "budget_period_cleared_from": null,
+    "budget_period_cleared_start": null,
+    "budget_period_id": "<period:1>",
+    "budget_period_item_id": "<period_item:2>",
+    "budget_period_name": "June 2026",
+    "created_at": "<instant>",
+    "description": null,
+    "external_link": "https://example.com/r/1",
+    "external_transaction_id": "stmt-1",
+    "id": "<transaction:1>",
+    "import_amount": null,
+    "import_description": null,
+    "import_extra": null,
+    "import_imported_at": null,
+    "import_payee": null,
+    "import_pending": false,
+    "import_posted_date": null,
+    "import_provider": "simplefin",
+    "import_transacted_at": null,
+    "import_transaction_id": null,
+    "institution_transaction_status": null,
+    "is_import": false,
+    "is_split_parent": false,
+    "merchant_id": "<merchant:1>",
+    "merchant_name": "Corner Market",
+    "notes": "note",
+    "parent_transaction_id": null,
+    "review_status": "flagged",
+    "status": "cleared",
+    "synced_amount": "0.00",
+    "synced_category": null,
+    "synced_description": null,
+    "synced_location": null,
+    "synced_name": null,
+    "synced_transactiondate": "<instant>",
+    "tenant_id": "<tenant:1>",
+    "transaction_date": "2026-06-12",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": null,
+    "type": "income",
+    "updated_at": "<instant>",
+    "uuid": "<uuid:10>",
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > get one 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "account_class": "Asset",
+    "account_id": "<account:1>",
+    "account_name": "Answers checking",
+    "account_uuid": "<uuid:1>",
+    "amount": "-42.50",
+    "assigned_to": null,
+    "assigned_user": null,
+    "budget_item_id": "<budget_item:1>",
+    "budget_item_name": "Groceries",
+    "budget_item_uuid": "<uuid:3>",
+    "budget_matching_confidence": null,
+    "budget_matching_method": null,
+    "budget_matching_rule_id": null,
+    "budget_period_cleared_from": null,
+    "budget_period_cleared_start": null,
+    "budget_period_id": "<period:1>",
+    "budget_period_item_id": "<period_item:1>",
+    "budget_period_item_name": "Groceries",
+    "budget_period_name": "June 2026",
+    "created_at": "<instant>",
+    "description": "Weekly shop",
+    "external_link": null,
+    "external_transaction_id": "stmt-1",
+    "id": "<transaction:1>",
+    "import_amount": null,
+    "import_description": null,
+    "import_extra": null,
+    "import_imported_at": null,
+    "import_payee": null,
+    "import_pending": false,
+    "import_posted_date": null,
+    "import_provider": "simplefin",
+    "import_transacted_at": null,
+    "import_transaction_id": null,
+    "institution_transaction_status": null,
+    "is_import": false,
+    "is_split_parent": false,
+    "merchant_id": "<merchant:1>",
+    "merchant_name": "Corner Market",
+    "notes": null,
+    "parent_transaction_id": null,
+    "parent_transaction_uuid": null,
+    "review_status": "needs review",
+    "split_children": [],
+    "status": "cleared",
+    "synced_amount": "0.00",
+    "synced_category": null,
+    "synced_description": null,
+    "synced_location": null,
+    "synced_name": null,
+    "synced_transactiondate": "<instant>",
+    "tags": [
+      {
+        "color": "#3B82F6",
+        "icon": "Tag",
+        "id": "<tag:2>",
+        "name": "Kids",
+        "uuid": "<uuid:9>",
+      },
+      {
+        "color": "#123456",
+        "icon": "Tag",
+        "id": "<tag:1>",
+        "name": "Trip",
+        "uuid": "<uuid:8>",
+      },
+    ],
+    "tenant_id": "<tenant:1>",
+    "transaction_date": "2026-06-12",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": null,
+    "type": "expense",
+    "updated_at": "<instant>",
+    "uuid": "<uuid:10>",
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > get one: none 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "error": "Transaction not found",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > get one: not a uuid 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "INTERNAL_ERROR",
+    "error": "Internal server error",
+  },
+  "status": 500,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > get one: split 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 6,
+  },
+  "body": {
+    "account_class": "Asset",
+    "account_id": "<account:1>",
+    "account_name": "Answers checking",
+    "account_uuid": "<uuid:1>",
+    "amount": "-40.00",
+    "assigned_to": null,
+    "assigned_user": null,
+    "budget_item_id": null,
+    "budget_item_name": null,
+    "budget_item_uuid": null,
+    "budget_matching_confidence": null,
+    "budget_matching_method": null,
+    "budget_matching_rule_id": null,
+    "budget_period_cleared_from": null,
+    "budget_period_cleared_start": null,
+    "budget_period_id": "<period:1>",
+    "budget_period_item_id": null,
+    "budget_period_item_name": null,
+    "budget_period_name": "June 2026",
+    "created_at": "<instant>",
+    "description": null,
+    "external_link": "https://example.com/r/1",
+    "external_transaction_id": "stmt-1",
+    "id": "<transaction:1>",
+    "import_amount": null,
+    "import_description": null,
+    "import_extra": null,
+    "import_imported_at": null,
+    "import_payee": null,
+    "import_pending": false,
+    "import_posted_date": null,
+    "import_provider": "simplefin",
+    "import_transacted_at": null,
+    "import_transaction_id": null,
+    "institution_transaction_status": null,
+    "is_import": false,
+    "is_split_parent": true,
+    "merchant_id": "<merchant:1>",
+    "merchant_name": "Corner Market",
+    "notes": "note",
+    "parent_transaction_id": null,
+    "parent_transaction_uuid": null,
+    "review_status": "flagged",
+    "split_children": [
+      {
+        "amount": -10,
+        "budget_item_id": null,
+        "budget_item_name": null,
+        "budget_item_uuid": null,
+        "budget_period_id": null,
+        "budget_period_item_id": null,
+        "description": null,
+        "id": "<transaction:6>",
+        "status": "cleared",
+        "tags": [],
+        "transaction_date": "2026-06-12",
+        "type": "expense",
+        "uuid": "<uuid:15>",
+      },
+      {
+        "amount": -10,
+        "budget_item_id": null,
+        "budget_item_name": null,
+        "budget_item_uuid": null,
+        "budget_period_id": null,
+        "budget_period_item_id": null,
+        "description": null,
+        "id": "<transaction:7>",
+        "status": "cleared",
+        "tags": [],
+        "transaction_date": "2026-06-12",
+        "type": "expense",
+        "uuid": "<uuid:16>",
+      },
+      {
+        "amount": -20,
+        "budget_item_id": null,
+        "budget_item_name": null,
+        "budget_item_uuid": null,
+        "budget_period_id": null,
+        "budget_period_item_id": null,
+        "description": null,
+        "id": "<transaction:8>",
+        "status": "cleared",
+        "tags": [],
+        "transaction_date": "2026-06-12",
+        "type": "expense",
+        "uuid": "<uuid:17>",
+      },
+    ],
+    "status": "cleared",
+    "synced_amount": "0.00",
+    "synced_category": null,
+    "synced_description": null,
+    "synced_location": null,
+    "synced_name": null,
+    "synced_transactiondate": "<instant>",
+    "tags": [
+      {
+        "color": "#3B82F6",
+        "icon": "Tag",
+        "id": "<tag:2>",
+        "name": "Kids",
+        "uuid": "<uuid:9>",
+      },
+      {
+        "color": "#123456",
+        "icon": "Tag",
+        "id": "<tag:1>",
+        "name": "Trip",
+        "uuid": "<uuid:8>",
+      },
+    ],
+    "tenant_id": "<tenant:1>",
+    "transaction_date": "2026-06-12",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": null,
+    "type": "expense",
+    "updated_at": "<instant>",
+    "uuid": "<uuid:10>",
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > ledger at the end 1`] = `
+[
+  {
+    "account_id": "<account:1>",
+    "amount": "-40.00",
+    "assigned_to": null,
+    "budget_item_id": null,
+    "budget_period_id": "<period:1>",
+    "budget_period_item_id": null,
+    "description": null,
+    "external_link": "https://example.com/r/1",
+    "external_transaction_id": "stmt-1",
+    "id": "<transaction:1>",
+    "is_split_parent": false,
+    "merchant_id": "<merchant:1>",
+    "notes": "note",
+    "parent_transaction_id": null,
+    "review_status": "flagged",
+    "status": "cleared",
+    "tags": [
+      "Kids",
+      "Trip",
+    ],
+    "transaction_date": "2026-06-12",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": null,
+    "type": "expense",
+    "uuid": "<uuid:10>",
+  },
+  {
+    "account_id": "<account:2>",
+    "amount": "-5.00",
+    "assigned_to": null,
+    "budget_item_id": null,
+    "budget_period_id": null,
+    "budget_period_item_id": null,
+    "description": "",
+    "external_link": null,
+    "external_transaction_id": null,
+    "id": "<transaction:3>",
+    "is_split_parent": false,
+    "merchant_id": null,
+    "notes": null,
+    "parent_transaction_id": null,
+    "review_status": "needs review",
+    "status": "cleared",
+    "tags": [],
+    "transaction_date": "2026-06-20",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": null,
+    "type": "payment",
+    "uuid": "<uuid:12>",
+  },
+  {
+    "account_id": "<account:1>",
+    "amount": "-12.34",
+    "assigned_to": null,
+    "budget_item_id": "<budget_item:1>",
+    "budget_period_id": "<period:1>",
+    "budget_period_item_id": "<period_item:1>",
+    "description": null,
+    "external_link": null,
+    "external_transaction_id": "b-1",
+    "id": "<transaction:11>",
+    "is_split_parent": false,
+    "merchant_id": "<merchant:1>",
+    "notes": null,
+    "parent_transaction_id": null,
+    "review_status": "needs review",
+    "status": "cleared",
+    "tags": [],
+    "transaction_date": "2026-06-05",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": null,
+    "type": "expense",
+    "uuid": "<uuid:18>",
+  },
+  {
+    "account_id": "<account:2>",
+    "amount": "7.00",
+    "assigned_to": null,
+    "budget_item_id": null,
+    "budget_period_id": null,
+    "budget_period_item_id": null,
+    "description": "Refund",
+    "external_link": null,
+    "external_transaction_id": null,
+    "id": "<transaction:12>",
+    "is_split_parent": false,
+    "merchant_id": null,
+    "notes": null,
+    "parent_transaction_id": null,
+    "review_status": "needs review",
+    "status": "cleared",
+    "tags": [],
+    "transaction_date": "2026-06-06",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": null,
+    "type": "income",
+    "uuid": "<uuid:19>",
+  },
+  {
+    "account_id": "<account:1>",
+    "amount": "-100.00",
+    "assigned_to": null,
+    "budget_item_id": null,
+    "budget_period_id": "<period:1>",
+    "budget_period_item_id": null,
+    "description": "Card",
+    "external_link": null,
+    "external_transaction_id": null,
+    "id": "<transaction:13>",
+    "is_split_parent": false,
+    "merchant_id": "<merchant:3>",
+    "notes": null,
+    "parent_transaction_id": null,
+    "review_status": "reviewed",
+    "status": "pending",
+    "tags": [],
+    "transaction_date": "2026-06-15",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": "<transaction:14>",
+    "type": "payment",
+    "uuid": "<uuid:20>",
+  },
+  {
+    "account_id": "<account:2>",
+    "amount": "100.00",
+    "assigned_to": null,
+    "budget_item_id": null,
+    "budget_period_id": "<period:1>",
+    "budget_period_item_id": null,
+    "description": "Card",
+    "external_link": null,
+    "external_transaction_id": null,
+    "id": "<transaction:14>",
+    "is_split_parent": false,
+    "merchant_id": "<merchant:3>",
+    "notes": null,
+    "parent_transaction_id": null,
+    "review_status": "reviewed",
+    "status": "pending",
+    "tags": [],
+    "transaction_date": "2026-06-15",
+    "transfer_source_account_id": "<account:1>",
+    "transfer_transaction_id": "<transaction:13>",
+    "type": "payment",
+    "uuid": "<uuid:21>",
+  },
+  {
+    "account_id": "<account:1>",
+    "amount": "-12.35",
+    "assigned_to": null,
+    "budget_item_id": null,
+    "budget_period_id": "<period:1>",
+    "budget_period_item_id": null,
+    "description": "Moved June 2026 balance to July 2026",
+    "external_link": null,
+    "external_transaction_id": null,
+    "id": "<transaction:15>",
+    "is_split_parent": false,
+    "merchant_id": "<merchant:4>",
+    "notes": null,
+    "parent_transaction_id": null,
+    "review_status": "reviewed",
+    "status": "pending",
+    "tags": [],
+    "transaction_date": "2026-06-30",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": "<transaction:16>",
+    "type": "transfer",
+    "uuid": "<uuid:24>",
+  },
+  {
+    "account_id": "<account:1>",
+    "amount": "12.35",
+    "assigned_to": null,
+    "budget_item_id": null,
+    "budget_period_id": "<period:2>",
+    "budget_period_item_id": null,
+    "description": "Moved June 2026 balance to July 2026",
+    "external_link": null,
+    "external_transaction_id": null,
+    "id": "<transaction:16>",
+    "is_split_parent": false,
+    "merchant_id": "<merchant:4>",
+    "notes": null,
+    "parent_transaction_id": null,
+    "review_status": "reviewed",
+    "status": "pending",
+    "tags": [],
+    "transaction_date": "2026-07-01",
+    "transfer_source_account_id": "<account:1>",
+    "transfer_transaction_id": "<transaction:15>",
+    "type": "transfer",
+    "uuid": "<uuid:25>",
+  },
+  {
+    "account_id": "<account:2>",
+    "amount": "3.00",
+    "assigned_to": null,
+    "budget_item_id": null,
+    "budget_period_id": "<period:1>",
+    "budget_period_item_id": null,
+    "description": "Leftover",
+    "external_link": null,
+    "external_transaction_id": null,
+    "id": "<transaction:17>",
+    "is_split_parent": false,
+    "merchant_id": "<merchant:4>",
+    "notes": null,
+    "parent_transaction_id": null,
+    "review_status": "reviewed",
+    "status": "pending",
+    "tags": [],
+    "transaction_date": "2026-06-30",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": "<transaction:18>",
+    "type": "transfer",
+    "uuid": "<uuid:26>",
+  },
+  {
+    "account_id": "<account:2>",
+    "amount": "-3.00",
+    "assigned_to": null,
+    "budget_item_id": null,
+    "budget_period_id": "<period:2>",
+    "budget_period_item_id": null,
+    "description": "Leftover",
+    "external_link": null,
+    "external_transaction_id": null,
+    "id": "<transaction:18>",
+    "is_split_parent": false,
+    "merchant_id": "<merchant:4>",
+    "notes": null,
+    "parent_transaction_id": null,
+    "review_status": "reviewed",
+    "status": "pending",
+    "tags": [],
+    "transaction_date": "2026-07-01",
+    "transfer_source_account_id": "<account:2>",
+    "transfer_transaction_id": "<transaction:17>",
+    "type": "transfer",
+    "uuid": "<uuid:27>",
+  },
+]
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > list: all 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": [
+    {
+      "account_class": "Asset",
+      "account_name": "Answers savings",
+      "account_uuid": "<uuid:2>",
+      "amount": "-5.00",
+      "assigned_to": null,
+      "assigned_user": null,
+      "budget_item_id": null,
+      "budget_item_name": null,
+      "budget_item_uuid": null,
+      "budget_period_id": null,
+      "budget_period_item_id": null,
+      "budget_period_item_name": null,
+      "budget_period_name": null,
+      "created_at": "<instant>",
+      "description": "",
+      "id": "<transaction:3>",
+      "is_split_parent": false,
+      "merchant_id": null,
+      "merchant_name": null,
+      "parent_transaction_id": null,
+      "review_status": "needs review",
+      "status": "cleared",
+      "tags": [],
+      "transaction_date": "2026-06-20",
+      "type": "payment",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:12>",
+    },
+    {
+      "account_class": "Asset",
+      "account_name": "Answers checking",
+      "account_uuid": "<uuid:1>",
+      "amount": "-40.00",
+      "assigned_to": null,
+      "assigned_user": null,
+      "budget_item_id": "<budget_item:2>",
+      "budget_item_name": "Dining",
+      "budget_item_uuid": "<uuid:4>",
+      "budget_period_id": "<period:1>",
+      "budget_period_item_id": "<period_item:2>",
+      "budget_period_item_name": "Dining",
+      "budget_period_name": "June 2026",
+      "created_at": "<instant>",
+      "description": null,
+      "id": "<transaction:1>",
+      "is_split_parent": false,
+      "merchant_id": "<merchant:1>",
+      "merchant_name": "Corner Market",
+      "parent_transaction_id": null,
+      "review_status": "flagged",
+      "status": "cleared",
+      "tags": [
+        {
+          "color": "#3B82F6",
+          "icon": "Tag",
+          "id": "<tag:2>",
+          "name": "Kids",
+          "uuid": "<uuid:9>",
+        },
+        {
+          "color": "#123456",
+          "icon": "Tag",
+          "id": "<tag:1>",
+          "name": "Trip",
+          "uuid": "<uuid:8>",
+        },
+      ],
+      "transaction_date": "2026-06-12",
+      "type": "expense",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:10>",
+    },
+    {
+      "account_class": "Asset",
+      "account_name": "Answers checking",
+      "account_uuid": "<uuid:1>",
+      "amount": "1000.00",
+      "assigned_to": "<user:1>",
+      "assigned_user": "Test Transaction answers",
+      "budget_item_id": "<budget_item:2>",
+      "budget_item_name": "Dining",
+      "budget_item_uuid": "<uuid:4>",
+      "budget_period_id": "<period:1>",
+      "budget_period_item_id": "<period_item:2>",
+      "budget_period_item_name": "Dining",
+      "budget_period_name": "June 2026",
+      "created_at": "<instant>",
+      "description": null,
+      "id": "<transaction:2>",
+      "is_split_parent": false,
+      "merchant_id": "<merchant:1>",
+      "merchant_name": "Corner Market",
+      "parent_transaction_id": null,
+      "review_status": "flagged",
+      "status": "pending",
+      "tags": [],
+      "transaction_date": "2026-06-01",
+      "type": "income",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:11>",
+    },
+  ],
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > list: bad account uuid 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": [],
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > list: bad uuid filters 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": [],
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > list: capped at 1 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": [
+    {
+      "account_class": "Asset",
+      "account_name": "Answers savings",
+      "account_uuid": "<uuid:2>",
+      "amount": "-5.00",
+      "assigned_to": null,
+      "assigned_user": null,
+      "budget_item_id": null,
+      "budget_item_name": null,
+      "budget_item_uuid": null,
+      "budget_period_id": null,
+      "budget_period_item_id": null,
+      "budget_period_item_name": null,
+      "budget_period_name": null,
+      "created_at": "<instant>",
+      "description": "",
+      "id": "<transaction:3>",
+      "is_split_parent": false,
+      "merchant_id": null,
+      "merchant_name": null,
+      "parent_transaction_id": null,
+      "review_status": "needs review",
+      "status": "cleared",
+      "tags": [],
+      "transaction_date": "2026-06-20",
+      "type": "payment",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:12>",
+    },
+  ],
+  "status": 200,
+  "truncated": "true",
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > list: date window and type 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": [
+    {
+      "account_class": "Asset",
+      "account_name": "Answers checking",
+      "account_uuid": "<uuid:1>",
+      "amount": "-40.00",
+      "assigned_to": null,
+      "assigned_user": null,
+      "budget_item_id": "<budget_item:2>",
+      "budget_item_name": "Dining",
+      "budget_item_uuid": "<uuid:4>",
+      "budget_period_id": "<period:1>",
+      "budget_period_item_id": "<period_item:2>",
+      "budget_period_item_name": "Dining",
+      "budget_period_name": "June 2026",
+      "created_at": "<instant>",
+      "description": null,
+      "id": "<transaction:1>",
+      "is_split_parent": false,
+      "merchant_id": "<merchant:1>",
+      "merchant_name": "Corner Market",
+      "parent_transaction_id": null,
+      "review_status": "flagged",
+      "status": "cleared",
+      "tags": [
+        {
+          "color": "#3B82F6",
+          "icon": "Tag",
+          "id": "<tag:2>",
+          "name": "Kids",
+          "uuid": "<uuid:9>",
+        },
+        {
+          "color": "#123456",
+          "icon": "Tag",
+          "id": "<tag:1>",
+          "name": "Trip",
+          "uuid": "<uuid:8>",
+        },
+      ],
+      "transaction_date": "2026-06-12",
+      "type": "expense",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:10>",
+    },
+  ],
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > list: filters that are not numbers or dates 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "merchant_id",
+        "message": "merchant_id must be a whole number",
+      },
+      {
+        "field": "amount_min",
+        "message": "amount_min must be a number",
+      },
+      {
+        "field": "start_date",
+        "message": "start_date must be a date (YYYY-MM-DD)",
+      },
+      {
+        "field": "end_date",
+        "message": "end_date must be a date (YYYY-MM-DD)",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "merchant_id must be a whole number",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > list: merchant and budget item uuid 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": [
+    {
+      "account_class": "Asset",
+      "account_name": "Answers checking",
+      "account_uuid": "<uuid:1>",
+      "amount": "-40.00",
+      "assigned_to": null,
+      "assigned_user": null,
+      "budget_item_id": "<budget_item:2>",
+      "budget_item_name": "Dining",
+      "budget_item_uuid": "<uuid:4>",
+      "budget_period_id": "<period:1>",
+      "budget_period_item_id": "<period_item:2>",
+      "budget_period_item_name": "Dining",
+      "budget_period_name": "June 2026",
+      "created_at": "<instant>",
+      "description": null,
+      "id": "<transaction:1>",
+      "is_split_parent": false,
+      "merchant_id": "<merchant:1>",
+      "merchant_name": "Corner Market",
+      "parent_transaction_id": null,
+      "review_status": "flagged",
+      "status": "cleared",
+      "tags": [
+        {
+          "color": "#3B82F6",
+          "icon": "Tag",
+          "id": "<tag:2>",
+          "name": "Kids",
+          "uuid": "<uuid:9>",
+        },
+        {
+          "color": "#123456",
+          "icon": "Tag",
+          "id": "<tag:1>",
+          "name": "Trip",
+          "uuid": "<uuid:8>",
+        },
+      ],
+      "transaction_date": "2026-06-12",
+      "type": "expense",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:10>",
+    },
+    {
+      "account_class": "Asset",
+      "account_name": "Answers checking",
+      "account_uuid": "<uuid:1>",
+      "amount": "1000.00",
+      "assigned_to": "<user:1>",
+      "assigned_user": "Test Transaction answers",
+      "budget_item_id": "<budget_item:2>",
+      "budget_item_name": "Dining",
+      "budget_item_uuid": "<uuid:4>",
+      "budget_period_id": "<period:1>",
+      "budget_period_item_id": "<period_item:2>",
+      "budget_period_item_name": "Dining",
+      "budget_period_name": "June 2026",
+      "created_at": "<instant>",
+      "description": null,
+      "id": "<transaction:2>",
+      "is_split_parent": false,
+      "merchant_id": "<merchant:1>",
+      "merchant_name": "Corner Market",
+      "parent_transaction_id": null,
+      "review_status": "flagged",
+      "status": "pending",
+      "tags": [],
+      "transaction_date": "2026-06-01",
+      "type": "income",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:11>",
+    },
+  ],
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > list: search and account 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": [],
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > list: with children 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 6,
+  },
+  "body": [
+    {
+      "account_class": "Asset",
+      "account_name": "Answers checking",
+      "account_uuid": "<uuid:1>",
+      "amount": "-20.00",
+      "assigned_to": null,
+      "assigned_user": null,
+      "budget_item_id": null,
+      "budget_item_name": null,
+      "budget_item_uuid": null,
+      "budget_period_id": null,
+      "budget_period_item_id": null,
+      "budget_period_item_name": null,
+      "budget_period_name": null,
+      "created_at": "<instant>",
+      "description": null,
+      "id": "<transaction:8>",
+      "is_split_parent": false,
+      "merchant_id": "<merchant:1>",
+      "merchant_name": "Corner Market",
+      "parent_transaction_id": "<transaction:1>",
+      "review_status": "flagged",
+      "status": "cleared",
+      "tags": [],
+      "transaction_date": "2026-06-12",
+      "type": "expense",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:17>",
+    },
+    {
+      "account_class": "Asset",
+      "account_name": "Answers checking",
+      "account_uuid": "<uuid:1>",
+      "amount": "-10.00",
+      "assigned_to": null,
+      "assigned_user": null,
+      "budget_item_id": null,
+      "budget_item_name": null,
+      "budget_item_uuid": null,
+      "budget_period_id": null,
+      "budget_period_item_id": null,
+      "budget_period_item_name": null,
+      "budget_period_name": null,
+      "created_at": "<instant>",
+      "description": null,
+      "id": "<transaction:7>",
+      "is_split_parent": false,
+      "merchant_id": "<merchant:1>",
+      "merchant_name": "Corner Market",
+      "parent_transaction_id": "<transaction:1>",
+      "review_status": "flagged",
+      "status": "cleared",
+      "tags": [],
+      "transaction_date": "2026-06-12",
+      "type": "expense",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:16>",
+    },
+    {
+      "account_class": "Asset",
+      "account_name": "Answers checking",
+      "account_uuid": "<uuid:1>",
+      "amount": "-10.00",
+      "assigned_to": null,
+      "assigned_user": null,
+      "budget_item_id": "<budget_item:1>",
+      "budget_item_name": "Groceries",
+      "budget_item_uuid": "<uuid:3>",
+      "budget_period_id": null,
+      "budget_period_item_id": null,
+      "budget_period_item_name": null,
+      "budget_period_name": null,
+      "created_at": "<instant>",
+      "description": null,
+      "id": "<transaction:6>",
+      "is_split_parent": false,
+      "merchant_id": "<merchant:1>",
+      "merchant_name": "Corner Market",
+      "parent_transaction_id": "<transaction:1>",
+      "review_status": "flagged",
+      "status": "cleared",
+      "tags": [],
+      "transaction_date": "2026-06-12",
+      "type": "expense",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:15>",
+    },
+    {
+      "account_class": "Asset",
+      "account_name": "Answers checking",
+      "account_uuid": "<uuid:1>",
+      "amount": "-40.00",
+      "assigned_to": null,
+      "assigned_user": null,
+      "budget_item_id": null,
+      "budget_item_name": null,
+      "budget_item_uuid": null,
+      "budget_period_id": "<period:1>",
+      "budget_period_item_id": null,
+      "budget_period_item_name": null,
+      "budget_period_name": "June 2026",
+      "created_at": "<instant>",
+      "description": null,
+      "id": "<transaction:1>",
+      "is_split_parent": true,
+      "merchant_id": "<merchant:1>",
+      "merchant_name": "Corner Market",
+      "parent_transaction_id": null,
+      "review_status": "flagged",
+      "status": "cleared",
+      "tags": [
+        {
+          "color": "#3B82F6",
+          "icon": "Tag",
+          "id": "<tag:2>",
+          "name": "Kids",
+          "uuid": "<uuid:9>",
+        },
+        {
+          "color": "#123456",
+          "icon": "Tag",
+          "id": "<tag:1>",
+          "name": "Trip",
+          "uuid": "<uuid:8>",
+        },
+      ],
+      "transaction_date": "2026-06-12",
+      "type": "expense",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:10>",
+    },
+    {
+      "account_class": "Asset",
+      "account_name": "Answers checking",
+      "account_uuid": "<uuid:1>",
+      "amount": "1000.00",
+      "assigned_to": "<user:1>",
+      "assigned_user": "Test Transaction answers",
+      "budget_item_id": "<budget_item:2>",
+      "budget_item_name": "Dining",
+      "budget_item_uuid": "<uuid:4>",
+      "budget_period_id": "<period:1>",
+      "budget_period_item_id": "<period_item:2>",
+      "budget_period_item_name": "Dining",
+      "budget_period_name": "June 2026",
+      "created_at": "<instant>",
+      "description": null,
+      "id": "<transaction:2>",
+      "is_split_parent": false,
+      "merchant_id": "<merchant:1>",
+      "merchant_name": "Corner Market",
+      "parent_transaction_id": null,
+      "review_status": "flagged",
+      "status": "pending",
+      "tags": [],
+      "transaction_date": "2026-06-01",
+      "type": "income",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:11>",
+    },
+  ],
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > page: an id sent twice 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "budget_period_id",
+        "message": "budget_period_id must be a whole number",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "budget_period_id must be a whole number",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > page: assigned 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "pagination": {
+      "limit": 20,
+      "page": 1,
+      "total": 1,
+      "totalPages": 1,
+    },
+    "transactions": [
+      {
+        "account_class": "Asset",
+        "account_name": "Answers checking",
+        "account_uuid": "<uuid:1>",
+        "amount": 1000,
+        "assigned_to": "<user:1>",
+        "assigned_user": "Test Transaction answers",
+        "budget_item_id": "<budget_item:2>",
+        "budget_item_name": "Dining",
+        "budget_item_uuid": "<uuid:4>",
+        "budget_period_id": "<period:1>",
+        "budget_period_item_id": "<period_item:2>",
+        "budget_period_item_name": "Dining",
+        "budget_period_name": "June 2026",
+        "created_at": "<instant>",
+        "description": null,
+        "id": "<transaction:2>",
+        "is_split_parent": false,
+        "merchant_id": "<merchant:1>",
+        "merchant_name": "Corner Market",
+        "parent_transaction_id": null,
+        "review_status": "flagged",
+        "status": "pending",
+        "tags": [],
+        "transaction_date": "2026-06-01",
+        "type": "income",
+        "updated_at": "<instant>",
+        "uuid": "<uuid:11>",
+      },
+    ],
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > page: assigned to or none 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "pagination": {
+      "limit": 200,
+      "page": 1,
+      "total": 3,
+      "totalPages": 1,
+    },
+    "transactions": [
+      {
+        "account_class": "Asset",
+        "account_name": "Answers savings",
+        "account_uuid": "<uuid:2>",
+        "amount": -5,
+        "assigned_to": null,
+        "assigned_user": null,
+        "budget_item_id": null,
+        "budget_item_name": null,
+        "budget_item_uuid": null,
+        "budget_period_id": null,
+        "budget_period_item_id": null,
+        "budget_period_item_name": null,
+        "budget_period_name": null,
+        "created_at": "<instant>",
+        "description": "",
+        "id": "<transaction:3>",
+        "is_split_parent": false,
+        "merchant_id": null,
+        "merchant_name": null,
+        "parent_transaction_id": null,
+        "review_status": "needs review",
+        "status": "cleared",
+        "tags": [],
+        "transaction_date": "2026-06-20",
+        "type": "payment",
+        "updated_at": "<instant>",
+        "uuid": "<uuid:12>",
+      },
+      {
+        "account_class": "Asset",
+        "account_name": "Answers checking",
+        "account_uuid": "<uuid:1>",
+        "amount": -40,
+        "assigned_to": null,
+        "assigned_user": null,
+        "budget_item_id": "<budget_item:2>",
+        "budget_item_name": "Dining",
+        "budget_item_uuid": "<uuid:4>",
+        "budget_period_id": "<period:1>",
+        "budget_period_item_id": "<period_item:2>",
+        "budget_period_item_name": "Dining",
+        "budget_period_name": "June 2026",
+        "created_at": "<instant>",
+        "description": null,
+        "id": "<transaction:1>",
+        "is_split_parent": false,
+        "merchant_id": "<merchant:1>",
+        "merchant_name": "Corner Market",
+        "parent_transaction_id": null,
+        "review_status": "flagged",
+        "status": "cleared",
+        "tags": [
+          {
+            "color": "#3B82F6",
+            "icon": "Tag",
+            "id": "<tag:2>",
+            "name": "Kids",
+            "uuid": "<uuid:9>",
+          },
+          {
+            "color": "#123456",
+            "icon": "Tag",
+            "id": "<tag:1>",
+            "name": "Trip",
+            "uuid": "<uuid:8>",
+          },
+        ],
+        "transaction_date": "2026-06-12",
+        "type": "expense",
+        "updated_at": "<instant>",
+        "uuid": "<uuid:10>",
+      },
+      {
+        "account_class": "Asset",
+        "account_name": "Answers checking",
+        "account_uuid": "<uuid:1>",
+        "amount": 1000,
+        "assigned_to": "<user:1>",
+        "assigned_user": "Test Transaction answers",
+        "budget_item_id": "<budget_item:2>",
+        "budget_item_name": "Dining",
+        "budget_item_uuid": "<uuid:4>",
+        "budget_period_id": "<period:1>",
+        "budget_period_item_id": "<period_item:2>",
+        "budget_period_item_name": "Dining",
+        "budget_period_name": "June 2026",
+        "created_at": "<instant>",
+        "description": null,
+        "id": "<transaction:2>",
+        "is_split_parent": false,
+        "merchant_id": "<merchant:1>",
+        "merchant_name": "Corner Market",
+        "parent_transaction_id": null,
+        "review_status": "flagged",
+        "status": "pending",
+        "tags": [],
+        "transaction_date": "2026-06-01",
+        "type": "income",
+        "updated_at": "<instant>",
+        "uuid": "<uuid:11>",
+      },
+    ],
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > page: bad account uuid 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "pagination": {
+      "limit": 20,
+      "page": 1,
+      "total": 0,
+      "totalPages": 0,
+    },
+    "transactions": [],
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > page: filters 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "pagination": {
+      "limit": 20,
+      "page": 1,
+      "total": 1,
+      "totalPages": 1,
+    },
+    "transactions": [
+      {
+        "account_class": "Asset",
+        "account_name": "Answers checking",
+        "account_uuid": "<uuid:1>",
+        "amount": -40,
+        "assigned_to": null,
+        "assigned_user": null,
+        "budget_item_id": "<budget_item:2>",
+        "budget_item_name": "Dining",
+        "budget_item_uuid": "<uuid:4>",
+        "budget_period_id": "<period:1>",
+        "budget_period_item_id": "<period_item:2>",
+        "budget_period_item_name": "Dining",
+        "budget_period_name": "June 2026",
+        "created_at": "<instant>",
+        "description": null,
+        "id": "<transaction:1>",
+        "is_split_parent": false,
+        "merchant_id": "<merchant:1>",
+        "merchant_name": "Corner Market",
+        "parent_transaction_id": null,
+        "review_status": "flagged",
+        "status": "cleared",
+        "tags": [
+          {
+            "color": "#3B82F6",
+            "icon": "Tag",
+            "id": "<tag:2>",
+            "name": "Kids",
+            "uuid": "<uuid:9>",
+          },
+          {
+            "color": "#123456",
+            "icon": "Tag",
+            "id": "<tag:1>",
+            "name": "Trip",
+            "uuid": "<uuid:8>",
+          },
+        ],
+        "transaction_date": "2026-06-12",
+        "type": "expense",
+        "updated_at": "<instant>",
+        "uuid": "<uuid:10>",
+      },
+    ],
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > page: filters that are not numbers or dates 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "date_from",
+        "message": "date_from must be a date (YYYY-MM-DD)",
+      },
+      {
+        "field": "date_to",
+        "message": "date_to must be a date (YYYY-MM-DD)",
+      },
+      {
+        "field": "budget_period_id",
+        "message": "budget_period_id must be a whole number",
+      },
+      {
+        "field": "budget_item_id",
+        "message": "budget_item_id must be a whole number",
+      },
+      {
+        "field": "amount_max",
+        "message": "amount_max must be a number",
+      },
+      {
+        "field": "account_id",
+        "message": "account_id must be a whole number",
+      },
+      {
+        "field": "assigned_to",
+        "message": "assigned_to must be a whole number",
+      },
+      {
+        "field": "assigned_to_or_unassigned",
+        "message": "assigned_to_or_unassigned must be a whole number",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "date_from must be a date (YYYY-MM-DD)",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > page: first 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "pagination": {
+      "limit": 2,
+      "page": 1,
+      "total": 3,
+      "totalPages": 2,
+    },
+    "transactions": [
+      {
+        "account_class": "Asset",
+        "account_name": "Answers savings",
+        "account_uuid": "<uuid:2>",
+        "amount": -5,
+        "assigned_to": null,
+        "assigned_user": null,
+        "budget_item_id": null,
+        "budget_item_name": null,
+        "budget_item_uuid": null,
+        "budget_period_id": null,
+        "budget_period_item_id": null,
+        "budget_period_item_name": null,
+        "budget_period_name": null,
+        "created_at": "<instant>",
+        "description": "",
+        "id": "<transaction:3>",
+        "is_split_parent": false,
+        "merchant_id": null,
+        "merchant_name": null,
+        "parent_transaction_id": null,
+        "review_status": "needs review",
+        "status": "cleared",
+        "tags": [],
+        "transaction_date": "2026-06-20",
+        "type": "payment",
+        "updated_at": "<instant>",
+        "uuid": "<uuid:12>",
+      },
+      {
+        "account_class": "Asset",
+        "account_name": "Answers checking",
+        "account_uuid": "<uuid:1>",
+        "amount": -40,
+        "assigned_to": null,
+        "assigned_user": null,
+        "budget_item_id": "<budget_item:2>",
+        "budget_item_name": "Dining",
+        "budget_item_uuid": "<uuid:4>",
+        "budget_period_id": "<period:1>",
+        "budget_period_item_id": "<period_item:2>",
+        "budget_period_item_name": "Dining",
+        "budget_period_name": "June 2026",
+        "created_at": "<instant>",
+        "description": null,
+        "id": "<transaction:1>",
+        "is_split_parent": false,
+        "merchant_id": "<merchant:1>",
+        "merchant_name": "Corner Market",
+        "parent_transaction_id": null,
+        "review_status": "flagged",
+        "status": "cleared",
+        "tags": [
+          {
+            "color": "#3B82F6",
+            "icon": "Tag",
+            "id": "<tag:2>",
+            "name": "Kids",
+            "uuid": "<uuid:9>",
+          },
+          {
+            "color": "#123456",
+            "icon": "Tag",
+            "id": "<tag:1>",
+            "name": "Trip",
+            "uuid": "<uuid:8>",
+          },
+        ],
+        "transaction_date": "2026-06-12",
+        "type": "expense",
+        "updated_at": "<instant>",
+        "uuid": "<uuid:10>",
+      },
+    ],
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > page: second 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "pagination": {
+      "limit": 2,
+      "page": 2,
+      "total": 3,
+      "totalPages": 2,
+    },
+    "transactions": [
+      {
+        "account_class": "Asset",
+        "account_name": "Answers checking",
+        "account_uuid": "<uuid:1>",
+        "amount": 1000,
+        "assigned_to": "<user:1>",
+        "assigned_user": "Test Transaction answers",
+        "budget_item_id": "<budget_item:2>",
+        "budget_item_name": "Dining",
+        "budget_item_uuid": "<uuid:4>",
+        "budget_period_id": "<period:1>",
+        "budget_period_item_id": "<period_item:2>",
+        "budget_period_item_name": "Dining",
+        "budget_period_name": "June 2026",
+        "created_at": "<instant>",
+        "description": null,
+        "id": "<transaction:2>",
+        "is_split_parent": false,
+        "merchant_id": "<merchant:1>",
+        "merchant_name": "Corner Market",
+        "parent_transaction_id": null,
+        "review_status": "flagged",
+        "status": "pending",
+        "tags": [],
+        "transaction_date": "2026-06-01",
+        "type": "income",
+        "updated_at": "<instant>",
+        "uuid": "<uuid:11>",
+      },
+    ],
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > period move: more than 2 decimals 1`] = `
+{
+  "after": {
+    "merchants": 3,
+    "taggings": 2,
+    "transactions": 9,
+  },
+  "body": {
+    "code": "INVALID_AMOUNT",
+    "error": "amount must be a number with at most 2 decimal places",
+    "message": "amount must be a number with at most 2 decimal places",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > period move: no next period 1`] = `
+{
+  "after": {
+    "merchants": 4,
+    "taggings": 2,
+    "transactions": 13,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "The next budget period doesn't exist yet. Create it first, then move the balance.",
+    "message": "The next budget period doesn't exist yet. Create it first, then move the balance.",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > period move: to July 1`] = `
+{
+  "after": {
+    "merchants": 4,
+    "taggings": 2,
+    "transactions": 11,
+  },
+  "body": {
+    "destination_transaction_uuid": "<uuid:25>",
+    "next_period_name": "July 2026",
+    "source_transaction_uuid": "<uuid:24>",
+    "success": true,
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > period move: unknown account 1`] = `
+{
+  "after": {
+    "merchants": 4,
+    "taggings": 2,
+    "transactions": 13,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Account not found",
+    "message": "Account not found",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > period move: unknown period 1`] = `
+{
+  "after": {
+    "merchants": 4,
+    "taggings": 2,
+    "transactions": 13,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Source budget period not found",
+    "message": "Source budget period not found",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > period move: with a note 1`] = `
+{
+  "after": {
+    "merchants": 4,
+    "taggings": 2,
+    "transactions": 13,
+  },
+  "body": {
+    "destination_transaction_uuid": "<uuid:27>",
+    "next_period_name": "July 2026",
+    "source_transaction_uuid": "<uuid:26>",
+    "success": true,
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > period move: zero 1`] = `
+{
+  "after": {
+    "merchants": 4,
+    "taggings": 2,
+    "transactions": 13,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "amount",
+        "message": "Amount cannot be zero",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Amount cannot be zero",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > split: a budget item uuid of no row 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 4,
+    "transactions": 5,
+  },
+  "body": {
+    "code": "INVALID_REFERENCE",
+    "error": "budget_item_uuid names a budget item that isn't in this tenant",
+    "field": "budget_item_uuid",
+    "message": "budget_item_uuid names a budget item that isn't in this tenant",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > split: a split that is null 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "splits.0",
+        "message": "Each split must have a numeric amount",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Each split must have a numeric amount",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > split: a tag of no row 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "INVALID_REFERENCE",
+    "error": "tag_uuids names a tag that isn't in this tenant",
+    "field": "tag_uuids",
+    "message": "tag_uuids names a tag that isn't in this tenant",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > split: again 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 6,
+  },
+  "body": {
+    "account_class": "Asset",
+    "account_id": "<account:1>",
+    "account_name": "Answers checking",
+    "account_uuid": "<uuid:1>",
+    "amount": "-40.00",
+    "assigned_to": null,
+    "assigned_user": null,
+    "budget_item_id": null,
+    "budget_item_name": null,
+    "budget_item_uuid": null,
+    "budget_matching_confidence": null,
+    "budget_matching_method": null,
+    "budget_matching_rule_id": null,
+    "budget_period_cleared_from": null,
+    "budget_period_cleared_start": null,
+    "budget_period_id": "<period:1>",
+    "budget_period_item_id": null,
+    "budget_period_item_name": null,
+    "budget_period_name": "June 2026",
+    "created_at": "<instant>",
+    "description": null,
+    "external_link": "https://example.com/r/1",
+    "external_transaction_id": "stmt-1",
+    "id": "<transaction:1>",
+    "import_amount": null,
+    "import_description": null,
+    "import_extra": null,
+    "import_imported_at": null,
+    "import_payee": null,
+    "import_pending": false,
+    "import_posted_date": null,
+    "import_provider": "simplefin",
+    "import_transacted_at": null,
+    "import_transaction_id": null,
+    "institution_transaction_status": null,
+    "is_import": false,
+    "is_split_parent": true,
+    "merchant_id": "<merchant:1>",
+    "merchant_name": "Corner Market",
+    "notes": "note",
+    "parent_transaction_id": null,
+    "parent_transaction_uuid": null,
+    "review_status": "flagged",
+    "split_children": [
+      {
+        "amount": -10,
+        "budget_item_id": null,
+        "budget_item_name": null,
+        "budget_item_uuid": null,
+        "budget_period_id": null,
+        "budget_period_item_id": null,
+        "description": null,
+        "id": "<transaction:6>",
+        "status": "cleared",
+        "tags": [],
+        "transaction_date": "2026-06-12",
+        "type": "expense",
+        "uuid": "<uuid:15>",
+      },
+      {
+        "amount": -10,
+        "budget_item_id": null,
+        "budget_item_name": null,
+        "budget_item_uuid": null,
+        "budget_period_id": null,
+        "budget_period_item_id": null,
+        "description": null,
+        "id": "<transaction:7>",
+        "status": "cleared",
+        "tags": [],
+        "transaction_date": "2026-06-12",
+        "type": "expense",
+        "uuid": "<uuid:16>",
+      },
+      {
+        "amount": -20,
+        "budget_item_id": null,
+        "budget_item_name": null,
+        "budget_item_uuid": null,
+        "budget_period_id": null,
+        "budget_period_item_id": null,
+        "description": null,
+        "id": "<transaction:8>",
+        "status": "cleared",
+        "tags": [],
+        "transaction_date": "2026-06-12",
+        "type": "expense",
+        "uuid": "<uuid:17>",
+      },
+    ],
+    "status": "cleared",
+    "synced_amount": "0.00",
+    "synced_category": null,
+    "synced_description": null,
+    "synced_location": null,
+    "synced_name": null,
+    "synced_transactiondate": "<instant>",
+    "tags": [
+      {
+        "color": "#3B82F6",
+        "icon": "Tag",
+        "id": "<tag:2>",
+        "name": "Kids",
+        "uuid": "<uuid:9>",
+      },
+      {
+        "color": "#123456",
+        "icon": "Tag",
+        "id": "<tag:1>",
+        "name": "Trip",
+        "uuid": "<uuid:8>",
+      },
+    ],
+    "tenant_id": "<tenant:1>",
+    "transaction_date": "2026-06-12",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": null,
+    "type": "expense",
+    "updated_at": "<instant>",
+    "uuid": "<uuid:10>",
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > split: budget item of no row 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "INVALID_REFERENCE",
+    "error": "budget_item_id does not name a budget item in this tenant",
+    "field": "budget_item_id",
+    "message": "budget_item_id does not name a budget item in this tenant",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > split: by uuids, with tags 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 4,
+    "transactions": 5,
+  },
+  "body": {
+    "account_class": "Asset",
+    "account_id": "<account:1>",
+    "account_name": "Answers checking",
+    "account_uuid": "<uuid:1>",
+    "amount": "-40.00",
+    "assigned_to": null,
+    "assigned_user": null,
+    "budget_item_id": null,
+    "budget_item_name": null,
+    "budget_item_uuid": null,
+    "budget_matching_confidence": null,
+    "budget_matching_method": null,
+    "budget_matching_rule_id": null,
+    "budget_period_cleared_from": null,
+    "budget_period_cleared_start": null,
+    "budget_period_id": "<period:1>",
+    "budget_period_item_id": null,
+    "budget_period_item_name": null,
+    "budget_period_name": "June 2026",
+    "created_at": "<instant>",
+    "description": null,
+    "external_link": "https://example.com/r/1",
+    "external_transaction_id": "stmt-1",
+    "id": "<transaction:1>",
+    "import_amount": null,
+    "import_description": null,
+    "import_extra": null,
+    "import_imported_at": null,
+    "import_payee": null,
+    "import_pending": false,
+    "import_posted_date": null,
+    "import_provider": "simplefin",
+    "import_transacted_at": null,
+    "import_transaction_id": null,
+    "institution_transaction_status": null,
+    "is_import": false,
+    "is_split_parent": true,
+    "merchant_id": "<merchant:1>",
+    "merchant_name": "Corner Market",
+    "notes": "note",
+    "parent_transaction_id": null,
+    "parent_transaction_uuid": null,
+    "review_status": "flagged",
+    "split_children": [
+      {
+        "amount": -25,
+        "budget_item_id": "<budget_item:1>",
+        "budget_item_name": "Groceries",
+        "budget_item_uuid": "<uuid:3>",
+        "budget_period_id": "<period:1>",
+        "budget_period_item_id": "<period_item:1>",
+        "description": "Food",
+        "id": "<transaction:4>",
+        "status": "cleared",
+        "tags": [
+          {
+            "color": "#123456",
+            "icon": "Tag",
+            "id": "<tag:1>",
+            "name": "Trip",
+            "uuid": "<uuid:8>",
+          },
+        ],
+        "transaction_date": "2026-06-12",
+        "type": "expense",
+        "uuid": "<uuid:13>",
+      },
+      {
+        "amount": -15,
+        "budget_item_id": "<budget_item:2>",
+        "budget_item_name": "Dining",
+        "budget_item_uuid": "<uuid:4>",
+        "budget_period_id": "<period:1>",
+        "budget_period_item_id": "<period_item:2>",
+        "description": null,
+        "id": "<transaction:5>",
+        "status": "cleared",
+        "tags": [
+          {
+            "color": "#3B82F6",
+            "icon": "Tag",
+            "id": "<tag:2>",
+            "name": "Kids",
+            "uuid": "<uuid:9>",
+          },
+        ],
+        "transaction_date": "2026-06-12",
+        "type": "expense",
+        "uuid": "<uuid:14>",
+      },
+    ],
+    "status": "cleared",
+    "synced_amount": "0.00",
+    "synced_category": null,
+    "synced_description": null,
+    "synced_location": null,
+    "synced_name": null,
+    "synced_transactiondate": "<instant>",
+    "tags": [
+      {
+        "color": "#3B82F6",
+        "icon": "Tag",
+        "id": "<tag:2>",
+        "name": "Kids",
+        "uuid": "<uuid:9>",
+      },
+      {
+        "color": "#123456",
+        "icon": "Tag",
+        "id": "<tag:1>",
+        "name": "Trip",
+        "uuid": "<uuid:8>",
+      },
+    ],
+    "tenant_id": "<tenant:1>",
+    "transaction_date": "2026-06-12",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": null,
+    "type": "expense",
+    "updated_at": "<instant>",
+    "uuid": "<uuid:10>",
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > split: does not add up 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "actual": -30,
+    "code": "BAD_REQUEST",
+    "error": "Split amounts must sum to transaction amount",
+    "expected": -40,
+    "message": "Split amounts must sum to transaction amount",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > split: none 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Transaction not found",
+    "message": "Transaction not found",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > split: not a number 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "splits.0.amount",
+        "message": "Each split must have a numeric amount",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Each split must have a numeric amount",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > split: tag ids not a list 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "splits.0.tag_ids",
+        "message": "Each split's tag_ids and tag_uuids must be lists",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Each split's tag_ids and tag_uuids must be lists",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > split: three decimals 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "splits.0.amount",
+        "message": "Each split amount must have at most 2 decimal places",
+      },
+      {
+        "field": "splits.1.amount",
+        "message": "Each split amount must have at most 2 decimal places",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Each split amount must have at most 2 decimal places",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > split: too few 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "splits",
+        "message": "At least 2 splits are required",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "At least 2 splits are required",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > tag: add 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 3,
+    "transactions": 3,
+  },
+  "body": {
+    "success": true,
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > tag: add again 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 3,
+    "transactions": 3,
+  },
+  "body": {
+    "success": true,
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > tag: unknown tag 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 3,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Tag not found",
+    "message": "Tag not found",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > tag: unknown transaction 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 3,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Transaction not found",
+    "message": "Transaction not found",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > transfer: bad type 1`] = `
+{
+  "after": {
+    "merchants": 3,
+    "taggings": 2,
+    "transactions": 9,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "type",
+        "message": "Type must be payment or transfer",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Type must be payment or transfer",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > transfer: by ids 1`] = `
+{
+  "after": {
+    "merchants": 3,
+    "taggings": 2,
+    "transactions": 9,
+  },
+  "body": {
+    "destination_transaction_uuid": "<uuid:23>",
+    "source_transaction_uuid": "<uuid:22>",
+    "success": true,
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > transfer: destination id of no row 1`] = `
+{
+  "after": {
+    "merchants": 3,
+    "taggings": 2,
+    "transactions": 9,
+  },
+  "body": {
+    "code": "INVALID_REFERENCE",
+    "error": "destination_account_id does not name an account in this tenant",
+    "field": "destination_account_id",
+    "message": "destination_account_id does not name an account in this tenant",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > transfer: no accounts 1`] = `
+{
+  "after": {
+    "merchants": 3,
+    "taggings": 2,
+    "transactions": 9,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "Source and destination accounts are required",
+    "message": "Source and destination accounts are required",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > transfer: payment by uuids 1`] = `
+{
+  "after": {
+    "merchants": 2,
+    "taggings": 2,
+    "transactions": 7,
+  },
+  "body": {
+    "destination_transaction_uuid": "<uuid:21>",
+    "source_transaction_uuid": "<uuid:20>",
+    "success": true,
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > transfer: period id of no row 1`] = `
+{
+  "after": {
+    "merchants": 3,
+    "taggings": 2,
+    "transactions": 9,
+  },
+  "body": {
+    "code": "INVALID_REFERENCE",
+    "error": "budget_period_id does not name a budget period in this tenant",
+    "field": "budget_period_id",
+    "message": "budget_period_id does not name a budget period in this tenant",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > transfer: same account 1`] = `
+{
+  "after": {
+    "merchants": 3,
+    "taggings": 2,
+    "transactions": 9,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "Cannot transfer to the same account",
+    "message": "Cannot transfer to the same account",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > transfer: source id of no row 1`] = `
+{
+  "after": {
+    "merchants": 3,
+    "taggings": 2,
+    "transactions": 9,
+  },
+  "body": {
+    "code": "INVALID_REFERENCE",
+    "error": "source_account_id does not name an account in this tenant",
+    "field": "source_account_id",
+    "message": "source_account_id does not name an account in this tenant",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > transfer: three decimals 1`] = `
+{
+  "after": {
+    "merchants": 3,
+    "taggings": 2,
+    "transactions": 9,
+  },
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "Amount must have at most 2 decimal places",
+    "message": "Amount must have at most 2 decimal places",
+  },
+  "status": 400,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > transfer: unknown destination 1`] = `
+{
+  "after": {
+    "merchants": 3,
+    "taggings": 2,
+    "transactions": 9,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Destination account not found for destination_account_uuid",
+    "message": "Destination account not found for destination_account_uuid",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > transfer: unknown period 1`] = `
+{
+  "after": {
+    "merchants": 3,
+    "taggings": 2,
+    "transactions": 9,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Budget period not found for budget_period_uuid",
+    "message": "Budget period not found for budget_period_uuid",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > transfer: unknown source 1`] = `
+{
+  "after": {
+    "merchants": 3,
+    "taggings": 2,
+    "transactions": 9,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Source account not found for source_account_uuid",
+    "message": "Source account not found for source_account_uuid",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > unsplit 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "account_id": "<account:1>",
+    "amount": "-40.00",
+    "assigned_to": null,
+    "budget_item_id": null,
+    "budget_matching_confidence": null,
+    "budget_matching_method": null,
+    "budget_matching_rule_id": null,
+    "budget_period_cleared_from": null,
+    "budget_period_cleared_start": null,
+    "budget_period_id": "<period:1>",
+    "budget_period_item_id": null,
+    "created_at": "<instant>",
+    "description": null,
+    "external_link": "https://example.com/r/1",
+    "external_transaction_id": "stmt-1",
+    "id": "<transaction:1>",
+    "import_amount": null,
+    "import_description": null,
+    "import_extra": null,
+    "import_imported_at": null,
+    "import_payee": null,
+    "import_pending": false,
+    "import_posted_date": null,
+    "import_provider": "simplefin",
+    "import_transacted_at": null,
+    "import_transaction_id": null,
+    "institution_transaction_status": null,
+    "is_import": false,
+    "is_split_parent": false,
+    "merchant_id": "<merchant:1>",
+    "notes": "note",
+    "parent_transaction_id": null,
+    "review_status": "flagged",
+    "status": "cleared",
+    "synced_amount": "0.00",
+    "synced_category": null,
+    "synced_description": null,
+    "synced_location": null,
+    "synced_name": null,
+    "synced_transactiondate": "<instant>",
+    "tenant_id": "<tenant:1>",
+    "transaction_date": "2026-06-12",
+    "transfer_source_account_id": null,
+    "transfer_transaction_id": null,
+    "type": "expense",
+    "updated_at": "<instant>",
+    "uuid": "<uuid:10>",
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > unsplit: not split 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Split transaction not found",
+    "message": "Split transaction not found",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > untag 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "success": true,
+  },
+  "status": 200,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > untag: unknown tag 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Tag not found",
+    "message": "Tag not found",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;
+
+exports[`Transaction routes: whole answers > answers every route as before > untag: unknown transaction 1`] = `
+{
+  "after": {
+    "merchants": 1,
+    "taggings": 2,
+    "transactions": 3,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Transaction not found",
+    "message": "Transaction not found",
+  },
+  "status": 404,
+  "truncated": null,
+}
+`;

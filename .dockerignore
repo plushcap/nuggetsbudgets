@@ -1,0 +1,56 @@
+# Every image builds with the repo root as its context (the Dockerfiles say so), so this
+# is the only .dockerignore Docker reads. A pattern without `**/` matches at the root only;
+# the ones below match at any depth, so nothing a package directory holds locally
+# (backend/.env, backend/uploads, a stray node_modules) reaches a build.
+
+# Dependencies and build output: the images install and build their own.
+**/node_modules
+**/build
+**/dist
+**/coverage
+**/.nyc_output
+**/*.tsbuildinfo
+
+# Environment files and secrets. The images take configuration at run time
+# (compose environment and Docker secrets), never from the build context.
+**/.env
+**/.env.*
+**/secrets
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+
+# Runtime data a local run leaves behind: database files, uploads (receipts, account
+# images), backups, logs, temp files.
+data
+**/uploads
+**/backups
+**/logs
+**/temp
+**/tmp
+**/*.log
+**/*.tmp
+**/*.temp
+
+# Repository metadata, docs, editor and agent files: no image uses them.
+**/.git
+**/.gitignore
+.github
+.claude
+.design-sync
+docs
+**/*.md
+**/.vscode
+**/.idea
+**/*.swp
+**/*.swo
+**/*~
+
+# OS files
+**/.DS_Store
+**/._*
+**/.Spotlight-V100
+**/.Trashes
+**/ehthumbs.db
+**/Thumbs.db

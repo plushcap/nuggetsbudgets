@@ -1,0 +1,24 @@
+<mj-section padding="20px 0">
+  <mj-column>
+    {{#if logoUrl}}
+    <mj-image
+      src="{{logoUrl}}"
+      alt="Nuggets Logo"
+      width="150px"
+      padding="10px 0 20px 0"
+      align="center"
+    />
+    {{else}}
+    <mj-text
+      font-size="28px"
+      font-weight="700"
+      color="#2563eb"
+      align="center"
+      padding="10px 0 20px 0"
+      font-family="'Atkinson Hyperlegible', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+    >
+      Nuggets
+    </mj-text>
+    {{/if}}
+  </mj-column>
+</mj-section>

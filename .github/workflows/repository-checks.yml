@@ -1,0 +1,103 @@
+name: Repository checks
+
+# The checks that read the repository itself, not the code: no secret in it, no file that
+# must stay out of it, docs that state the versions in use, and no issue or pull request
+# number cited. ci-cd.yml skips a pull
+# request that changes Markdown or docs/ only, so a key pasted into a doc, or a file added
+# under docs/, went unscanned until the next pull request's tree scan. This workflow
+# has no paths-ignore: every pull request runs it. It needs no install and takes seconds.
+on:
+  pull_request:
+    branches: [ main, develop ]
+    # Draft PRs don't run it, as they don't run CI; it runs when a PR is marked ready.
+    types: [ opened, synchronize, reopened, ready_for_review ]
+  push:
+    branches: [ develop ]
+  # A manual run, as ci-cd.yml's deploy-lint had (the tree only: no pull request's commits).
+  workflow_dispatch:
+
+# Cancel an in-progress run when a newer commit is pushed to the same PR/branch.
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  repository:
+    if: (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+        # The secret scan below reads the pull request's commits.
+        fetch-depth: 0
+
+    # Members' uploads, Zone.Identifier files, personal Claude Code settings, data dumps and
+    # exports, environment, password and key files, and private keys stay out of git.
+    - name: Nothing tracked that must stay out of the repository
+      if: ${{ !cancelled() }}
+      run: scripts/check-tracked-files.sh
+
+    # No secret in the tree or in a pull request's commits. gitleaks' own CLI (MIT;
+    # its GitHub Action needs a paid licence for an organization's repositories), at a pinned
+    # version checked against its published checksum. The tree, and the PR's commits, so a
+    # secret added and removed again within the PR (still in the history it merges) fails
+    # too. Findings are redacted in the log. .gitleaks.toml has the exceptions; a made-up
+    # test value is marked on its line (the step after this lists the new markers).
+    - name: No secrets in the tree or the pull request's commits
+      if: ${{ !cancelled() }}
+      env:
+        GITLEAKS_VERSION: 8.30.1
+        GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        dir="$RUNNER_TEMP/gitleaks"
+        tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+        mkdir -p "$dir"
+        curl -sSfL --retry 3 -o "$dir/$tarball" \
+          "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}"
+        echo "${GITLEAKS_SHA256}  $dir/$tarball" | sha256sum -c -
+        tar -xzf "$dir/$tarball" -C "$dir" gitleaks
+        "$dir/gitleaks" dir . --config .gitleaks.toml --redact --no-banner --verbose
+        if [ -n "$BASE_SHA" ]; then
+          # A merge commit's own changes too (against its first parent), or a key added in one
+          # and removed in the next would pass.
+          "$dir/gitleaks" git . --config .gitleaks.toml --redact --no-banner --verbose \
+            --log-opts="--diff-merges=first-parent ${BASE_SHA}..${HEAD_SHA}"
+        fi
+
+    # Each line the pull request adds with the marker that makes gitleaks pass it, as a
+    # warning on that line and in the summary, for the reviewer to check the value is made
+    # up. It never fails the run.
+    - name: New lines gitleaks is told to pass, for review
+      if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+      env:
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: scripts/list-new-gitleaks-allows.sh "$BASE_SHA" "$HEAD_SHA"
+
+    # The versions CLAUDE.md and the scripts state (Node.js, PostgreSQL, React, Vite, …) match
+    # package.json, .nvmrc, the Dockerfiles, compose files, workflows and Vite's build target,
+    # which must agree with each other too. Here, a docs-only change is checked too.
+    # The runner's own Node runs it; it has no dependencies.
+    - name: The docs state the versions in use
+      if: ${{ !cancelled() }}
+      run: node scripts/check-doc-versions.mjs
+
+    # No tracked file cites an issue or pull request by its number, or links to one, or cites an
+    # audit finding or a requirement by its code: the project is published from one commit with
+    # no history, and those documents lived in issues, so the number or code points at nothing a
+    # reader can open. The cases the check must flag
+    # and must leave (colours, entities, anchors, identifiers, test ids) run first. The runner's
+    # own Node runs both; they have no dependencies.
+    - name: The tree cites no issue numbers or audit codes
+      if: ${{ !cancelled() }}
+      run: |
+        node --test scripts/check-issue-refs.test.mjs
+        node scripts/check-issue-refs.mjs

@@ -1,0 +1,25 @@
+<mj-section padding="30px 0 20px 0" background-color="#f9fafb">
+  <mj-column>
+    <mj-text
+      font-size="12px"
+      color="#6b7280"
+      align="center"
+      padding="10px 25px"
+      font-family="'Atkinson Hyperlegible', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+      line-height="18px"
+    >
+      This is an automated notification from your Nuggets financial tracker.
+      <br/>
+      You are receiving this because you have notification preferences enabled.
+    </mj-text>
+    <mj-text
+      font-size="11px"
+      color="#9ca3af"
+      align="center"
+      padding="5px 25px 10px 25px"
+      font-family="'Atkinson Hyperlegible', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+    >
+      &copy; {{year}} Nuggets Financial Tracker
+    </mj-text>
+  </mj-column>
+</mj-section>

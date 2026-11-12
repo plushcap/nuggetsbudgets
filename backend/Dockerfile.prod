@@ -1,0 +1,177 @@
+# Production Dockerfile: @nuggets/shared, the MCP package and the backend, built from the npm
+# workspace at the repo root (package.json's workspaces, one package-lock.json). The build
+# context MUST be the repo root.
+#
+# Layout inside the final image (the same paths as before the workspace, so volumes, the
+# entrypoint and `docker exec` commands are unchanged):
+#   /app           — backend (WORKDIR, dist, init.sql, migrations, upgrade, uploads volume, logs, etc.)
+#   /mcp           — the MCP package (package.json + dist)
+#   /shared        — @nuggets/shared (package.json + dist)
+#   /node_modules  — the workspace's production dependencies, hoisted, as the workspace
+#                    root's node_modules is. Node looks for a package in node_modules
+#                    folders up from the importing file, so /app, /mcp and /shared all find
+#                    it there, and its `nuggets-mcp` and `@nuggets/shared` entries are the
+#                    workspace's own relative links (../mcp, ../../shared). A dependency
+#                    npm kept out of the root (another version of one already there) is in
+#                    /app/node_modules, /mcp/node_modules or /shared/node_modules, as it was
+#                    in the workspace's backend/, mcp/ or shared/.
+# The backend imports the MCP handler by package name (`nuggets-mcp`), which resolves to
+# /node_modules/nuggets-mcp → /mcp/dist/httpHandler.js.
+#
+# Base images are pinned by digest, with the tag kept for readers and for Dependabot,
+# which bumps both monthly (.github/dependabot.yml). A rebuild of the same commit gets
+# the same base images.
+#
+# Multi-arch strategy:
+#   * The builder stage runs on $BUILDPLATFORM (native) so tsc + the full `npm ci`
+#     never execute under qemu (the full-install SIGILL we hit on arm64).
+#   * The production dependencies are installed by a lean `npm ci --omit=dev` in the
+#     prod-deps stage, under $TARGETPLATFORM, so any per-arch native sub-packages resolve
+#     naturally (npm's lockfile doesn't track arches that weren't present when the lock
+#     was generated, npm/cli#4828 — cross-arch npm_config_* tricks are unreliable).
+#     Historically required by pdfjs-dist/@napi-rs/canvas; that dep is gone (Ollama
+#     document-import removal), but the pattern is kept — it is the known-good,
+#     future-proof path if a native dep returns.
+
+ARG BUILDPLATFORM
+FROM --platform=$BUILDPLATFORM node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94 AS builder
+
+# ============================================================================
+# Stage 1: build shared, mcp and the backend (pure JS — arch-independent).
+# ============================================================================
+WORKDIR /build
+
+# The workspace's lockfile and the manifests of the three packages built here first, so
+# the install layer stays cached until one of their dependencies changes. --workspace
+# installs only them and their dependencies, never the frontend's (whose manifest npm ci
+# doesn't need for it).
+COPY package.json package-lock.json ./
+COPY shared/package.json shared/
+COPY mcp/package.json mcp/
+COPY backend/package.json backend/
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefer-offline --no-audit --no-fund \
+      --workspace shared --workspace mcp --workspace backend
+
+COPY shared/tsconfig.json shared/
+COPY shared/src shared/src
+COPY mcp/tsconfig.json mcp/tsconfig.build.json mcp/
+COPY mcp/src mcp/src
+COPY backend/. backend/
+
+# shared, then mcp, then the backend (the root package.json's build:server).
+RUN echo "===== Build =====" && \
+    node --version && \
+    npm --version && \
+    npm run build:server && \
+    ls -la mcp/dist/ backend/dist/
+
+# ============================================================================
+# Stage 2: the production dependencies — $TARGETPLATFORM.
+# `npm ci --omit=dev` here is what would install the *target arch* native binaries of
+# a dependency with per-arch prebuilts.
+# ============================================================================
+FROM node:26-slim@sha256:e4db4c914bf8ad241bd24804fc25d272d89bad97e68cdc8a1414862790a02c39 AS prod-deps
+
+WORKDIR /deps
+COPY package.json package-lock.json ./
+COPY shared/package.json shared/
+COPY mcp/package.json mcp/
+COPY backend/package.json backend/
+# The backend's production dependencies, with shared's and mcp's (it depends on both).
+# Then the workspace's link to the backend itself, which points at no package of the
+# image (the backend is /app, not /backend), and an empty node_modules for each package
+# that had nothing kept out of the root, so the stage below copies one for each.
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev --prefer-offline --no-audit --no-fund --workspace backend && \
+    rm -f node_modules/nuggets-backend && \
+    mkdir -p shared/node_modules mcp/node_modules backend/node_modules && \
+    ls -la node_modules/nuggets-mcp node_modules/@nuggets/shared
+
+# ============================================================================
+# Stage 3: production runtime — $TARGETPLATFORM. COPY only, no npm.
+# ============================================================================
+FROM node:26-slim@sha256:e4db4c914bf8ad241bd24804fc25d272d89bad97e68cdc8a1414862790a02c39 AS production
+
+# The app reads NODE_ENV for its production behaviour (secure cookies, rate limiting
+# always on, no test-data routes, no error details in responses, JSON logs). The compose
+# files set it too; this keeps an image run without them in production mode.
+ENV NODE_ENV=production
+
+# Runtime packages only: curl (HEALTHCHECK), dumb-init (PID 1), ca-certificates, and
+# postgresql-client-18, whose pg_dump/pg_restore BackupService runs for backups and
+# restores; it comes from the PostgreSQL apt repository (PGDG), to match the server's
+# major version. apt reads the repository's ASCII-armoured signing key directly
+# (signed-by=*.asc, PGDG's documented setup), so gnupg and lsb-release, which only
+# installed the key and named the release, are no longer in the image.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl dumb-init \
+    && . /etc/os-release \
+    && curl -fsSL -o /usr/share/keyrings/pgdg.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && echo "deb [signed-by=/usr/share/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt/ ${VERSION_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client-18 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Non-root user matches existing portainer config (NUGGETS_USER_ID=1001).
+RUN groupadd --gid 1001 nuggets && \
+    useradd --uid 1001 --gid nuggets --shell /bin/bash --create-home nuggets
+
+# --- The dependencies, at the workspace root's place (see the top). Owned by root: the
+# server reads them and never writes them.
+COPY --from=prod-deps /deps/node_modules /node_modules
+
+# --- @nuggets/shared at /shared and the MCP package at /mcp (built on $BUILDPLATFORM: pure JS) ---
+COPY --from=builder --chown=nuggets:nuggets /build/shared/package.json /shared/package.json
+COPY --from=builder --chown=nuggets:nuggets /build/shared/dist /shared/dist
+COPY --from=prod-deps --chown=nuggets:nuggets /deps/shared/node_modules /shared/node_modules
+COPY --from=builder --chown=nuggets:nuggets /build/mcp/package.json /mcp/package.json
+COPY --from=builder --chown=nuggets:nuggets /build/mcp/dist /mcp/dist
+COPY --from=prod-deps --chown=nuggets:nuggets /deps/mcp/node_modules /mcp/node_modules
+
+# --- Backend at /app ---
+WORKDIR /app
+COPY --from=builder --chown=nuggets:nuggets /build/backend/package.json ./package.json
+COPY --from=prod-deps --chown=nuggets:nuggets /deps/backend/node_modules ./node_modules
+
+# Built artifacts + runtime assets
+COPY --from=builder --chown=nuggets:nuggets /build/backend/dist ./dist
+COPY --from=builder --chown=nuggets:nuggets /build/backend/src/email-templates ./dist/email-templates
+COPY --from=builder --chown=nuggets:nuggets /build/backend/init.sql ./init.sql
+COPY --from=builder --chown=nuggets:nuggets /build/backend/migrations ./migrations
+# The SQL that cuts a v2.4.0 database over to the baseline (MigrationService).
+COPY --from=builder --chown=nuggets:nuggets /build/backend/upgrade ./upgrade
+
+# Entrypoint: applies pending DB migrations (unless RUN_MIGRATIONS=false) then
+# starts the server. Copied from the build context (repo root) so it doesn't
+# depend on the builder stage; made runnable below.
+COPY --chown=nuggets:nuggets backend/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
+# Create runtime dirs (overridden by volume mounts in prod; still need to exist).
+RUN mkdir -p /app/uploads /app/logs /app/ssl /app/backups /app/temp && \
+    chown -R nuggets:nuggets /app /mcp /shared && \
+    chmod -R 755 /app && \
+    chmod -R 700 /app/ssl
+
+# Numeric, so a runtime can tell it isn't root without reading /etc/passwd.
+USER 1001:1001
+
+EXPOSE 5000
+
+# Readiness (/api/ready), as in the compose files: healthy only while the backend can
+# serve. /api/health is liveness only (the process answers).
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
+    CMD ["sh", "-c", "curl -fsS -o /dev/null http://localhost:${PORT:-5000}/api/ready || exit 1"]
+
+# Which build this is: the release workflow passes the image's version tag and the
+# commit (.github/workflows/docker-build-deploy.yml), and the backend reports them in
+# /api/health, its log lines and backup manifests (src/utils/appVersion.ts). Last, so a
+# new commit changes only this layer and the ones above stay cached.
+ARG APP_VERSION=unknown
+ARG GIT_SHA=unknown
+ENV APP_VERSION=$APP_VERSION \
+    GIT_SHA=$GIT_SHA
+
+ENTRYPOINT ["dumb-init", "--", "/app/docker-entrypoint.sh"]
+CMD ["node", "dist/index.js"]

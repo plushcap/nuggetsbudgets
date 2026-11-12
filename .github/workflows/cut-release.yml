@@ -1,0 +1,246 @@
+name: Cut a release
+
+# Run by hand from the Actions tab ("Run workflow" on main). Choose which part of the
+# version goes up: it takes the newest release tag (vX.Y.Z; pre-releases such as
+# v1.3.0-rc.1 don't count), raises that part, tags main's newest commit with the result,
+# and starts "Build and Deploy to GitHub Container Registry" on the tag. That run builds
+# the images as X.Y.Z, X.Y, latest and sha-<commit> and publishes the GitHub Release, as
+# a pushed tag does (docker-build-deploy.yml).
+#
+#   newest tag   major    minor    patch
+#   (none)       3.0.0    refused  refused
+#   v3.1.2       4.0.0    3.2.0    3.1.3
+#
+# With no release tag it numbers on from v2.4.0 (BEFORE_THIS_REPOSITORY): the releases up to
+# it were cut before this repository, which was published without their tags. So the first
+# release here is a major, v3.0.0; a minor or a patch would label main's code as a 2.x.
+#
+# A tag this workflow creates doesn't start the build on its own: GitHub starts no
+# workflow for a push made with the run's GITHUB_TOKEN, except workflow_dispatch and
+# repository_dispatch. So a step starts the build by workflow_dispatch on the tag, and
+# the release is built exactly once; the next starts the end-to-end tests (ci-cd.yml's e2e
+# job) on it the same way, without the build waiting for them. Don't give the tag step a personal or App token
+# (to get past a tag rule, say): its tag push would then start the build too, twice.
+#
+# It always numbers from the newest release and tags main. A patch to an older line
+# (v1.1.5 after v1.2.0) is still a tag pushed by hand on that line's commit.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Which part of the version goes up'
+        required: true
+        default: minor
+        type: choice
+        options:
+          - minor
+          - major
+          - patch
+      dry_run:
+        description: 'Only show the next version; create no tag and build nothing'
+        required: false
+        default: false
+        type: boolean
+
+# Every job states the access it needs; a job that states none gets none.
+permissions: {}
+
+# Two runs at once could both pick the same next version.
+concurrency:
+  group: cut-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write   # create the tag
+      actions: write    # start the build workflow on the tag
+
+    steps:
+    - name: Only from main
+      if: github.ref != 'refs/heads/main'
+      run: |
+        echo "::error::Run this from main: a release is main's newest commit (this run is on $GITHUB_REF)."
+        exit 1
+
+    - name: Checkout main with its tags
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+        persist-credentials: false
+
+    - name: Work out the next version
+      id: next
+      env:
+        BUMP: ${{ inputs.bump }}
+        DRY_RUN: ${{ inputs.dry_run }}
+        GH_TOKEN: ${{ github.token }}
+        BEFORE_THIS_REPOSITORY: v2.4.0
+      run: |
+        release_tag='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+        # Release tags only: vX.Y.Z with plain numbers. sort -V orders 1.10.0 after 1.9.0.
+        # A git error stops the run here; only grep's "no match" is allowed through, so a
+        # tag list that failed to load can't read as "no releases yet".
+        all_tags=$(git tag --list 'v*')
+        newest=$( (grep -E "$release_tag" <<< "$all_tags" || true) | sort -V | tail -n 1)
+        if [ -z "$newest" ]; then
+          if [ "$BUMP" != major ]; then
+            echo "::error::this repository has no release tag yet, so its first release is a major, numbered on from $BEFORE_THIS_REPOSITORY (the last release before it): choose major."
+            exit 1
+          fi
+          IFS=. read -r major minor patch <<< "${BEFORE_THIS_REPOSITORY#v}"
+        else
+          IFS=. read -r major minor patch <<< "${newest#v}"
+        fi
+        case "$BUMP" in
+          major) major=$((major + 1)) minor=0 patch=0 ;;
+          minor) minor=$((minor + 1)) patch=0 ;;
+          patch) patch=$((patch + 1)) ;;
+          *) echo "::error::bump must be major, minor or patch, not '$BUMP'"; exit 1 ;;
+        esac
+        tag="v$major.$minor.$patch"
+
+        commit=$(git rev-parse HEAD)
+        if [ "$commit" != "$GITHUB_SHA" ]; then
+          echo "::error::the checkout ($commit) isn't the commit this run was started on ($GITHUB_SHA)"
+          exit 1
+        fi
+        # One release per commit: a second tag on the same commit would publish the same
+        # build under two versions.
+        already=$( (git tag --points-at "$commit" | grep -E "$release_tag" || true) | paste -sd, -)
+        if [ -n "$already" ]; then
+          echo "::error::main's newest commit (${commit:0:7}) is already released as $already: merge something new first."
+          exit 1
+        fi
+        if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
+          echo "::error::$tag already exists"
+          exit 1
+        fi
+        # The build is started on "$tag" by name: a branch with the same name would be
+        # ambiguous, and a build on a branch publishes no release.
+        if git rev-parse -q --verify "refs/remotes/origin/$tag" > /dev/null; then
+          echo "::error::a branch is named $tag; rename or delete it, or the build might run on it instead of the tag"
+          exit 1
+        fi
+        # Two release builds at once would race for latest and X.Y, image by image, and the
+        # older release could end up with them. Wait for the one running to finish.
+        running=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow docker-build-deploy.yml --limit 30 \
+          --json headBranch,status,url \
+          --jq '[.[] | select(.status != "completed" and (.headBranch | test("^v[0-9]")))] | map(.headBranch + " (" + .url + ")") | join(", ")')
+        if [ -n "$running" ] && [ "$DRY_RUN" = "true" ]; then
+          echo "::warning::a release build is still running: $running. A real run would wait for it."
+        elif [ -n "$running" ]; then
+          echo "::error::a release build is still running: $running. Run this again when it has finished."
+          exit 1
+        fi
+        # The release's notes link to CHANGELOG.md at the tag, so its heading should be there.
+        version="${tag#v}"
+        if grep -qE "^## ${version//./\\.} \(" CHANGELOG.md; then
+          changelog=yes
+        else
+          changelog=no
+          echo "::warning::CHANGELOG.md has no '## $version (YYYY-MM-DD)' heading, so the release notes' changelog link shows only 'Unreleased'. Add it in a PR (the Unreleased entries under it) before cutting $tag."
+        fi
+
+        from="${newest:-$BEFORE_THIS_REPOSITORY (before this repository)}"
+        echo "Newest release: $from. Next ($BUMP): $tag, on ${commit:0:7}."
+        {
+          echo "tag=$tag"
+          echo "commit=$commit"
+          echo "newest=$from"
+          echo "changelog=$changelog"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Tag main's newest commit
+      id: tag
+      if: ${{ !inputs.dry_run }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ steps.next.outputs.tag }}
+        COMMIT: ${{ steps.next.outputs.commit }}
+      run: |
+        gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+          -f ref="refs/tags/$TAG" -f sha="$COMMIT" > /dev/null
+        echo "Created $TAG at ${COMMIT:0:7}."
+
+    - name: Start the release build on the tag
+      id: dispatch
+      if: ${{ !inputs.dry_run }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ steps.next.outputs.tag }}
+      run: |
+        # gh prints the new run's URL on stdout; its errors go to stderr, so they reach the log.
+        out=$(gh workflow run docker-build-deploy.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" \
+          -f environment=production)
+        echo "$out"
+        url=$(grep -oE 'https://[^ ]+/actions/runs/[0-9]+' <<< "$out" | head -n 1 || true)
+        echo "url=$url" >> "$GITHUB_OUTPUT"
+
+    # The end-to-end tests on the release: its commit may never have been through a
+    # PR's CI. ci-cd.yml runs only its e2e job on a tag. The build doesn't wait for them,
+    # and this step failing doesn't fail the release: the summary says so.
+    - name: Start the end-to-end tests on the tag
+      id: e2e
+      if: ${{ !inputs.dry_run && steps.tag.outcome == 'success' }}
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ steps.next.outputs.tag }}
+      run: |
+        out=$(gh workflow run ci-cd.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG")
+        echo "$out"
+        url=$(grep -oE 'https://[^ ]+/actions/runs/[0-9]+' <<< "$out" | head -n 1 || true)
+        echo "url=$url" >> "$GITHUB_OUTPUT"
+
+    # Says what actually happened: a failed tag or dispatch is reported as such, with what
+    # to do next, never as a build on its way.
+    - name: Summary
+      if: ${{ always() && steps.next.outputs.tag != '' }}
+      env:
+        TAG: ${{ steps.next.outputs.tag }}
+        NEWEST: ${{ steps.next.outputs.newest }}
+        COMMIT: ${{ steps.next.outputs.commit }}
+        CHANGELOG: ${{ steps.next.outputs.changelog }}
+        DRY_RUN: ${{ inputs.dry_run }}
+        BUMP: ${{ inputs.bump }}
+        TAG_OUTCOME: ${{ steps.tag.outcome }}
+        DISPATCH_OUTCOME: ${{ steps.dispatch.outcome }}
+        RUN_URL: ${{ steps.dispatch.outputs.url }}
+        E2E_OUTCOME: ${{ steps.e2e.outcome }}
+        E2E_URL: ${{ steps.e2e.outputs.url }}
+      run: |
+        builds="${RUN_URL:-$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/docker-build-deploy.yml?query=branch%3A$TAG}"
+        version="${TAG#v}"
+        {
+          echo "### Release $TAG"
+          echo
+          echo "- Bump: $BUMP, from $NEWEST"
+          echo "- Commit: \`${COMMIT:0:7}\` on main"
+          if [ "$CHANGELOG" != "yes" ]; then
+            echo "- CHANGELOG.md has no \`## $version (YYYY-MM-DD)\` heading: the release notes' changelog link shows only Unreleased."
+          fi
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "- Dry run: no tag was created and nothing was built."
+          elif [ "$TAG_OUTCOME" = "failure" ]; then
+            echo "- **No tag was created**, so nothing was built. See the tag step's log."
+          elif [ "$TAG_OUTCOME" != "success" ]; then
+            echo "- **The tag step didn't finish** (${TAG_OUTCOME:-not run}): check whether $TAG exists under Tags before running this again."
+          elif [ "$DISPATCH_OUTCOME" != "success" ]; then
+            echo "- **$TAG was created, but the build may not have started** (the dispatch step: ${DISPATCH_OUTCOME:-not run}). Check the build workflow's runs for $TAG."
+            echo "  If there's none, start it by hand: Actions → Build and Deploy to GitHub Container Registry → Run workflow → Use workflow from → Tags → $TAG."
+            echo "  (Running Cut a release again refuses: this commit is already $TAG.)"
+            echo "- The end-to-end tests weren't started either (${E2E_OUTCOME:-not run}): once the build runs, Actions → CI/CD Testing Pipeline → Run workflow → Use workflow from → Tags → $TAG."
+          else
+            echo "- The build and the GitHub Release: [docker-build-deploy.yml on $TAG]($builds)"
+            echo "- When it finishes, the images are tagged \`$version\`, \`$(cut -d. -f1,2 <<< "$version")\`, \`latest\` and \`sha-${COMMIT:0:7}\`."
+            if [ "$E2E_OUTCOME" = "success" ]; then
+              echo "- The end-to-end tests on it: [ci-cd.yml on $TAG](${E2E_URL:-$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/ci-cd.yml?query=branch%3A$TAG})"
+            else
+              echo "- **The end-to-end tests didn't start** (${E2E_OUTCOME:-not run}): Actions → CI/CD Testing Pipeline → Run workflow → Use workflow from → Tags → $TAG."
+            fi
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"

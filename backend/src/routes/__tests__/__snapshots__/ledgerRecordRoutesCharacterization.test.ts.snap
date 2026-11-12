@@ -1,0 +1,1551 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Ledger record routes: whole answers > annotations > creates threads and replies, lists them, counts them and answers the inbox 1`] = `
+{
+  "counts": {
+    "body": {
+      "notify": 0,
+      "open": 1,
+    },
+    "status": 200,
+  },
+  "inbox": {
+    "body": {
+      "inbox": [
+        {
+          "agent_reply_count": "0",
+          "body": "Coffee again",
+          "feedback": null,
+          "feedback_reason": null,
+          "inbox_reason": "reply",
+          "last_activity_at": "<instant>",
+          "last_author_kind": "user",
+          "last_body": "Coffee again",
+          "learning_status": null,
+          "status": "open",
+          "subject_label": "Coffee",
+          "subject_type": "transaction",
+          "subject_uuid": "<uuid>",
+          "uuid": "<uuid>",
+        },
+        {
+          "agent_reply_count": "1",
+          "body": "Is this groceries?",
+          "feedback": null,
+          "feedback_reason": null,
+          "inbox_reason": "reply",
+          "last_activity_at": "<instant>",
+          "last_author_kind": "user",
+          "last_body": "Yes",
+          "learning_status": null,
+          "status": "answered",
+          "subject_label": "Market",
+          "subject_type": "transaction",
+          "subject_uuid": "<uuid>",
+          "uuid": "<uuid>",
+        },
+      ],
+      "next_since": "<instant>",
+      "next_since_uuid": "<uuid>",
+      "since": "<instant>",
+    },
+    "status": 200,
+  },
+  "inboxAfter": {
+    "body": {
+      "inbox": [],
+      "next_since": "<instant>",
+      "next_since_uuid": "<uuid>",
+      "since": "<instant>",
+    },
+    "status": 200,
+  },
+  "inboxBadSince": {
+    "body": {
+      "code": "INVALID_CURSOR",
+      "error": "since must be a time, as an answer's next_since gives it",
+      "message": "since must be a time, as an answer's next_since gives it",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "inboxBadSinceUuid": {
+    "body": {
+      "code": "INVALID_CURSOR",
+      "error": "since_uuid must be the uuid of a thread",
+      "message": "since_uuid must be the uuid of a thread",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "inboxOldCursor": {
+    "body": {
+      "inbox": [
+        {
+          "agent_reply_count": "0",
+          "body": "Coffee again",
+          "feedback": null,
+          "feedback_reason": null,
+          "inbox_reason": "reply",
+          "last_activity_at": "<instant>",
+          "last_author_kind": "user",
+          "last_body": "Coffee again",
+          "learning_status": null,
+          "status": "open",
+          "subject_label": "Coffee",
+          "subject_type": "transaction",
+          "subject_uuid": "<uuid>",
+          "uuid": "<uuid>",
+        },
+        {
+          "agent_reply_count": "1",
+          "body": "Is this groceries?",
+          "feedback": null,
+          "feedback_reason": null,
+          "inbox_reason": "reply",
+          "last_activity_at": "<instant>",
+          "last_author_kind": "user",
+          "last_body": "Yes",
+          "learning_status": null,
+          "status": "answered",
+          "subject_label": "Market",
+          "subject_type": "transaction",
+          "subject_uuid": "<uuid>",
+          "uuid": "<uuid>",
+        },
+      ],
+      "next_since": "<instant>",
+      "next_since_uuid": "<uuid>",
+      "since": "2026-01-01",
+    },
+    "status": 200,
+  },
+  "invalidBody": {
+    "body": {
+      "code": "VALIDATION_ERROR",
+      "details": [
+        {
+          "field": "kind",
+          "message": "Invalid option: expected one of "reasoning"|"question"|"answer"|"observation"|"decision"|"flag"|"correction"|"note"",
+        },
+      ],
+      "error": "Validation failed",
+      "message": "Invalid option: expected one of "reasoning"|"question"|"answer"|"observation"|"decision"|"flag"|"correction"|"note"",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "noSubjectUuid": {
+    "body": {
+      "code": "BAD_REQUEST",
+      "error": "subject_uuid is required for a new thread",
+      "message": "subject_uuid is required for a new thread",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "reply": {
+    "body": {
+      "created_at": "<instant>",
+      "kind": "answer",
+      "parent_uuid": "<uuid>",
+      "status": "open",
+      "subject_type": "transaction",
+      "subject_uuid": null,
+      "uuid": "<uuid>",
+    },
+    "status": 201,
+  },
+  "replyMissingParent": {
+    "body": {
+      "code": "NOT_FOUND",
+      "error": "Parent annotation not found",
+      "message": "Parent annotation not found",
+      "requestId": "<requestId>",
+    },
+    "status": 404,
+  },
+  "root": {
+    "body": {
+      "created_at": "<instant>",
+      "kind": "question",
+      "parent_uuid": null,
+      "status": "open",
+      "subject_type": "transaction",
+      "subject_uuid": "<uuid>",
+      "uuid": "<uuid>",
+    },
+    "status": 201,
+  },
+  "second": {
+    "body": {
+      "created_at": "<instant>",
+      "kind": "note",
+      "parent_uuid": null,
+      "status": "open",
+      "subject_type": "transaction",
+      "subject_uuid": "<uuid>",
+      "uuid": "<uuid>",
+    },
+    "status": 201,
+  },
+  "subjectMissing": {
+    "body": {
+      "code": "NOT_FOUND",
+      "error": "Subject not found",
+      "message": "Subject not found",
+      "requestId": "<requestId>",
+    },
+    "status": 404,
+  },
+  "threads": {
+    "body": {
+      "threads": [
+        {
+          "agent_name": null,
+          "author_first_name": "Test",
+          "author_kind": "user",
+          "body": "Coffee again",
+          "created_at": "<instant>",
+          "kind": "note",
+          "notify": false,
+          "reply_count": "0",
+          "severity": null,
+          "status": "open",
+          "subject_budget_item_name": null,
+          "subject_label": "Coffee",
+          "subject_review_status": "needs review",
+          "subject_type": "transaction",
+          "subject_uuid": "<uuid>",
+          "uuid": "<uuid>",
+        },
+        {
+          "agent_name": "bot",
+          "author_first_name": null,
+          "author_kind": "agent",
+          "body": "Is this groceries?",
+          "created_at": "<instant>",
+          "kind": "question",
+          "notify": true,
+          "reply_count": "1",
+          "severity": "action_required",
+          "status": "answered",
+          "subject_budget_item_name": "Groceries",
+          "subject_label": "Market",
+          "subject_review_status": "reviewed",
+          "subject_type": "transaction",
+          "subject_uuid": "<uuid>",
+          "uuid": "<uuid>",
+        },
+      ],
+    },
+    "status": 200,
+  },
+  "threadsAll": {
+    "body": {
+      "threads": [
+        {
+          "agent_name": null,
+          "author_first_name": "Test",
+          "author_kind": "user",
+          "body": "Coffee again",
+          "created_at": "<instant>",
+          "kind": "note",
+          "notify": false,
+          "reply_count": "0",
+          "severity": null,
+          "status": "open",
+          "subject_budget_item_name": null,
+          "subject_label": "Coffee",
+          "subject_review_status": "needs review",
+          "subject_type": "transaction",
+          "subject_uuid": "<uuid>",
+          "uuid": "<uuid>",
+        },
+        {
+          "agent_name": "bot",
+          "author_first_name": null,
+          "author_kind": "agent",
+          "body": "Is this groceries?",
+          "created_at": "<instant>",
+          "kind": "question",
+          "notify": true,
+          "reply_count": "1",
+          "severity": "action_required",
+          "status": "answered",
+          "subject_budget_item_name": "Groceries",
+          "subject_label": "Market",
+          "subject_review_status": "reviewed",
+          "subject_type": "transaction",
+          "subject_uuid": "<uuid>",
+          "uuid": "<uuid>",
+        },
+      ],
+    },
+    "status": 200,
+  },
+  "threadsNone": {
+    "body": {
+      "threads": [],
+    },
+    "status": 200,
+  },
+  "threadsNotify": {
+    "body": {
+      "threads": [
+        {
+          "agent_name": "bot",
+          "author_first_name": null,
+          "author_kind": "agent",
+          "body": "Is this groceries?",
+          "created_at": "<instant>",
+          "kind": "question",
+          "notify": true,
+          "reply_count": "1",
+          "severity": "action_required",
+          "status": "answered",
+          "subject_budget_item_name": "Groceries",
+          "subject_label": "Market",
+          "subject_review_status": "reviewed",
+          "subject_type": "transaction",
+          "subject_uuid": "<uuid>",
+          "uuid": "<uuid>",
+        },
+      ],
+    },
+    "status": 200,
+  },
+  "timeline": {
+    "body": {
+      "annotations": [
+        {
+          "agent_name": "bot",
+          "author_first_name": null,
+          "author_kind": "agent",
+          "author_user_id": null,
+          "body": "Is this groceries?",
+          "created_at": "<instant>",
+          "edited": false,
+          "feedback": null,
+          "feedback_reason": null,
+          "kind": "question",
+          "learning_status": null,
+          "meta": {
+            "confidence": 0.6,
+          },
+          "notify": true,
+          "parent_uuid": null,
+          "pinned": false,
+          "severity": "action_required",
+          "status": "answered",
+          "uuid": "<uuid>",
+        },
+        {
+          "agent_name": null,
+          "author_first_name": "Test",
+          "author_kind": "user",
+          "author_user_id": "<id>",
+          "body": "Yes",
+          "created_at": "<instant>",
+          "edited": false,
+          "feedback": null,
+          "feedback_reason": null,
+          "kind": "answer",
+          "learning_status": null,
+          "meta": null,
+          "notify": false,
+          "parent_uuid": "<uuid>",
+          "pinned": false,
+          "severity": null,
+          "status": "open",
+          "uuid": "<uuid>",
+        },
+      ],
+      "subject_type": "transaction",
+      "subject_uuid": "<uuid>",
+    },
+    "status": 200,
+  },
+  "timelineMissing": {
+    "body": {
+      "code": "NOT_FOUND",
+      "error": "Subject not found",
+      "message": "Subject not found",
+      "requestId": "<requestId>",
+    },
+    "status": 404,
+  },
+  "timelineNoType": {
+    "body": {
+      "code": "BAD_REQUEST",
+      "error": "Unsupported subject_type: ",
+      "message": "Unsupported subject_type: ",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "timelineNoUuid": {
+    "body": {
+      "code": "BAD_REQUEST",
+      "error": "subject_uuid is required",
+      "message": "subject_uuid is required",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "timelineUnsupported": {
+    "body": {
+      "code": "BAD_REQUEST",
+      "error": "Unsupported subject_type: planet",
+      "message": "Unsupported subject_type: planet",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "unsupportedSubject": {
+    "body": {
+      "code": "VALIDATION_ERROR",
+      "details": [
+        {
+          "field": "subject_type",
+          "message": "Invalid option: expected one of "transaction"|"account"|"merchant"|"security"|"budget_item"|"budget_period_item"|"category"|"tag"",
+        },
+      ],
+      "error": "Validation failed",
+      "message": "Invalid option: expected one of "transaction"|"account"|"merchant"|"security"|"budget_item"|"budget_period_item"|"category"|"tag"",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+}
+`;
+
+exports[`Ledger record routes: whole answers > annotations > edits and resolves threads, with each refusal 1`] = `
+{
+  "applied": {
+    "body": {
+      "edited": false,
+      "feedback": "incorrect",
+      "notify": false,
+      "pinned": false,
+      "severity": null,
+      "status": "open",
+      "uuid": "<uuid>",
+    },
+    "status": 200,
+  },
+  "editAppendOnly": {
+    "body": {
+      "code": "BAD_REQUEST",
+      "error": "Agent reasoning/decision entries are append-only and cannot be edited",
+      "message": "Agent reasoning/decision entries are append-only and cannot be edited",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "editBody": {
+    "body": {
+      "edited": true,
+      "feedback": null,
+      "notify": false,
+      "pinned": true,
+      "severity": null,
+      "status": "open",
+      "uuid": "<uuid>",
+    },
+    "status": 200,
+  },
+  "editMissing": {
+    "body": {
+      "code": "NOT_FOUND",
+      "error": "Annotation not found",
+      "message": "Annotation not found",
+      "requestId": "<requestId>",
+    },
+    "status": 404,
+  },
+  "feedback": {
+    "body": {
+      "edited": false,
+      "feedback": "incorrect",
+      "notify": false,
+      "pinned": false,
+      "severity": null,
+      "status": "open",
+      "uuid": "<uuid>",
+    },
+    "status": 200,
+  },
+  "reopen": {
+    "body": {
+      "edited": true,
+      "feedback": null,
+      "notify": true,
+      "pinned": true,
+      "severity": "info",
+      "status": "open",
+      "uuid": "<uuid>",
+    },
+    "status": 200,
+  },
+  "replyThreadFields": {
+    "body": {
+      "code": "BAD_REQUEST",
+      "error": "No updatable fields supplied",
+      "message": "No updatable fields supplied",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "resolve": {
+    "body": {
+      "edited": true,
+      "feedback": null,
+      "notify": false,
+      "pinned": true,
+      "severity": null,
+      "status": "resolved",
+      "uuid": "<uuid>",
+    },
+    "status": 200,
+  },
+  "resolveAgain": {
+    "body": {
+      "resolved": 0,
+    },
+    "status": 200,
+  },
+  "resolveAll": {
+    "body": {
+      "resolved": 2,
+    },
+    "status": 200,
+  },
+  "resolveNeither": {
+    "body": {
+      "code": "VALIDATION_ERROR",
+      "details": [
+        {
+          "field": "(root)",
+          "message": "Provide exactly one of 'uuid' or 'scope'",
+        },
+      ],
+      "error": "Validation failed",
+      "message": "Provide exactly one of 'uuid' or 'scope'",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "resolveOne": {
+    "body": {
+      "resolved": 1,
+    },
+    "status": 200,
+  },
+  "resolveOneMissing": {
+    "body": {
+      "code": "NOT_FOUND",
+      "error": "No open annotation thread with that uuid",
+      "message": "No open annotation thread with that uuid",
+      "requestId": "<requestId>",
+    },
+    "status": 404,
+  },
+  "resolveReviewed": {
+    "body": {
+      "resolved": 0,
+    },
+    "status": 200,
+  },
+  "timeline": {
+    "body": {
+      "annotations": [
+        {
+          "agent_name": null,
+          "author_first_name": "Test",
+          "author_kind": "user",
+          "author_user_id": "<id>",
+          "body": "Coffee again",
+          "created_at": "<instant>",
+          "edited": false,
+          "feedback": null,
+          "feedback_reason": null,
+          "kind": "note",
+          "learning_status": null,
+          "meta": null,
+          "notify": false,
+          "parent_uuid": null,
+          "pinned": false,
+          "severity": null,
+          "status": "answered",
+          "uuid": "<uuid>",
+        },
+        {
+          "agent_name": null,
+          "author_first_name": null,
+          "author_kind": "agent",
+          "author_user_id": null,
+          "body": "Left as is",
+          "created_at": "<instant>",
+          "edited": false,
+          "feedback": "incorrect",
+          "feedback_reason": "wrong",
+          "kind": "decision",
+          "learning_status": "applied",
+          "meta": null,
+          "notify": false,
+          "parent_uuid": null,
+          "pinned": false,
+          "severity": null,
+          "status": "answered",
+          "uuid": "<uuid>",
+        },
+        {
+          "agent_name": null,
+          "author_first_name": "Test",
+          "author_kind": "user",
+          "author_user_id": "<id>",
+          "body": "Hmm, coffee",
+          "created_at": "<instant>",
+          "edited": true,
+          "feedback": null,
+          "feedback_reason": null,
+          "kind": "note",
+          "learning_status": null,
+          "meta": null,
+          "notify": true,
+          "parent_uuid": null,
+          "pinned": true,
+          "severity": "info",
+          "status": "answered",
+          "uuid": "<uuid>",
+        },
+        {
+          "agent_name": null,
+          "author_first_name": "Test",
+          "author_kind": "user",
+          "author_user_id": "<id>",
+          "body": "Reply",
+          "created_at": "<instant>",
+          "edited": false,
+          "feedback": null,
+          "feedback_reason": null,
+          "kind": "note",
+          "learning_status": null,
+          "meta": null,
+          "notify": false,
+          "parent_uuid": "<uuid>",
+          "pinned": false,
+          "severity": null,
+          "status": "open",
+          "uuid": "<uuid>",
+        },
+        {
+          "agent_name": null,
+          "author_first_name": "Test",
+          "author_kind": "user",
+          "author_user_id": "<id>",
+          "body": "user manually resolved the activity",
+          "created_at": "<instant>",
+          "edited": false,
+          "feedback": null,
+          "feedback_reason": null,
+          "kind": "answer",
+          "learning_status": null,
+          "meta": null,
+          "notify": false,
+          "parent_uuid": "<uuid>",
+          "pinned": false,
+          "severity": null,
+          "status": "open",
+          "uuid": "<uuid>",
+        },
+        {
+          "agent_name": null,
+          "author_first_name": "Test",
+          "author_kind": "user",
+          "author_user_id": "<id>",
+          "body": "user manually resolved the activity",
+          "created_at": "<instant>",
+          "edited": false,
+          "feedback": null,
+          "feedback_reason": null,
+          "kind": "answer",
+          "learning_status": null,
+          "meta": null,
+          "notify": false,
+          "parent_uuid": "<uuid>",
+          "pinned": false,
+          "severity": null,
+          "status": "open",
+          "uuid": "<uuid>",
+        },
+        {
+          "agent_name": null,
+          "author_first_name": "Test",
+          "author_kind": "user",
+          "author_user_id": "<id>",
+          "body": "user manually resolved the activity",
+          "created_at": "<instant>",
+          "edited": false,
+          "feedback": null,
+          "feedback_reason": null,
+          "kind": "answer",
+          "learning_status": null,
+          "meta": null,
+          "notify": false,
+          "parent_uuid": "<uuid>",
+          "pinned": false,
+          "severity": null,
+          "status": "open",
+          "uuid": "<uuid>",
+        },
+      ],
+      "subject_type": "transaction",
+      "subject_uuid": "<uuid>",
+    },
+    "status": 200,
+  },
+}
+`;
+
+exports[`Ledger record routes: whole answers > attachments > uploads, serves and deletes a file, with each refusal 1`] = `
+{
+  "badBytes": {
+    "body": {
+      "code": "UPLOAD_REJECTED",
+      "error": "“a.pdf” isn’t the kind of file its name says it is.",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "deleted": {
+    "body": {
+      "message": "Attachment deleted",
+      "uuid": "<uuid>",
+    },
+    "status": 200,
+  },
+  "deletedAgain": {
+    "body": {
+      "code": "NOT_FOUND",
+      "error": "Attachment not found",
+      "message": "Attachment not found",
+      "requestId": "<requestId>",
+    },
+    "status": 404,
+  },
+  "entityMissing": {
+    "body": {
+      "code": "NOT_FOUND",
+      "error": "Referenced budget_item not found",
+      "message": "Referenced budget_item not found",
+      "requestId": "<requestId>",
+    },
+    "status": 404,
+  },
+  "entityMissingBadBytes": {
+    "body": {
+      "code": "NOT_FOUND",
+      "error": "Referenced budget_item not found",
+      "message": "Referenced budget_item not found",
+      "requestId": "<requestId>",
+    },
+    "status": 404,
+  },
+  "file": {
+    "body": "%PDF-1.4 receipt",
+    "headers": {
+      "cache-control": "private, no-store",
+      "content-disposition": "inline; filename="receipt.pdf"; filename*=UTF-8''receipt.pdf",
+      "content-type": "application/pdf",
+      "x-content-type-options": "nosniff",
+    },
+    "status": 200,
+  },
+  "fileGone": {
+    "body": {
+      "code": "NOT_FOUND",
+      "error": "Attachment not found",
+      "message": "Attachment not found",
+      "requestId": "<requestId>",
+    },
+    "status": 404,
+  },
+  "fileMissing": {
+    "body": {
+      "code": "NOT_FOUND",
+      "error": "Attachment not found",
+      "message": "Attachment not found",
+      "requestId": "<requestId>",
+    },
+    "status": 404,
+  },
+  "list": {
+    "body": {
+      "attachments": [
+        {
+          "attachment_type": "document",
+          "bill_date": "2026-04-02",
+          "created_at": "<instant>",
+          "date_uploaded": "<instant>",
+          "file_extension": "pdf",
+          "file_size": "16",
+          "mime_type": "application/pdf",
+          "name": "Receipt scan",
+          "notes": "paid",
+          "original_filename": "receipt.pdf",
+          "safe_filename": "<safe_filename>",
+          "uuid": "<uuid>",
+        },
+        {
+          "attachment_type": "document",
+          "bill_date": "2026-04-02",
+          "created_at": "<instant>",
+          "date_uploaded": "<instant>",
+          "file_extension": "pdf",
+          "file_size": "15",
+          "mime_type": "application/pdf",
+          "name": "Receipt scan",
+          "notes": "paid",
+          "original_filename": "second.pdf",
+          "safe_filename": "<safe_filename>",
+          "uuid": "<uuid>",
+        },
+      ],
+    },
+    "status": 200,
+  },
+  "noEntity": {
+    "body": {
+      "code": "BAD_REQUEST",
+      "error": "An attachment must reference one of: transaction_id, budget_item_id, merchant_id, holding_event_id",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "noFiles": {
+    "body": {
+      "code": "BAD_REQUEST",
+      "error": "No valid files uploaded (allowed: PDF, DOC, DOCX, JPG, PNG, XLS, XLSX; max 5MB)",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "uploaded": {
+    "body": {
+      "attachments": [
+        {
+          "attachment_type": "document",
+          "bill_date": "2026-04-02",
+          "budget_item_id": null,
+          "created_at": "<instant>",
+          "date_uploaded": "<instant>",
+          "file_extension": "pdf",
+          "file_name": "<file_name>",
+          "file_size": 16,
+          "holding_event_id": null,
+          "id": "<id>",
+          "merchant_id": null,
+          "mime_type": "application/pdf",
+          "name": "Receipt scan",
+          "notes": "paid",
+          "original_filename": "receipt.pdf",
+          "safe_filename": "<safe_filename>",
+          "transaction_id": "<id>",
+          "uuid": "<uuid>",
+        },
+        {
+          "attachment_type": "document",
+          "bill_date": "2026-04-02",
+          "budget_item_id": null,
+          "created_at": "<instant>",
+          "date_uploaded": "<instant>",
+          "file_extension": "pdf",
+          "file_name": "<file_name>",
+          "file_size": 15,
+          "holding_event_id": null,
+          "id": "<id>",
+          "merchant_id": null,
+          "mime_type": "application/pdf",
+          "name": "Receipt scan",
+          "notes": "paid",
+          "original_filename": "second.pdf",
+          "safe_filename": "<safe_filename>",
+          "transaction_id": "<id>",
+          "uuid": "<uuid>",
+        },
+      ],
+    },
+    "status": 201,
+  },
+  "wrongType": {
+    "body": {
+      "code": "BAD_REQUEST",
+      "error": "No valid files uploaded (allowed: PDF, DOC, DOCX, JPG, PNG, XLS, XLSX; max 5MB)",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+}
+`;
+
+exports[`Ledger record routes: whole answers > categories > lists, creates, renames and deletes, with each refusal 1`] = `
+{
+  "clash": {
+    "body": {
+      "code": "CONFLICT",
+      "error": "Category exists",
+      "message": "A category with this name already exists",
+      "requestId": "<requestId>",
+    },
+    "status": 409,
+  },
+  "created": {
+    "body": {
+      "created_at": "<instant>",
+      "description": "rent",
+      "icon": "Home",
+      "id": "<id>",
+      "name": "Housing",
+      "notes": null,
+      "priority": "Need",
+      "uuid": "<uuid>",
+    },
+    "status": 201,
+  },
+  "deleteInUse": {
+    "body": {
+      "code": "CONFLICT",
+      "error": "Category in use",
+      "message": "Cannot delete category that is assigned to budget items",
+      "requestId": "<requestId>",
+    },
+    "status": 409,
+  },
+  "deleteMissing": {
+    "body": {
+      "code": "NOT_FOUND",
+      "error": "Category not found",
+      "message": "The specified category does not exist",
+      "requestId": "<requestId>",
+    },
+    "status": 404,
+  },
+  "deleted": {
+    "body": {},
+    "status": 204,
+  },
+  "duplicate": {
+    "body": {
+      "code": "CONFLICT",
+      "error": "Category exists",
+      "message": "A category with this name already exists",
+      "requestId": "<requestId>",
+    },
+    "status": 409,
+  },
+  "list": {
+    "body": [
+      {
+        "created_at": "<instant>",
+        "description": null,
+        "icon": "Utensils",
+        "id": "<id>",
+        "name": "Food",
+        "notes": null,
+        "priority": "Undefined",
+        "uuid": "<uuid>",
+      },
+      {
+        "created_at": "<instant>",
+        "description": "rent",
+        "icon": "Home",
+        "id": "<id>",
+        "name": "Housing",
+        "notes": null,
+        "priority": "Need",
+        "uuid": "<uuid>",
+      },
+    ],
+    "status": 200,
+  },
+  "missingIcon": {
+    "body": {
+      "code": "VALIDATION_ERROR",
+      "details": [
+        {
+          "field": "icon",
+          "message": "Name and icon are required",
+        },
+      ],
+      "error": "Validation failed",
+      "message": "Name and icon are required",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "missingName": {
+    "body": {
+      "code": "VALIDATION_ERROR",
+      "details": [
+        {
+          "field": "name",
+          "message": "Name and icon are required",
+        },
+      ],
+      "error": "Validation failed",
+      "message": "Name and icon are required",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "noIcon": {
+    "body": {
+      "code": "VALIDATION_ERROR",
+      "details": [
+        {
+          "field": "icon",
+          "message": "Name and icon are required",
+        },
+      ],
+      "error": "Validation failed",
+      "message": "Name and icon are required",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "recased": {
+    "body": {
+      "created_at": "<instant>",
+      "description": null,
+      "icon": "Cart",
+      "id": "<id>",
+      "name": "GROCERIES",
+      "notes": null,
+      "priority": "Undefined",
+      "uuid": "<uuid>",
+    },
+    "status": 200,
+  },
+  "renamed": {
+    "body": {
+      "created_at": "<instant>",
+      "description": null,
+      "icon": "Cart",
+      "id": "<id>",
+      "name": "Groceries",
+      "notes": "weekly",
+      "priority": "Undefined",
+      "uuid": "<uuid>",
+    },
+    "status": 200,
+  },
+  "tooLong": {
+    "body": {
+      "code": "VALIDATION_ERROR",
+      "details": [
+        {
+          "field": "name",
+          "message": "Category name must be 100 characters or less",
+        },
+      ],
+      "error": "Validation failed",
+      "message": "Category name must be 100 characters or less",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "updateMissing": {
+    "body": {
+      "code": "NOT_FOUND",
+      "error": "Category not found",
+      "message": "The specified category does not exist",
+      "requestId": "<requestId>",
+    },
+    "status": 404,
+  },
+}
+`;
+
+exports[`Ledger record routes: whole answers > data management > previews and deletes a range, with each refusal 1`] = `
+{
+  "backupRefused": {
+    "body": {
+      "code": "BACKUP_REQUIRES_DEPLOYMENT_ADMIN",
+      "error": "Only a deployment admin can create a backup: it holds every tenant on this server. Delete without one, or ask a deployment admin to back up first.",
+      "requestId": "<requestId>",
+    },
+    "status": 403,
+  },
+  "deleteBadDate": {
+    "body": {
+      "code": "VALIDATION_ERROR",
+      "details": [
+        {
+          "field": "dateFrom",
+          "message": "Invalid date format",
+        },
+      ],
+      "error": "Validation failed",
+      "message": "Invalid date format",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "deleteFuture": {
+    "body": {
+      "code": "BAD_REQUEST",
+      "error": "Cannot delete transactions in the future",
+      "message": "Cannot delete transactions in the future",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "deleteNoDates": {
+    "body": {
+      "code": "VALIDATION_ERROR",
+      "details": [
+        {
+          "field": "dateFrom",
+          "message": "Date range is required",
+        },
+        {
+          "field": "dateTo",
+          "message": "Date range is required",
+        },
+      ],
+      "error": "Validation failed",
+      "message": "Date range is required",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "deleteNoKey": {
+    "body": {
+      "code": "VALIDATION_ERROR",
+      "details": [
+        {
+          "field": "selectionKey",
+          "message": "Preview the deletion first: send the selectionKey its preview answered",
+        },
+      ],
+      "error": "Validation failed",
+      "message": "Preview the deletion first: send the selectionKey its preview answered",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "deleteOutdated": {
+    "body": {
+      "code": "PREVIEW_OUTDATED",
+      "error": "The transactions in this range have changed since the preview, so nothing was deleted. Preview again to see what would be deleted now.",
+      "message": "The transactions in this range have changed since the preview, so nothing was deleted. Preview again to see what would be deleted now.",
+      "requestId": "<requestId>",
+    },
+    "status": 409,
+  },
+  "deleteReversed": {
+    "body": {
+      "code": "VALIDATION_ERROR",
+      "details": [
+        {
+          "field": "dateTo",
+          "message": "Start date must be before or equal to end date",
+        },
+      ],
+      "error": "Validation failed",
+      "message": "Start date must be before or equal to end date",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "deleted": {
+    "body": {
+      "affectedAccounts": 1,
+      "backupCreated": false,
+      "count": 2,
+      "earliestDate": "2019-05-15",
+      "latestDate": "2019-05-15",
+      "success": true,
+      "totalExpenses": 20,
+      "totalIncome": 35,
+    },
+    "status": 200,
+  },
+  "deletedNone": {
+    "body": {
+      "affectedAccounts": 0,
+      "backupCreated": false,
+      "count": 0,
+      "earliestDate": null,
+      "latestDate": null,
+      "success": true,
+      "totalExpenses": 0,
+      "totalIncome": 0,
+    },
+    "status": 200,
+  },
+  "emptyPreview": {
+    "body": {
+      "affectedAccounts": 0,
+      "count": 0,
+      "earliestDate": null,
+      "latestDate": null,
+      "selectionKey": "<hex64>",
+      "success": true,
+      "totalExpenses": 0,
+      "totalIncome": 0,
+    },
+    "status": 200,
+  },
+  "preview": {
+    "body": {
+      "affectedAccounts": 1,
+      "count": 2,
+      "earliestDate": "2019-05-15",
+      "latestDate": "2019-05-15",
+      "selectionKey": "<hex64>",
+      "success": true,
+      "totalExpenses": 20,
+      "totalIncome": 35,
+    },
+    "status": 200,
+  },
+  "previewBadDate": {
+    "body": {
+      "code": "VALIDATION_ERROR",
+      "details": [
+        {
+          "field": "dateTo",
+          "message": "Invalid date format",
+        },
+      ],
+      "error": "Validation failed",
+      "message": "Invalid date format",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "previewFuture": {
+    "body": {
+      "code": "BAD_REQUEST",
+      "error": "Cannot delete transactions in the future",
+      "message": "Cannot delete transactions in the future",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "previewNoDates": {
+    "body": {
+      "code": "VALIDATION_ERROR",
+      "details": [
+        {
+          "field": "dateTo",
+          "message": "Date range is required",
+        },
+      ],
+      "error": "Validation failed",
+      "message": "Date range is required",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "previewReversed": {
+    "body": {
+      "code": "VALIDATION_ERROR",
+      "details": [
+        {
+          "field": "dateTo",
+          "message": "Start date must be before or equal to end date",
+        },
+      ],
+      "error": "Validation failed",
+      "message": "Start date must be before or equal to end date",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+}
+`;
+
+exports[`Ledger record routes: whole answers > institutions > lists, reads, creates, renames and deletes, with each refusal 1`] = `
+{
+  "blankCreate": {
+    "body": {
+      "code": "VALIDATION_ERROR",
+      "details": [
+        {
+          "field": "name",
+          "message": "Institution name is required",
+        },
+      ],
+      "error": "Validation failed",
+      "message": "Institution name is required",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "blankRename": {
+    "body": {
+      "code": "VALIDATION_ERROR",
+      "details": [
+        {
+          "field": "name",
+          "message": "Institution name is required",
+        },
+      ],
+      "error": "Validation failed",
+      "message": "Institution name is required",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "created": {
+    "body": {
+      "created_at": "<instant>",
+      "id": "<id>",
+      "name": "First Bank",
+      "notes": "branch on Main",
+      "uuid": "<uuid>",
+    },
+    "status": 201,
+  },
+  "deleteInUse": {
+    "body": {
+      "code": "BAD_REQUEST",
+      "error": "Cannot delete institution",
+      "message": "This institution is currently used by 1 account. Please reassign or delete those accounts first.",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "deleteMissing": {
+    "body": {
+      "code": "NOT_FOUND",
+      "error": "Institution not found",
+      "message": "Institution not found",
+      "requestId": "<requestId>",
+    },
+    "status": 404,
+  },
+  "deleted": {
+    "body": {
+      "deleted": {
+        "created_at": "<instant>",
+        "id": "<id>",
+        "name": "First National",
+        "notes": null,
+        "uuid": "<uuid>",
+      },
+      "message": "Institution deleted successfully",
+      "success": true,
+    },
+    "status": 200,
+  },
+  "list": {
+    "body": [
+      {
+        "account_count": "1",
+        "created_at": "<instant>",
+        "id": "<id>",
+        "name": "First Bank",
+        "notes": "branch on Main",
+        "uuid": "<uuid>",
+      },
+    ],
+    "status": 200,
+  },
+  "one": {
+    "body": {
+      "created_at": "<instant>",
+      "id": "<id>",
+      "name": "First Bank",
+      "notes": "branch on Main",
+      "uuid": "<uuid>",
+    },
+    "status": 200,
+  },
+  "oneMissing": {
+    "body": {
+      "code": "NOT_FOUND",
+      "error": "Institution not found",
+      "message": "Institution not found",
+      "requestId": "<requestId>",
+    },
+    "status": 404,
+  },
+  "renameMissing": {
+    "body": {
+      "code": "NOT_FOUND",
+      "error": "Institution not found",
+      "message": "Institution not found",
+      "requestId": "<requestId>",
+    },
+    "status": 404,
+  },
+  "renamed": {
+    "body": {
+      "created_at": "<instant>",
+      "id": "<id>",
+      "name": "First National",
+      "notes": null,
+      "uuid": "<uuid>",
+    },
+    "status": 200,
+  },
+}
+`;
+
+exports[`Ledger record routes: whole answers > net worth > answers today, the history, and clears and rebuilds it for a deployment admin only 1`] = `
+{
+  "clearMember": {
+    "body": {
+      "code": "DEPLOYMENT_ADMIN_REQUIRED",
+      "error": "Deployment admin required",
+      "requestId": "<requestId>",
+    },
+    "status": 403,
+  },
+  "cleared": {
+    "body": {
+      "deleted_count": "<count>",
+      "message": "Successfully deleted <count> net worth snapshots (all aggregation levels)",
+    },
+    "status": 200,
+  },
+  "current": {
+    "body": {
+      "current_net_worth": {
+        "account_count": 1,
+        "active_account_count": 1,
+        "net_worth": 70,
+        "snapshot_date": "<today>",
+        "total_assets": 70,
+        "total_liabilities": 0,
+      },
+    },
+    "status": 200,
+  },
+  "historyDays": {
+    "body": {
+      "history": [
+        {
+          "account_count": 1,
+          "active_account_count": 0,
+          "aggregation_level": "daily",
+          "calculation_method": "aggregated",
+          "created_at": "<instant>",
+          "id": "<id>",
+          "is_interpolated": false,
+          "net_worth": 70,
+          "snapshot_date": "<today>",
+          "snapshot_trigger": "aggregation",
+          "source_snapshot_count": 0,
+          "total_assets": 70,
+          "total_liabilities": 0,
+          "updated_at": "<instant>",
+          "uuid": "",
+        },
+        {
+          "account_count": 1,
+          "active_account_count": 0,
+          "aggregation_level": "daily",
+          "calculation_method": "aggregated",
+          "created_at": "<instant>",
+          "id": "<id>",
+          "is_interpolated": false,
+          "net_worth": 70,
+          "snapshot_date": "<today-1>",
+          "snapshot_trigger": "aggregation",
+          "source_snapshot_count": 0,
+          "total_assets": 70,
+          "total_liabilities": 0,
+          "updated_at": "<instant>",
+          "uuid": "",
+        },
+        {
+          "account_count": 1,
+          "active_account_count": 0,
+          "aggregation_level": "daily",
+          "calculation_method": "aggregated",
+          "created_at": "<instant>",
+          "id": "<id>",
+          "is_interpolated": false,
+          "net_worth": 100,
+          "snapshot_date": "<today-2>",
+          "snapshot_trigger": "aggregation",
+          "source_snapshot_count": 0,
+          "total_assets": 100,
+          "total_liabilities": 0,
+          "updated_at": "<instant>",
+          "uuid": "",
+        },
+      ],
+      "meta": {
+        "count": 3,
+        "fill_gaps": true,
+        "limit": 3,
+        "period": "day",
+      },
+    },
+    "status": 200,
+  },
+  "historyDefault": {
+    "meta": {
+      "count": "<count>",
+      "fill_gaps": true,
+      "limit": 30,
+      "period": "month",
+    },
+    "status": 200,
+  },
+  "historyNoGaps": {
+    "meta": {
+      "count": "<count>",
+      "fill_gaps": false,
+      "limit": 30,
+      "period": "week",
+    },
+    "status": 200,
+  },
+  "historyOdd": {
+    "meta": {
+      "count": "<count>",
+      "fill_gaps": false,
+      "limit": 3660,
+      "period": "month",
+    },
+    "status": 200,
+  },
+  "rebuildEmpty": {
+    "body": {
+      "code": "BAD_REQUEST",
+      "error": "No transactions found",
+      "message": "Cannot rebuild net worth history without transaction data",
+      "requestId": "<requestId>",
+    },
+    "status": 400,
+  },
+  "rebuildMember": {
+    "body": {
+      "code": "DEPLOYMENT_ADMIN_REQUIRED",
+      "error": "Deployment admin required",
+      "requestId": "<requestId>",
+    },
+    "status": 403,
+  },
+  "rebuilt": {
+    "body": {
+      "earliest_date": "<today-2>",
+      "latest_date": "<today>",
+      "message": "Successfully rebuilt net worth history from earliest transaction",
+      "monthly_aggregates": "<count>",
+      "snapshots_created": 3,
+      "total_days": 3,
+      "weekly_aggregates": "<count>",
+    },
+    "status": 200,
+  },
+}
+`;

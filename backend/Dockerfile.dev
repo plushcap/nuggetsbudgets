@@ -1,0 +1,48 @@
+FROM node:26-slim@sha256:e4db4c914bf8ad241bd24804fc25d272d89bad97e68cdc8a1414862790a02c39
+
+# This Dockerfile expects the build context to be the REPO ROOT (not ./backend):
+# it builds the npm workspace there (package.json's workspaces, one package-lock.json),
+# laid out at /app as in the repository.
+
+WORKDIR /app
+
+# curl, and the PostgreSQL 18 client (pg_dump/pg_restore for backups) from the PostgreSQL
+# apt repository, set up as in backend/Dockerfile.prod: apt reads the armoured key itself.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && . /etc/os-release \
+    && curl -fsSL -o /usr/share/keyrings/pgdg.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && echo "deb [signed-by=/usr/share/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt/ ${VERSION_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client-18 \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Install the workspace ---
+# Its lockfile and the manifests of the three packages this image builds first, so this
+# layer stays cached until one of their dependencies changes. --workspace installs only
+# them and their dependencies: the versions the lockfile pins, the ones CI tests,
+# never newer, as frontend/Dockerfile.dev installs. The dependencies are hoisted to
+# /app/node_modules, outside the directories docker-compose.yml bind-mounts.
+COPY package.json package-lock.json ./
+COPY shared/package.json shared/
+COPY mcp/package.json mcp/
+COPY backend/package.json backend/
+RUN npm ci --no-audit --no-fund --workspace shared --workspace mcp --workspace backend
+
+# --- Build @nuggets/shared, the MCP package, then the backend (build:server) ---
+COPY shared/tsconfig.json shared/
+COPY shared/src shared/src
+COPY mcp/tsconfig.json mcp/tsconfig.build.json mcp/
+COPY mcp/src mcp/src
+COPY backend/. backend/
+RUN npm run build:server
+
+WORKDIR /app/backend
+
+# Expose port
+EXPOSE 5000
+
+# Apply pending migrations (as MIGRATION_DB_USER), then start the compiled code, as the
+# production image does.
+ENTRYPOINT ["sh", "/app/backend/docker-entrypoint.sh"]
+CMD ["npm", "start"]

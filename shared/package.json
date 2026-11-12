@@ -1,0 +1,48 @@
+{
+  "name": "@nuggets/shared",
+  "version": "1.0.0",
+  "description": "Shared Zod schemas and inferred types for the Nuggets backend, frontend, and MCP server (single source of truth for validation + contract types).",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "module",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "clean": "rm -rf dist",
+    "lint": "eslint 'src/**/*.ts' --max-warnings 0",
+    "lint:fix": "eslint 'src/**/*.ts' --fix --max-warnings 0"
+  },
+  "dependencies": {
+    "zod": "^4.6.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
+    "globals": "^17.13.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.72.1"
+  },
+  "homepage": "https://github.com/plushcap/nuggetsbudgets#readme",
+  "bugs": {
+    "url": "https://github.com/plushcap/nuggetsbudgets/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/plushcap/nuggetsbudgets.git",
+    "directory": "shared"
+  },
+  "engines": {
+    "node": ">=26"
+  }
+}

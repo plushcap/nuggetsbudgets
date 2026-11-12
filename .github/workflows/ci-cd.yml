@@ -1,0 +1,581 @@
+name: CI/CD Testing Pipeline
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    # Draft PRs don't run CI; the suite runs when a PR is marked ready for review.
+    types: [ opened, synchronize, reopened, ready_for_review ]
+    # Documentation-only changes skip the suite.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  # Merging a PR to main runs nothing here — the PR already validated the change and
+  # the release/tag workflows build the prod images. Develop pushes stay covered.
+  push:
+    branches: [ develop ]
+    # A release tag pushed by hand (vX.Y.Z, as docker-build-deploy.yml builds): only the
+    # e2e job runs, so a release made from a commit no PR's CI ran is still checked.
+    # GitHub doesn't apply paths-ignore to a tag push.
+    tags: [ 'v*' ]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  # cut-release.yml creates its tag with the run's GITHUB_TOKEN, which starts no push event,
+  # so it starts this workflow on the tag itself, as it does the release build. On a tag
+  # that runs the e2e job. By hand on develop it runs every job, as a push there does; on
+  # another branch, nothing.
+  workflow_dispatch:
+
+# Cancel an in-progress run when a newer commit is pushed to the same PR/branch,
+# so superseded runs don't keep consuming Actions minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+# Read-only token for every job: the jobs check out and test, and `npm ci` runs
+# dependencies' install scripts. checkout keeps no credentials in .git/config.
+permissions:
+  contents: read
+
+jobs:
+  test-backend:
+    # Run on non-draft PRs and develop pushes. Merges to main run nothing — the PR
+    # already validated the change, and prod images are built on release tags.
+    if: (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: '26'
+        cache: 'npm'
+        cache-dependency-path: package-lock.json
+
+    # One install from the root lockfile (npm workspaces), of every workspace: the
+    # backend's unit tests type-check the frontend's and the MCP server's source too (the
+    # vocabulary guard), and without the frontend's dependencies its types are `any`.
+    - name: Install dependencies (every workspace)
+      run: npm ci
+
+    # shared first, then mcp: the backend imports both by name, from their built dist/
+    # (@nuggets/shared, and nuggets-mcp's HTTP handler), during tsc and vitest.
+    - name: Build shared and MCP packages
+      run: npm run build -w shared && npm run build -w mcp
+
+    # The build checks src/ only, with noUncheckedIndexedAccess; this checks it, and the tests
+    # against it with that flag off.
+    - name: Type-check MCP sources and tests
+      working-directory: ./mcp
+      run: npm run type-check
+
+    # With coverage (mcp/vitest.config.ts sets the floors it must stay above).
+    - name: Run MCP tests
+      working-directory: ./mcp
+      run: npm run test:coverage
+
+    # Load the SHIPPED base schema (backend/init.sql — the same snapshot the shipped
+    # Postgres image loads via docker-entrypoint-initdb.d), then build + run migrations.
+    # CI exercising the shipped file means schema/seed drift in it (re-applying
+    # baked migrations) fails here, not on a user's first boot. init.sql is
+    # a point-in-time snapshot; migrations bring the schema fully up to date. The other
+    # fresh-install path, the runner loading init.sql itself, is checked further down.
+    - name: Load database schema
+      run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/init.sql
+      env:
+        DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+
+    - name: Build backend
+      working-directory: ./backend
+      run: npm run build
+
+    # The build checks the source only (tsconfig.build.json, noUncheckedIndexedAccess on);
+    # this checks the tests against it too, with that flag off (tsconfig.test.json).
+    - name: Type-check backend sources and tests
+      working-directory: ./backend
+      run: npm run type-check
+
+    # Runs as the schema owner. APP_DB_PASSWORD makes migrate grant the RLS-enforced
+    # serving role (nuggets_app) LOGIN with that password, as it does in production.
+    - name: Run database migrations
+      working-directory: ./backend
+      run: npm run migrate
+      env:
+        DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_NAME: test_db
+        DB_USER: test_user
+        DB_PASSWORD: test_password
+        APP_DB_PASSWORD: test_app_password
+        JWT_SECRET: test_secret
+        SESSION_SECRET: test_session_secret
+        CSRF_SECRET: test_csrf_secret
+
+    # Verify the committed Kysely types match the migrated schema. Runs AFTER
+    # migrations so it introspects the current schema. Blocking: a schema change
+    # must be accompanied by a regenerated schema.generated.ts (npm run db:codegen).
+    - name: Check generated DB types are up to date
+      working-directory: ./backend
+      run: npm run db:codegen:check
+      env:
+        DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+
+    # Rolls back every migration newer than the baseline (init.sql holds the rest), applies
+    # them again and compares pg_dump --schema-only before and after: a DOWN part
+    # that doesn't undo its migration fails here, not in an incident. A few seconds; with no
+    # migration newer than the baseline, it says so and passes.
+    # pg_dump runs in the service container, whose version matches the server's.
+    - name: Migration rollbacks re-apply to the same schema
+      run: backend/scripts/check-migrations.sh rollback
+      env:
+        PG_CONTAINER: ${{ job.services.postgres.id }}
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_NAME: test_db
+        DB_USER: test_user
+        DB_PASSWORD: test_password
+        APP_DB_PASSWORD: test_app_password
+        JWT_SECRET: test_secret
+        SESSION_SECRET: test_session_secret
+        CSRF_SECRET: test_csrf_secret
+
+    # A plain Postgres 18 (an external or managed one, or the stock image) has nothing
+    # loaded: the migration runner loads init.sql into the empty database itself.
+    # The result must match test_db, loaded with psql above.
+    - name: Fresh install on an empty database
+      run: backend/scripts/check-migrations.sh fresh-install
+      env:
+        PG_CONTAINER: ${{ job.services.postgres.id }}
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_NAME: test_db
+        DB_USER: test_user
+        DB_PASSWORD: test_password
+        APP_DB_PASSWORD: test_app_password
+        JWT_SECRET: test_secret
+        SESSION_SECRET: test_session_secret
+        CSRF_SECRET: test_csrf_secret
+
+    # The upgrade from v2.4.0, the last release with the migrations the baseline replaced:
+    # a v2.4.0 install (backend/src/test/fixtures/v2.4.0-install.sql, so no git history is
+    # needed) loaded into an empty database, cut over to the baseline by the runner and
+    # migrated, must match a fresh install: schema, privileges, schema_migrations and the
+    # database's settings.
+    - name: Upgrade from v2.4.0 matches a fresh install
+      run: backend/scripts/check-migrations.sh upgrade
+      env:
+        PG_CONTAINER: ${{ job.services.postgres.id }}
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_NAME: test_db
+        DB_USER: test_user
+        DB_PASSWORD: test_password
+        APP_DB_PASSWORD: test_app_password
+        JWT_SECRET: test_secret
+        SESSION_SECRET: test_session_secret
+        CSRF_SECRET: test_csrf_secret
+
+    # The unit project needs no database. It runs here with none configured, as on
+    # a contributor's machine, so a database test named into it fails (backend/vitest.config.ts).
+    - name: Run backend unit tests without a database
+      working-directory: ./backend
+      run: npm run test:unit
+
+    # pg_dump and pg_restore of the server's major version, which the backup and restore
+    # round trip (BackupService.roundTrip.db.test.ts) runs and refuses to skip in CI. The
+    # runner's own client tools are an older major, which can't dump a Postgres 18 server.
+    # Its apt sources may already have the PostgreSQL repository (PGDG); the repository is
+    # added, as backend/Dockerfile.prod does, only when they don't.
+    - name: Install the PostgreSQL 18 client tools
+      run: |
+        sudo apt-get update -qq
+        if ! sudo apt-get install -y -qq --no-install-recommends postgresql-client-18; then
+          . /etc/os-release
+          sudo curl -fsSL -o /usr/share/keyrings/pgdg.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt/ ${VERSION_CODENAME}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg-nuggets.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends postgresql-client-18
+        fi
+        echo "PG_BIN_DIR=/usr/lib/postgresql/18/bin" >> "$GITHUB_ENV"
+        /usr/lib/postgresql/18/bin/pg_restore --version
+
+    # Every project: unit, integration, and migrations (the tests that change the schema,
+    # one file at a time once the others are done; backend/vitest.config.ts). The app
+    # under test connects as nuggets_app, like production, so every DB-backed suite runs
+    # under RLS (test_user is a superuser and would bypass it); rls-catalog and
+    # rls-isolation assert the isolation itself.
+    # DATABASE_URL stays the owner connection for creating and purging test tenants;
+    # MIGRATION_DB_USER is the owner for the migration pool. With coverage
+    # (backend/vitest.config.ts sets the floors it must stay above); measured, it adds
+    # about 3% to the run.
+    - name: Run backend tests
+      working-directory: ./backend
+      run: npm run test:coverage
+      env:
+        NODE_ENV: test
+        DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_NAME: test_db
+        DB_USER: nuggets_app
+        DB_PASSWORD: test_password
+        APP_DB_PASSWORD: test_app_password
+        MIGRATION_DB_USER: test_user
+        JWT_SECRET: test_secret
+        SESSION_SECRET: test_session_secret
+        CSRF_SECRET: test_csrf_secret
+
+    # Coverage over every source file: the totals in the job summary, and the reports
+    # (coverage-summary.json, lcov) as an artifact. The floors are in each vitest.config.ts;
+    # a run below one fails its test step. Runs when the tests ran, failed or not.
+    - name: Coverage summary and reports (backend, MCP)
+      if: ${{ !cancelled() }}
+      run: |
+        for pkg in backend mcp; do
+          f="$pkg/coverage/coverage-summary.json"
+          [ -f "$f" ] || { echo "no $f"; continue; }
+          node -e '
+            const t = require(process.argv[1]).total;
+            const k = ["statements", "branches", "functions", "lines"];
+            console.log("### Coverage: " + process.argv[2] + "\n\n| " + k.join(" | ") + " |\n|" + " ---: |".repeat(k.length) + "\n| " + k.map((x) => t[x].pct + "%").join(" | ") + " |\n");
+          ' "$PWD/$f" "$pkg" >> "$GITHUB_STEP_SUMMARY"
+        done
+
+    - name: Upload coverage reports (backend, MCP)
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: coverage-backend-mcp
+        path: |
+          backend/coverage/coverage-summary.json
+          backend/coverage/lcov.info
+          mcp/coverage/coverage-summary.json
+          mcp/coverage/lcov.info
+        if-no-files-found: ignore
+        retention-days: 14
+
+    - name: Run backend linting
+      working-directory: ./backend
+      run: npm run lint
+
+    # The packages this job installed and built above. Runs even when an earlier step
+    # failed (a test failure doesn't hide a lint failure); both are linted before it fails.
+    - name: Lint shared and MCP packages
+      if: ${{ !cancelled() }}
+      run: |
+        status=0
+        for pkg in shared mcp; do
+          echo "::group::npm run lint ($pkg)"
+          (cd "$pkg" && npm run lint) || status=1
+          echo "::endgroup::"
+        done
+        exit "$status"
+
+    # Fail on a high or critical advisory in a production dependency. npm audit
+    # reads only the lockfile, the root's, one for the whole workspace: audited once, here,
+    # for every workspace (shared, mcp, backend, frontend). `--workspace <pkg>` reported the
+    # hoisted tree's advisories for every package, a backend-only one in the frontend's step
+    # too. It runs even when an earlier step failed, so a test failure doesn't hide
+    # an audit failure. `npm explain <package>` says which workspace depends on what it names.
+    - name: Audit production dependencies (every workspace)
+      if: ${{ !cancelled() }}
+      run: npm audit --omit=dev --audit-level=high
+
+  test-frontend:
+    if: (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: '26'
+        cache: 'npm'
+        cache-dependency-path: package-lock.json
+
+    # One install from the root lockfile (npm workspaces): shared and the frontend
+    # with their dependencies; the backend's are left to test-backend.
+    - name: Install dependencies (shared, frontend)
+      run: npm ci --workspace shared --workspace frontend
+
+    # @nuggets/shared must be built before the frontend so tsc / vite / vitest can
+    # resolve it (its dist/).
+    - name: Build shared package
+      run: npm run build -w shared
+
+    # Type-check up front so TypeScript errors fail CI (the build uses Vite, which does not
+    # type-check): the source with exactOptionalPropertyTypes and noUncheckedIndexedAccess
+    # (tsconfig.app.json), the tests without them (tsconfig.test.json), and
+    # vite.config.ts and vitest.config.ts (tsconfig.node.json), where a misspelled option is
+    # otherwise ignored.
+    - name: Type-check frontend sources and tests
+      working-directory: ./frontend
+      run: npm run type-check
+
+    # With coverage (frontend/vitest.config.ts sets the floors it must stay above).
+    - name: Run frontend tests
+      working-directory: ./frontend
+      run: npm run test:coverage
+
+    # Coverage over every source file: the totals in the job summary, and the reports
+    # (coverage-summary.json, lcov) as an artifact. The floors are in each vitest.config.ts;
+    # a run below one fails its test step. Runs when the tests ran, failed or not.
+    - name: Coverage summary and reports (frontend)
+      if: ${{ !cancelled() }}
+      run: |
+        for pkg in frontend; do
+          f="$pkg/coverage/coverage-summary.json"
+          [ -f "$f" ] || { echo "no $f"; continue; }
+          node -e '
+            const t = require(process.argv[1]).total;
+            const k = ["statements", "branches", "functions", "lines"];
+            console.log("### Coverage: " + process.argv[2] + "\n\n| " + k.join(" | ") + " |\n|" + " ---: |".repeat(k.length) + "\n| " + k.map((x) => t[x].pct + "%").join(" | ") + " |\n");
+          ' "$PWD/$f" "$pkg" >> "$GITHUB_STEP_SUMMARY"
+        done
+
+    - name: Upload coverage reports (frontend)
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: coverage-frontend
+        path: |
+          frontend/coverage/coverage-summary.json
+          frontend/coverage/lcov.info
+        if-no-files-found: ignore
+        retention-days: 14
+    
+    - name: Run frontend linting
+      working-directory: ./frontend
+      run: npm run lint
+
+    # Design-system guard: fail on reintroduced dark:/static-colour/accessible-*
+    # patterns or browser confirm()/alert() (see CLAUDE.md "UI / theming / a11y").
+    - name: Run frontend design-system guard
+      working-directory: ./frontend
+      run: npm run lint:guard
+
+    - name: Build frontend
+      working-directory: ./frontend
+      run: npm run build
+
+    # The built index.html: browser-support.js copied as it is, and loaded as a classic
+    # deferred script before the app's module, so a browser too old for the app sees the
+    # notice. The unit test reads the source index.html, which the build rewrites.
+    - name: Check the built index.html
+      working-directory: ./frontend
+      run: npm run check:build
+
+    # Fail on a high or critical advisory in a production dependency: the workspace
+    # (the frontend with it) is audited once, in test-backend; this is
+    # frontend/static-server's own lockfile (the production image's static file server,
+    # `serve`, a package outside the workspace). Runs even when an earlier step failed.
+    - name: Audit production dependencies (static server)
+      if: ${{ !cancelled() }}
+      working-directory: ./frontend/static-server
+      run: npm audit --omit=dev --audit-level=high
+
+  # End to end: Playwright drives the built frontend against the built backend, as a
+  # deployment runs them (e2e/run.sh): the backend in production mode as the RLS-bound
+  # nuggets_app role on a freshly migrated database, the SPA from its production static
+  # server with its Content-Security-Policy, one origin through a proxy. The journeys: first-run
+  # setup, sign out and in, a new ledger, an account, a budget, a transaction in the account,
+  # the transaction list and the budget, a transfer to a second account. The browser is the
+  # runner's installed Google Chrome, so nothing is downloaded for it. A few minutes, mostly
+  # installs and builds; the journeys themselves take about 30 seconds. Also on a release tag
+  # (pushed, or started on the tag by cut-release.yml); the release build doesn't wait for it.
+  e2e:
+    if: (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          # A throwaway CI database, not a secret. The backend runs as production, which
+          # refuses a weak database password (16+ characters, three kinds, no "password").
+          POSTGRES_USER: nuggets_owner
+          POSTGRES_PASSWORD: E2e-Owner-Ci-7qX4tL9mZ2vK # gitleaks:allow
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Setup Node.js
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: '26'
+        cache: 'npm'
+        cache-dependency-path: |
+          package-lock.json
+          frontend/static-server/package-lock.json
+
+    # The whole workspace from the root lockfile (shared, mcp, backend, frontend and the test
+    # runner), built in dependency order by the root's `npm run build` (shared, mcp, the
+    # backend, then the frontend); then the production static server, a package of its own.
+    # Each package's own tests and checks run in the jobs above; this one only builds.
+    - name: Install and build
+      run: |
+        set -e
+        npm ci
+        npm run build
+        npm ci --prefix frontend/static-server
+
+    - name: Type-check the end-to-end tests
+      working-directory: ./e2e
+      run: npm run type-check
+
+    - name: End-to-end tests
+      run: e2e/run.sh
+      env:
+        E2E_DATABASE_URL: postgresql://nuggets_owner:E2e-Owner-Ci-7qX4tL9mZ2vK@localhost:5432/nuggets_e2e # gitleaks:allow
+        APP_DB_PASSWORD: E2e-App-Ci-3pW8nR5yH1cJ
+        E2E_BROWSER_CHANNEL: chrome
+
+    # A failing test's screenshot and trace (npx playwright show-trace), and the backend's log.
+    - name: Upload end-to-end results
+      if: failure()
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: e2e-results
+        path: |
+          e2e/test-results/
+          e2e/.run/backend.log
+        if-no-files-found: ignore
+        include-hidden-files: true
+        retention-days: 7
+
+  # Quick checks of the deploy surface, on every PR this workflow runs for: the compose files
+  # parse and resolve, the Postgres volume path, LF line endings, and shellcheck, hadolint and
+  # actionlint pass. The linters run from images pinned by digest, so a runner image update
+  # can't change what they report; bump them deliberately. The tracked-files check, the secret
+  # scan and the docs' versions are repository-checks.yml, which runs for a Markdown-only PR
+  # too. Building and running the images is docker-images.yml, which runs only when the
+  # files that go into them change.
+  deploy-lint:
+    if: (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    # Each file as it is used: the development one with a .env (from the example), the
+    # production ones with the documented production settings, and the smoke test's
+    # override on top of the deployment manifest.
+    - name: Validate compose files
+      run: |
+        cp .env.example .env
+        docker compose -f docker-compose.yml config -q
+        docker compose --env-file deploy/production.env.example -f docker-compose.prod.yml config -q
+        docker compose --env-file deploy/production.env.example -f docker-compose.portainer.yml config -q
+        docker compose --env-file deploy/production.env.example -f docker-compose.portainer.yml \
+          -f scripts/smoke-test.compose.yml config -q
+
+    # Postgres 18 keeps its cluster under /var/lib/postgresql/18/docker. A volume mounted at
+    # the old /var/lib/postgresql/data would leave the database in an anonymous volume, lost
+    # on the next `down`. Uses the .env the step above created.
+    - name: Postgres data volume at the Postgres 18 path
+      run: |
+        check() {
+          targets=$(docker compose "$@" config --format json | jq -r '.services.postgres.volumes[]?.target')
+          if ! grep -qx /var/lib/postgresql <<<"$targets" || grep -q '^/var/lib/postgresql/data' <<<"$targets"; then
+            echo "::error::postgres data must be mounted at /var/lib/postgresql ($*): $targets"
+            exit 1
+          fi
+        }
+        check -f docker-compose.yml
+        check --env-file deploy/production.env.example -f docker-compose.prod.yml
+        check --env-file deploy/production.env.example -f docker-compose.portainer.yml
+
+    # A Windows checkout with core.autocrlf would give the scripts the containers run CRLF
+    # line endings (/bin/sh^M), and the migrations other checksums than the ones databases
+    # hold; .gitattributes keeps them LF. Checked out here as such a checkout is.
+    - name: Scripts and migrations check out with LF line endings
+      if: ${{ !cancelled() }}
+      run: |
+        checkout="$RUNNER_TEMP/autocrlf-checkout"
+        mkdir -p "$checkout"
+        # An index of its own, so the job's checkout and index stay as they were.
+        GIT_INDEX_FILE="$RUNNER_TEMP/autocrlf-index" \
+          git -c core.autocrlf=true -c core.eol=crlf --work-tree="$checkout" checkout HEAD -- .
+        # A CR that ends a line: one inside a line is data (trim_space's set of whitespace
+        # characters, as pg_dump writes the baseline's function body), not a line ending.
+        crlf=$(git ls-files -z -- '*.sh' '*.sql' '*Dockerfile*' | (cd "$checkout" && xargs -0 grep -l $'\r$' --) || true)
+        if [ -n "$crlf" ]; then
+          echo "::error::CRLF line endings in a checkout with core.autocrlf=true (see .gitattributes):"
+          echo "$crlf"
+          exit 1
+        fi
+
+    - name: shellcheck
+      if: ${{ !cancelled() }}
+      run: |
+        git ls-files -z '*.sh' | xargs -0 docker run --rm -v "$PWD:/mnt:ro" -w /mnt \
+          koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d
+
+    # Reads .hadolint.yaml (the ignored rules and why).
+    - name: hadolint
+      if: ${{ !cancelled() }}
+      run: |
+        git ls-files -z '*Dockerfile*' | xargs -0 docker run --rm -v "$PWD:/mnt:ro" -w /mnt \
+          hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d hadolint
+
+    # The workflows: actionlint, with the shellcheck its image bundles for run:
+    # scripts; every action pinned to a full commit SHA with its version as a comment
+    # (`@<sha> # v1.2.3`, which Dependabot updates together); and a top-level permissions
+    # block in each workflow, so a job gets only the access it asks for.
+    - name: Workflows (actionlint, pinned actions, permissions)
+      if: ${{ !cancelled() }}
+      run: |
+        status=0
+        docker run --rm -v "$PWD:/repo:ro" -w /repo \
+          rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
+          -no-color || status=1
+        unpinned=$(grep -nE '^[[:space:]]*(-[[:space:]]+)?uses:' .github/workflows/*.yml \
+          | grep -vE 'uses: ([A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@[0-9a-f]{40} # v[0-9][0-9A-Za-z.-]*|\./[^ ]+)$' || true)
+        if [ -n "$unpinned" ]; then
+          echo "::error::actions not pinned as owner/repo@<full commit SHA> # vX.Y.Z:"
+          echo "$unpinned"
+          status=1
+        fi
+        for f in .github/workflows/*.yml; do
+          grep -q '^permissions:' "$f" || { echo "::error file=$f::no top-level permissions: block"; status=1; }
+        done
+        exit "$status"

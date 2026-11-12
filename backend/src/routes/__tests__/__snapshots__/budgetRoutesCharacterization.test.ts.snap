@@ -1,0 +1,2694 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > activity: a period item that is not there 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Budget period item not found",
+    "message": "Budget period item not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > activity: budget events of an item 1`] = `
+{
+  "after": undefined,
+  "body": [
+    {
+      "amount": "1.10",
+      "budget_item_name": "Car fund",
+      "created_at": "<instant>",
+      "description": "Transfer from Car fund to Pay",
+      "id": "<event:1>",
+      "transaction_type": "move_out",
+      "type": "transfer",
+    },
+    {
+      "amount": "20.25",
+      "budget_item_name": "Car fund",
+      "created_at": "<instant>",
+      "description": "Top up",
+      "id": "<event:2>",
+      "transaction_type": "move_out",
+      "type": "transfer",
+    },
+    {
+      "amount": "70.50",
+      "budget_item_name": "Car fund",
+      "created_at": "<instant>",
+      "description": "Saving up",
+      "id": "<event:3>",
+      "transaction_type": "add",
+      "type": "budget_update",
+    },
+    {
+      "amount": "50.00",
+      "budget_item_name": "Car fund",
+      "created_at": "<instant>",
+      "description": "Initial budget for Car fund",
+      "id": "<event:4>",
+      "transaction_type": "add",
+      "type": "budget_update",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > activity: by the period item id 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > activity: transactions by the period item id 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > activity: transactions of an item 1`] = `
+{
+  "after": undefined,
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > budget: a period item that is not there 1`] = `
+{
+  "after": {
+    "events": 8,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Budget period item not found",
+    "message": "Budget period item not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > budget: an amount that is text 1`] = `
+{
+  "after": {
+    "events": 8,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "amount",
+        "message": "Amount must be a number",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Amount must be a number",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > budget: set an amount 1`] = `
+{
+  "after": {
+    "events": 7,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "eventUuid": "<uuid:15>",
+    "success": true,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > budget: set another 1`] = `
+{
+  "after": {
+    "events": 8,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "eventUuid": "<uuid:16>",
+    "success": true,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > budget: three decimals 1`] = `
+{
+  "after": {
+    "events": 8,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "code": "INVALID_AMOUNT",
+    "error": "Amount must be a number with at most 2 decimal places",
+    "message": "Amount must be a number with at most 2 decimal places",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > envelope transfers: April 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "data": {
+      "envelope_account": {
+        "id": "<account:4>",
+        "name": "Answers envelopes",
+        "uuid": "<uuid:19>",
+      },
+      "net_transfer_amount": 0.3,
+      "transfer_count": 2,
+      "transfers": [
+        {
+          "account_name": "Answers envelopes",
+          "amount": 0.2,
+          "date": "2024-04-03",
+          "description": "To the envelopes",
+          "source_account_name": "Answers checking",
+          "uuid": "<uuid:20>",
+        },
+        {
+          "account_name": "Answers envelopes",
+          "amount": 0.1,
+          "date": "2024-04-02",
+          "description": "To the envelopes",
+          "source_account_name": "Answers checking",
+          "uuid": "<uuid:21>",
+        },
+      ],
+    },
+    "success": true,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > envelope transfers: a period that is not there 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Budget period not found",
+    "message": "Budget period not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > envelope transfers: no envelope account 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "code": "NO_ENVELOPE_ACCOUNT",
+    "error": "No envelope account configured",
+    "message": "No envelope account configured",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > events: a period that is not there 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Budget period not found",
+    "message": "Budget period not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > events: an item that is not there 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Budget item not found",
+    "message": "Budget item not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > events: one item 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "data": [
+      {
+        "amount": 50,
+        "budgetItemName": "Car fund",
+        "description": "Initial budget for Car fund",
+        "eventId": "<event:5>",
+        "eventType": "budget_update",
+        "periodName": "May 2024",
+        "timestamp": "<instant>",
+        "transactionType": "add",
+        "userName": "Test Budget answers",
+      },
+      {
+        "amount": 50,
+        "budgetItemName": "Car fund",
+        "description": "Initial budget for Car fund",
+        "eventId": "<event:4>",
+        "eventType": "budget_update",
+        "periodName": "April 2024",
+        "timestamp": "<instant>",
+        "transactionType": "add",
+        "userName": "Test Budget answers",
+      },
+      {
+        "amount": 70.5,
+        "budgetItemName": "Car fund",
+        "description": "Saving up",
+        "eventId": "<event:3>",
+        "eventType": "budget_update",
+        "periodName": "April 2024",
+        "timestamp": "<instant>",
+        "transactionType": "add",
+        "userName": "Test Budget answers",
+      },
+      {
+        "amount": 20.25,
+        "budgetItemName": "Car fund",
+        "description": "Top up",
+        "eventId": "<event:2>",
+        "eventType": "transfer",
+        "periodName": "April 2024",
+        "timestamp": "<instant>",
+        "transactionType": "move_out",
+        "userName": "Test Budget answers",
+      },
+      {
+        "amount": 1.1,
+        "budgetItemName": "Car fund",
+        "description": "Transfer from Car fund to Pay",
+        "eventId": "<event:1>",
+        "eventType": "transfer",
+        "periodName": "April 2024",
+        "timestamp": "<instant>",
+        "transactionType": "move_out",
+        "userName": "Test Budget answers",
+      },
+      {
+        "amount": 50,
+        "budgetItemName": "Car fund",
+        "description": "Initial budget for Car fund",
+        "eventId": "<event:6>",
+        "eventType": "budget_update",
+        "periodName": "March 2024",
+        "timestamp": "<instant>",
+        "transactionType": "add",
+        "userName": "Test Budget answers",
+      },
+    ],
+    "success": true,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > events: one period, limited 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "data": [
+      {
+        "amount": 400,
+        "budgetItemName": "Groceries",
+        "description": "Initial budget for Groceries",
+        "eventId": "<event:7>",
+        "eventType": "budget_update",
+        "periodName": "April 2024",
+        "timestamp": "<instant>",
+        "transactionType": "add",
+        "userName": "Test Budget answers",
+      },
+      {
+        "amount": 50,
+        "budgetItemName": "Car fund",
+        "description": "Initial budget for Car fund",
+        "eventId": "<event:4>",
+        "eventType": "budget_update",
+        "periodName": "April 2024",
+        "timestamp": "<instant>",
+        "transactionType": "add",
+        "userName": "Test Budget answers",
+      },
+    ],
+    "success": true,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: archive 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 1,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "goal": {
+      "created_at": "<instant>",
+      "description": "A deposit",
+      "estimated_monthly_contribution": "250.00",
+      "id": "<goal:1>",
+      "image_path": null,
+      "name": "Bigger house",
+      "status": "archived",
+      "target_amount": "12000.00",
+      "target_date": "2027-06-30",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:24>",
+    },
+    "message": "Goal archived successfully",
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: archive one that is not there 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 1,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Goal not found",
+    "message": "Goal not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: balance history 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "history": [
+      {
+        "balance": 300,
+        "date": "<from-today>",
+      },
+      {
+        "balance": 300,
+        "date": "<from-today>",
+      },
+      {
+        "balance": 300,
+        "date": "<today>",
+      },
+    ],
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: balance history by account 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "accounts": [
+      {
+        "account_id": "<account:2>",
+        "account_name": "Answers savings",
+        "account_uuid": "<uuid:2>",
+        "history": [
+          {
+            "balance": 300,
+            "date": "<from-today>",
+          },
+          {
+            "balance": 300,
+            "date": "<today>",
+          },
+        ],
+      },
+    ],
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: balance history of a goal that is not there 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Goal not found",
+    "message": "Goal not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: create 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "goal": {
+      "created_at": "<instant>",
+      "description": "A deposit",
+      "estimated_monthly_contribution": "250.00",
+      "id": "<goal:1>",
+      "image_path": null,
+      "name": "House",
+      "status": "active",
+      "target_amount": "10000.00",
+      "target_date": "2027-06-30",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:24>",
+    },
+  },
+  "status": 201,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: create without a target 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "target_amount",
+        "message": "Target amount must be a number",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Target amount must be a number",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: delete an image it does not have 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 1,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "No image found for this goal",
+    "message": "No image found for this goal",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: link a hidden account 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 2,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "message": "Account associated successfully",
+  },
+  "status": 201,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: link an account 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 1,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "message": "Account associated successfully",
+  },
+  "status": 201,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: link an account that is not there 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 2,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "INVALID_REFERENCE",
+    "error": "account_id does not name an account in this tenant",
+    "field": "account_id",
+    "message": "account_id does not name an account in this tenant",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: link an envelope 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 2,
+    "goal_envelopes": 1,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "message": "Budget item associated successfully",
+  },
+  "status": 201,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: link an item that is not an envelope 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 2,
+    "goal_envelopes": 1,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "BUDGET_ITEM_NOT_ROLLOVER",
+    "error": "Only rollover (envelope) budget items can be associated with goals",
+    "message": "Only rollover (envelope) budget items can be associated with goals",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: link to a goal that is not there 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 2,
+    "goal_envelopes": 1,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Goal not found",
+    "message": "Goal not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: link without an account 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 2,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "account_id",
+        "message": "account_id is required",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "account_id is required",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: list 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "goals": [
+      {
+        "account_count": "2",
+        "budget_item_count": "1",
+        "created_at": "<instant>",
+        "current_progress": 300,
+        "description": "A deposit",
+        "estimated_monthly_contribution": "250.00",
+        "id": "<goal:1>",
+        "image_path": null,
+        "name": "House",
+        "progress_percentage": 3,
+        "projected_completion_date": "<from-today>",
+        "remaining_amount": 9700,
+        "status": "active",
+        "target_amount": "10000.00",
+        "target_date": "2027-06-30",
+        "updated_at": "<instant>",
+        "uuid": "<uuid:24>",
+      },
+    ],
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: list after archiving 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "goals": [],
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: one 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "goal": {
+      "associated_accounts": [
+        {
+          "account_group": "cash",
+          "account_type": "checking",
+          "associated_at": "<instant>",
+          "balance_unavailable": false,
+          "calculated_balance": 300,
+          "icon": "CreditCard",
+          "id": "<account:2>",
+          "linked_since": "<today>",
+          "name": "Answers savings",
+          "subtype": null,
+          "uuid": "<uuid:2>",
+        },
+      ],
+      "associated_budget_items": [
+        {
+          "associated_at": "<instant>",
+          "color": "#3B82F6",
+          "icon": "CreditCard",
+          "id": "<budget_item:2>",
+          "linked_since": "<today>",
+          "name": "Car fund",
+          "rollover_starting_balance": "0.00",
+          "uuid": "<uuid:7>",
+        },
+      ],
+      "created_at": "<instant>",
+      "current_progress": 300,
+      "description": "A deposit",
+      "estimated_monthly_contribution": "250.00",
+      "id": "<goal:1>",
+      "image_path": null,
+      "name": "House",
+      "progress_history": [
+        {
+          "snapshot_date": "<today>",
+          "total_from_accounts": "300.00",
+          "total_from_budget_items": "0.00",
+          "total_progress": "300.00",
+        },
+      ],
+      "progress_percentage": 3,
+      "projection": {
+        "currentProgress": 300,
+        "pastPerformanceDate": null,
+        "pastPerformanceMonths": null,
+        "plannedContributionDate": "<from-today>",
+        "plannedContributionMonths": 39,
+        "remainingAmount": 9700,
+        "targetAmount": 10000,
+      },
+      "remaining_amount": 9700,
+      "status": "active",
+      "target_amount": "10000.00",
+      "target_date": "2027-06-30",
+      "total_from_accounts": 300,
+      "total_from_budget_items": 0,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:24>",
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: one that is not there 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Goal not found",
+    "message": "Goal not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: progress history 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "history": [
+      {
+        "snapshot_date": "<today>",
+        "total_from_accounts": "300.00",
+        "total_from_budget_items": "0.00",
+        "total_progress": "300.00",
+      },
+    ],
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: progress history backwards 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "code": "INVALID_DATE_RANGE",
+    "error": "start_date must be on or before end_date",
+    "message": "start_date must be on or before end_date",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: progress history from a day that is not one 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "start_date",
+        "message": "start_date must be a real date, as YYYY-MM-DD, from 1800 to 2999.",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "start_date must be a real date, as YYYY-MM-DD, from 1800 to 2999.",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: progress history over a range 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "history": [
+      {
+        "snapshot_date": "2024-01-31",
+        "total_from_accounts": "0.00",
+        "total_from_budget_items": "0.00",
+        "total_progress": "0.00",
+      },
+      {
+        "snapshot_date": "2024-02-29",
+        "total_from_accounts": "0.00",
+        "total_from_budget_items": "0.00",
+        "total_progress": "0.00",
+      },
+      {
+        "snapshot_date": "2024-03-31",
+        "total_from_accounts": "0.00",
+        "total_from_budget_items": "0.00",
+        "total_progress": "0.00",
+      },
+      {
+        "snapshot_date": "2024-04-30",
+        "total_from_accounts": "0.00",
+        "total_from_budget_items": "0.00",
+        "total_progress": "0.00",
+      },
+    ],
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: unlink an account 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 1,
+    "goal_envelopes": 1,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "message": "Account association removed successfully",
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: unlink an account by its id 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 2,
+    "goal_envelopes": 1,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: unlink an envelope 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 1,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "message": "Budget item association removed successfully",
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: unlink an envelope by its id 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 2,
+    "goal_envelopes": 1,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: update 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 2,
+    "goal_envelopes": 1,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "goal": {
+      "created_at": "<instant>",
+      "description": "A deposit",
+      "estimated_monthly_contribution": "250.00",
+      "id": "<goal:1>",
+      "image_path": null,
+      "name": "Bigger house",
+      "status": "active",
+      "target_amount": "12000.00",
+      "target_date": "2027-06-30",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:24>",
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > goals: update one that is not there 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 2,
+    "goal_envelopes": 1,
+    "items": 4,
+    "period_items": 12,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Goal not found",
+    "message": "Goal not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > items: create a monthly item 1`] = `
+{
+  "after": {
+    "events": 0,
+    "events_net": "0",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 1,
+    "period_items": 0,
+    "periods": 0,
+    "rules": 0,
+    "transactions_in_periods": 0,
+  },
+  "body": {
+    "category_id": "<category:1>",
+    "color": "#123456",
+    "created_at": "<instant>",
+    "default_budget_amount": "400.00",
+    "description": null,
+    "expense_type": "Expense",
+    "goal_target_amount": null,
+    "goal_target_date": null,
+    "icon": "Cart",
+    "id": "<budget_item:1>",
+    "image_path": null,
+    "instructions": null,
+    "isbill": false,
+    "merchant_id": null,
+    "name": "Groceries",
+    "notes": null,
+    "priority": "Essential",
+    "recurring_amount_varies": false,
+    "recurring_last_payment_date": null,
+    "recurring_next_payment_date": null,
+    "recurring_payment": false,
+    "recurring_payment_amount": "0.00",
+    "recurring_payment_frequency": 12,
+    "rollover": false,
+    "rollover_starting_balance": "0.00",
+    "rollover_starting_balance_date": null,
+    "rollover_target_amount": "0.00",
+    "rollover_target_date": null,
+    "status": "active",
+    "subtype": "Flexible",
+    "tenant_id": "<tenant:1>",
+    "transaction_auto_tag_id": null,
+    "type": "Monthly",
+    "updated_at": "<instant>",
+    "uuid": "<uuid:6>",
+  },
+  "status": 201,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > items: create an envelope 1`] = `
+{
+  "after": {
+    "events": 0,
+    "events_net": "0",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 2,
+    "period_items": 0,
+    "periods": 0,
+    "rules": 0,
+    "transactions_in_periods": 0,
+  },
+  "body": {
+    "category_id": null,
+    "color": "#3B82F6",
+    "created_at": "<instant>",
+    "default_budget_amount": "50.00",
+    "description": null,
+    "expense_type": "Expense",
+    "goal_target_amount": null,
+    "goal_target_date": null,
+    "icon": "CreditCard",
+    "id": "<budget_item:2>",
+    "image_path": null,
+    "instructions": null,
+    "isbill": false,
+    "merchant_id": null,
+    "name": "Car fund",
+    "notes": null,
+    "priority": "Optional",
+    "recurring_amount_varies": false,
+    "recurring_last_payment_date": null,
+    "recurring_next_payment_date": null,
+    "recurring_payment": false,
+    "recurring_payment_amount": "0.00",
+    "recurring_payment_frequency": 12,
+    "rollover": true,
+    "rollover_starting_balance": "0.00",
+    "rollover_starting_balance_date": null,
+    "rollover_target_amount": "0.00",
+    "rollover_target_date": null,
+    "status": "active",
+    "subtype": "Fixed",
+    "tenant_id": "<tenant:1>",
+    "transaction_auto_tag_id": null,
+    "type": "Envelope",
+    "updated_at": "<instant>",
+    "uuid": "<uuid:7>",
+  },
+  "status": 201,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > items: create income 1`] = `
+{
+  "after": {
+    "events": 0,
+    "events_net": "0",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 0,
+    "periods": 0,
+    "rules": 0,
+    "transactions_in_periods": 0,
+  },
+  "body": {
+    "category_id": null,
+    "color": "#3B82F6",
+    "created_at": "<instant>",
+    "default_budget_amount": "0.00",
+    "description": null,
+    "expense_type": "Income",
+    "goal_target_amount": null,
+    "goal_target_date": null,
+    "icon": "CreditCard",
+    "id": "<budget_item:3>",
+    "image_path": null,
+    "instructions": null,
+    "isbill": false,
+    "merchant_id": null,
+    "name": "Pay",
+    "notes": null,
+    "priority": "Optional",
+    "recurring_amount_varies": false,
+    "recurring_last_payment_date": null,
+    "recurring_next_payment_date": null,
+    "recurring_payment": false,
+    "recurring_payment_amount": "0.00",
+    "recurring_payment_frequency": 12,
+    "rollover": false,
+    "rollover_starting_balance": "0.00",
+    "rollover_starting_balance_date": null,
+    "rollover_target_amount": "0.00",
+    "rollover_target_date": null,
+    "status": "active",
+    "subtype": "Paycheck",
+    "tenant_id": "<tenant:1>",
+    "transaction_auto_tag_id": null,
+    "type": "Monthly",
+    "updated_at": "<instant>",
+    "uuid": "<uuid:8>",
+  },
+  "status": 201,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > items: list 1`] = `
+{
+  "after": undefined,
+  "body": [
+    {
+      "category_id": "<category:1>",
+      "category_name": "Household",
+      "color": "#123456",
+      "created_at": "<instant>",
+      "default_budget_amount": "400.00",
+      "description": null,
+      "expense_type": "Expense",
+      "goal_target_amount": null,
+      "goal_target_date": null,
+      "icon": "Cart",
+      "id": "<budget_item:1>",
+      "image_path": null,
+      "instructions": null,
+      "isbill": false,
+      "merchant_id": null,
+      "name": "Groceries",
+      "notes": null,
+      "priority": "Essential",
+      "recurring_amount_varies": false,
+      "recurring_last_payment_date": null,
+      "recurring_next_payment_date": null,
+      "recurring_payment": false,
+      "recurring_payment_amount": "0.00",
+      "recurring_payment_frequency": 12,
+      "rollover": false,
+      "rollover_starting_balance": "0.00",
+      "rollover_starting_balance_date": null,
+      "rollover_target_amount": "0.00",
+      "rollover_target_date": null,
+      "status": "active",
+      "subtype": "Flexible",
+      "tenant_id": "<tenant:1>",
+      "transaction_auto_tag_id": null,
+      "type": "Monthly",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:6>",
+    },
+    {
+      "category_id": null,
+      "category_name": null,
+      "color": "#3B82F6",
+      "created_at": "<instant>",
+      "default_budget_amount": "0.00",
+      "description": null,
+      "expense_type": "Income",
+      "goal_target_amount": null,
+      "goal_target_date": null,
+      "icon": "CreditCard",
+      "id": "<budget_item:3>",
+      "image_path": null,
+      "instructions": null,
+      "isbill": false,
+      "merchant_id": null,
+      "name": "Pay",
+      "notes": null,
+      "priority": "Optional",
+      "recurring_amount_varies": false,
+      "recurring_last_payment_date": null,
+      "recurring_next_payment_date": null,
+      "recurring_payment": false,
+      "recurring_payment_amount": "0.00",
+      "recurring_payment_frequency": 12,
+      "rollover": false,
+      "rollover_starting_balance": "0.00",
+      "rollover_starting_balance_date": null,
+      "rollover_target_amount": "0.00",
+      "rollover_target_date": null,
+      "status": "active",
+      "subtype": "Paycheck",
+      "tenant_id": "<tenant:1>",
+      "transaction_auto_tag_id": null,
+      "type": "Monthly",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:8>",
+    },
+    {
+      "category_id": null,
+      "category_name": null,
+      "color": "#3B82F6",
+      "created_at": "<instant>",
+      "default_budget_amount": "50.00",
+      "description": null,
+      "expense_type": "Expense",
+      "goal_target_amount": null,
+      "goal_target_date": null,
+      "icon": "CreditCard",
+      "id": "<budget_item:2>",
+      "image_path": null,
+      "instructions": null,
+      "isbill": false,
+      "merchant_id": null,
+      "name": "Car fund",
+      "notes": null,
+      "priority": "Optional",
+      "recurring_amount_varies": false,
+      "recurring_last_payment_date": null,
+      "recurring_next_payment_date": null,
+      "recurring_payment": false,
+      "recurring_payment_amount": "0.00",
+      "recurring_payment_frequency": 12,
+      "rollover": true,
+      "rollover_starting_balance": "0.00",
+      "rollover_starting_balance_date": null,
+      "rollover_target_amount": "0.00",
+      "rollover_target_date": null,
+      "status": "active",
+      "subtype": "Fixed",
+      "tenant_id": "<tenant:1>",
+      "transaction_auto_tag_id": null,
+      "type": "Envelope",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:7>",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > items: update 1`] = `
+{
+  "after": {
+    "events": 0,
+    "events_net": "0",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 0,
+    "periods": 0,
+    "rules": 0,
+    "transactions_in_periods": 0,
+  },
+  "body": {
+    "category_id": "<category:1>",
+    "color": "#123456",
+    "created_at": "<instant>",
+    "default_budget_amount": "400.00",
+    "description": "Food",
+    "expense_type": "Expense",
+    "goal_target_amount": null,
+    "goal_target_date": null,
+    "icon": "Cart",
+    "id": "<budget_item:1>",
+    "image_path": null,
+    "instructions": null,
+    "isbill": false,
+    "merchant_id": null,
+    "name": "Groceries",
+    "notes": null,
+    "priority": "Essential",
+    "recurring_amount_varies": false,
+    "recurring_last_payment_date": null,
+    "recurring_next_payment_date": null,
+    "recurring_payment": false,
+    "recurring_payment_amount": "0.00",
+    "recurring_payment_frequency": 12,
+    "rollover": false,
+    "rollover_starting_balance": "0.00",
+    "rollover_starting_balance_date": null,
+    "rollover_target_amount": "0.00",
+    "rollover_target_date": "2027-01-31",
+    "status": "active",
+    "subtype": "Flexible",
+    "tenant_id": "<tenant:1>",
+    "transaction_auto_tag_id": null,
+    "type": "Monthly",
+    "updated_at": "<instant>",
+    "uuid": "<uuid:6>",
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > period items: April 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "data": [
+      {
+        "budget_item_id": "<budget_item:3>",
+        "budget_item_name": "Pay",
+        "budget_item_uuid": "<uuid:8>",
+        "budget_period_id": "<period:2>",
+        "calculated_actual": "0.00",
+        "calculated_budget": "0.00",
+        "calculated_remaining": "0.00",
+        "calculated_transfers": "0.00",
+        "category_name": null,
+        "color": "#3B82F6",
+        "created_at": "<instant>",
+        "expense_type": "Income",
+        "goal_target_amount": null,
+        "goal_target_date": null,
+        "icon": "CreditCard",
+        "id": "<period_item:1>",
+        "image_path": null,
+        "isbill": false,
+        "priority": "Optional",
+        "rollover": false,
+        "rollover_target_amount": "0.00",
+        "starting": "0.00",
+        "status": "active",
+        "subtype": "Paycheck",
+        "tenant_id": "<tenant:1>",
+        "type": "Monthly",
+        "updated_at": "<instant>",
+        "uuid": "<uuid:12>",
+      },
+      {
+        "budget_item_id": "<budget_item:2>",
+        "budget_item_name": "Car fund",
+        "budget_item_uuid": "<uuid:7>",
+        "budget_period_id": "<period:2>",
+        "calculated_actual": "0.00",
+        "calculated_budget": "50.00",
+        "calculated_remaining": "100.00",
+        "calculated_transfers": "0.00",
+        "category_name": null,
+        "color": "#3B82F6",
+        "created_at": "<instant>",
+        "expense_type": "Expense",
+        "goal_target_amount": null,
+        "goal_target_date": null,
+        "icon": "CreditCard",
+        "id": "<period_item:2>",
+        "image_path": null,
+        "isbill": false,
+        "priority": "Optional",
+        "rollover": true,
+        "rollover_target_amount": "0.00",
+        "starting": "0.00",
+        "status": "active",
+        "subtype": "Fixed",
+        "tenant_id": "<tenant:1>",
+        "type": "Envelope",
+        "updated_at": "<instant>",
+        "uuid": "<uuid:13>",
+      },
+      {
+        "budget_item_id": "<budget_item:1>",
+        "budget_item_name": "Groceries",
+        "budget_item_uuid": "<uuid:6>",
+        "budget_period_id": "<period:2>",
+        "calculated_actual": "0.00",
+        "calculated_budget": "400.00",
+        "calculated_remaining": "400.00",
+        "calculated_transfers": "0.00",
+        "category_name": "Household",
+        "color": "#123456",
+        "created_at": "<instant>",
+        "expense_type": "Expense",
+        "goal_target_amount": null,
+        "goal_target_date": null,
+        "icon": "Cart",
+        "id": "<period_item:3>",
+        "image_path": null,
+        "isbill": false,
+        "priority": "Essential",
+        "rollover": false,
+        "rollover_target_amount": "0.00",
+        "starting": "0.00",
+        "status": "active",
+        "subtype": "Flexible",
+        "tenant_id": "<tenant:1>",
+        "type": "Monthly",
+        "updated_at": "<instant>",
+        "uuid": "<uuid:14>",
+      },
+    ],
+    "success": true,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > period items: April, one item 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "data": [
+      {
+        "budget_item_id": "<budget_item:2>",
+        "budget_item_name": "Car fund",
+        "budget_item_uuid": "<uuid:7>",
+        "budget_period_id": "<period:2>",
+        "calculated_actual": "0.00",
+        "calculated_budget": "50.00",
+        "calculated_remaining": "100.00",
+        "calculated_transfers": "0.00",
+        "category_name": null,
+        "color": "#3B82F6",
+        "created_at": "<instant>",
+        "expense_type": "Expense",
+        "goal_target_amount": null,
+        "goal_target_date": null,
+        "icon": "CreditCard",
+        "id": "<period_item:2>",
+        "image_path": null,
+        "isbill": false,
+        "priority": "Optional",
+        "rollover": true,
+        "rollover_target_amount": "0.00",
+        "starting": "0.00",
+        "status": "active",
+        "subtype": "Fixed",
+        "tenant_id": "<tenant:1>",
+        "type": "Envelope",
+        "updated_at": "<instant>",
+        "uuid": "<uuid:13>",
+      },
+    ],
+    "success": true,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > period items: a period that is not there 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Budget period not found",
+    "message": "Budget period not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: April summary 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "summary": [
+      {
+        "actualAmount": 0,
+        "budgetAmount": 120.5,
+        "budgetItemId": "<budget_item:2>",
+        "budgetItemName": "Car fund",
+        "remainingAmount": 170.5,
+        "rolloverEnabled": true,
+        "startingAmount": 0,
+        "transfersAmount": 0,
+      },
+      {
+        "actualAmount": 0,
+        "budgetAmount": 400,
+        "budgetItemId": "<budget_item:1>",
+        "budgetItemName": "Groceries",
+        "remainingAmount": 400,
+        "rolloverEnabled": false,
+        "startingAmount": 0,
+        "transfersAmount": 0,
+      },
+      {
+        "actualAmount": 0,
+        "budgetAmount": 0,
+        "budgetItemId": "<budget_item:3>",
+        "budgetItemName": "Pay",
+        "remainingAmount": 0,
+        "rolloverEnabled": false,
+        "startingAmount": 0,
+        "transfersAmount": 0,
+      },
+    ],
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: create March 1`] = `
+{
+  "after": {
+    "events": 2,
+    "events_net": "450.00",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 3,
+    "periods": 1,
+    "rules": 0,
+    "transactions_in_periods": 0,
+  },
+  "body": {
+    "budgetItemsCreated": 3,
+    "created_at": "<instant>",
+    "end_date": "2024-03-31",
+    "id": "<period:1>",
+    "month": "March",
+    "month_number": 3,
+    "name": "March 2024",
+    "start_date": "2024-03-01",
+    "status": "upcoming",
+    "tenant_id": "<tenant:1>",
+    "updated_at": "<instant>",
+    "uuid": "<uuid:9>",
+    "year": 2024,
+  },
+  "status": 201,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: create March again 1`] = `
+{
+  "after": {
+    "events": 2,
+    "events_net": "450.00",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 3,
+    "periods": 1,
+    "rules": 0,
+    "transactions_in_periods": 0,
+  },
+  "body": {
+    "code": "BUDGET_PERIOD_EXISTS",
+    "error": "Budget period for 3/2024 already exists: March 2024",
+    "message": "Budget period for 3/2024 already exists: March 2024",
+    "requestId": "<request>",
+  },
+  "status": 409,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: create without a month 1`] = `
+{
+  "after": {
+    "events": 2,
+    "events_net": "450.00",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 3,
+    "periods": 1,
+    "rules": 0,
+    "transactions_in_periods": 0,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "month",
+        "message": "Month must be between 1 and 12",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Month must be between 1 and 12",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: delete April 1`] = `
+{
+  "after": {
+    "events": 2,
+    "events_net": "450.00",
+    "goal_accounts": 1,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 4,
+    "periods": 1,
+    "rules": 1,
+    "transactions_in_periods": 0,
+  },
+  "body": {
+    "budget_items_deleted": 4,
+    "budget_transactions_deleted": 8,
+    "message": "Budget period "April 2024" deleted successfully",
+    "success": true,
+    "transactions_unassociated": 7,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: delete May 1`] = `
+{
+  "after": {
+    "events": 10,
+    "events_net": "970.50",
+    "goal_accounts": 1,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 8,
+    "periods": 2,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "budget_items_deleted": 4,
+    "budget_transactions_deleted": 2,
+    "message": "Budget period "May 2024" deleted successfully",
+    "success": true,
+    "transactions_unassociated": 0,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: delete one that is not there 1`] = `
+{
+  "after": {
+    "events": 10,
+    "events_net": "970.50",
+    "goal_accounts": 1,
+    "goal_envelopes": 0,
+    "items": 4,
+    "period_items": 8,
+    "periods": 2,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Budget period not found",
+    "message": "Budget period not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: list 1`] = `
+{
+  "after": undefined,
+  "body": [
+    {
+      "created_at": "<instant>",
+      "end_date": "2024-03-31",
+      "id": "<period:1>",
+      "month": "March",
+      "month_number": 3,
+      "name": "March 2024",
+      "start_date": "2024-03-01",
+      "status": "upcoming",
+      "tenant_id": "<tenant:1>",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:9>",
+      "year": 2024,
+    },
+    {
+      "created_at": "<instant>",
+      "end_date": "2024-04-30",
+      "id": "<period:2>",
+      "month": "April",
+      "month_number": 4,
+      "name": "April 2024",
+      "start_date": "2024-04-01",
+      "status": "upcoming",
+      "tenant_id": "<tenant:1>",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:10>",
+      "year": 2024,
+    },
+    {
+      "created_at": "<instant>",
+      "end_date": "2024-05-31",
+      "id": "<period:3>",
+      "month": "May",
+      "month_number": 5,
+      "name": "May 2024",
+      "start_date": "2024-05-01",
+      "status": "upcoming",
+      "tenant_id": "<tenant:1>",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:11>",
+      "year": 2024,
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: managed create of April 1`] = `
+{
+  "after": {
+    "events": 4,
+    "events_net": "900.00",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 6,
+    "periods": 2,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "budget_items_created": 3,
+    "message": "Budget period created successfully",
+    "period_id": "<period:2>",
+    "success": true,
+    "transactions_associated": 3,
+  },
+  "status": 201,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: managed create of April again 1`] = `
+{
+  "after": {
+    "events": 4,
+    "events_net": "900.00",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 6,
+    "periods": 2,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "code": "BUDGET_PERIOD_EXISTS",
+    "error": "Budget period for 4/2024 already exists: April 2024",
+    "message": "Budget period for 4/2024 already exists: April 2024",
+    "requestId": "<request>",
+  },
+  "status": 409,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: managed create of May without taking its transactions 1`] = `
+{
+  "after": {
+    "events": 6,
+    "events_net": "1350.00",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "budget_items_created": 3,
+    "message": "Budget period created successfully",
+    "period_id": "<period:3>",
+    "success": true,
+    "transactions_associated": 0,
+  },
+  "status": 201,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: managed create of month 13 1`] = `
+{
+  "after": {
+    "events": 4,
+    "events_net": "900.00",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 6,
+    "periods": 2,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "month",
+        "message": "Month must be between 1 and 12",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Month must be between 1 and 12",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: managed create without a year 1`] = `
+{
+  "after": {
+    "events": 4,
+    "events_net": "900.00",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 6,
+    "periods": 2,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "year",
+        "message": "Give the year, from 1800 to 2999",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Give the year, from 1800 to 2999",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: management 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "periods": [
+      {
+        "budget_item_count": "3",
+        "budget_transaction_count": "2",
+        "end_date": "2024-03-31",
+        "id": "<period:1>",
+        "month_number": 3,
+        "name": "March 2024",
+        "start_date": "2024-03-01",
+        "transaction_count": "0",
+        "uuid": "<uuid:9>",
+        "year": 2024,
+      },
+      {
+        "budget_item_count": "3",
+        "budget_transaction_count": "2",
+        "end_date": "2024-04-30",
+        "id": "<period:2>",
+        "month_number": 4,
+        "name": "April 2024",
+        "start_date": "2024-04-01",
+        "transaction_count": "3",
+        "uuid": "<uuid:10>",
+        "year": 2024,
+      },
+      {
+        "budget_item_count": "3",
+        "budget_transaction_count": "2",
+        "end_date": "2024-05-31",
+        "id": "<period:3>",
+        "month_number": 5,
+        "name": "May 2024",
+        "start_date": "2024-05-01",
+        "transaction_count": "0",
+        "uuid": "<uuid:11>",
+        "year": 2024,
+      },
+    ],
+    "stats": {
+      "earliest_year": 2024,
+      "latest_year": 2024,
+      "total_periods": "3",
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > periods: summary of a period that is not there 1`] = `
+{
+  "after": undefined,
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Budget period not found",
+    "message": "Budget period not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > rules: create a merchant rule without a merchant 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 2,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "merchant_id",
+        "message": "Merchant is required for merchant_exact method",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Merchant is required for merchant_exact method",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > rules: create a text rule without text 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 2,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "matching_text",
+        "message": "Matching text is required for this method",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Matching text is required for this method",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > rules: create by ids 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "amount_max": "500.00",
+    "amount_min": "5.00",
+    "budget_item_id": "<budget_item:1>",
+    "created_at": "<instant>",
+    "id": "<rule:1>",
+    "is_active": true,
+    "matching_text": "corner",
+    "merchant_id": null,
+    "method": "contains",
+    "notes": "weekly",
+    "priority": 10,
+    "updated_at": "<instant>",
+    "uuid": "<uuid:22>",
+  },
+  "status": 201,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > rules: create by uuids 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 2,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "amount_max": null,
+    "amount_min": null,
+    "budget_item_id": "<budget_item:3>",
+    "created_at": "<instant>",
+    "id": "<rule:2>",
+    "is_active": true,
+    "matching_text": null,
+    "merchant_id": "<merchant:1>",
+    "method": "merchant_exact",
+    "notes": null,
+    "priority": 100,
+    "updated_at": "<instant>",
+    "uuid": "<uuid:23>",
+  },
+  "status": 201,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > rules: create with an unknown method 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 2,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "method",
+        "message": "Method must be one of: exact, contains, starts_with, ends_with, regex, merchant_exact",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Method must be one of: exact, contains, starts_with, ends_with, regex, merchant_exact",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > rules: create without a method 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 2,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "method",
+        "message": "Method must be one of: exact, contains, starts_with, ends_with, regex, merchant_exact",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Method must be one of: exact, contains, starts_with, ends_with, regex, merchant_exact",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > rules: delete 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {},
+  "status": 204,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > rules: delete one that is not there 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 1,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Rule not found",
+    "message": "The specified matching rule does not exist",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > rules: list 1`] = `
+{
+  "after": undefined,
+  "body": [
+    {
+      "amount_max": "500.00",
+      "amount_min": "5.00",
+      "budget_item_color": "#123456",
+      "budget_item_icon": "Cart",
+      "budget_item_id": "<budget_item:1>",
+      "budget_item_name": "Groceries",
+      "budget_item_uuid": "<uuid:6>",
+      "created_at": "<instant>",
+      "id": "<rule:1>",
+      "is_active": true,
+      "matching_text": "corner",
+      "merchant_id": null,
+      "merchant_name": null,
+      "method": "contains",
+      "notes": "weekly",
+      "priority": 10,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:22>",
+    },
+    {
+      "amount_max": null,
+      "amount_min": null,
+      "budget_item_color": "#3B82F6",
+      "budget_item_icon": "CreditCard",
+      "budget_item_id": "<budget_item:3>",
+      "budget_item_name": "Pay",
+      "budget_item_uuid": "<uuid:8>",
+      "created_at": "<instant>",
+      "id": "<rule:2>",
+      "is_active": true,
+      "matching_text": null,
+      "merchant_id": "<merchant:1>",
+      "merchant_name": "Corner Market",
+      "method": "merchant_exact",
+      "notes": null,
+      "priority": 100,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:23>",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > rules: list by item id 1`] = `
+{
+  "after": undefined,
+  "body": [
+    {
+      "amount_max": "500.00",
+      "amount_min": "5.00",
+      "budget_item_color": "#123456",
+      "budget_item_icon": "Cart",
+      "budget_item_id": "<budget_item:1>",
+      "budget_item_name": "Groceries",
+      "budget_item_uuid": "<uuid:6>",
+      "created_at": "<instant>",
+      "id": "<rule:1>",
+      "is_active": true,
+      "matching_text": "corner",
+      "merchant_id": null,
+      "merchant_name": null,
+      "method": "contains",
+      "notes": "weekly",
+      "priority": 10,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:22>",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > rules: list by item uuid 1`] = `
+{
+  "after": undefined,
+  "body": [
+    {
+      "amount_max": null,
+      "amount_min": null,
+      "budget_item_color": "#3B82F6",
+      "budget_item_icon": "CreditCard",
+      "budget_item_id": "<budget_item:3>",
+      "budget_item_name": "Pay",
+      "budget_item_uuid": "<uuid:8>",
+      "created_at": "<instant>",
+      "id": "<rule:2>",
+      "is_active": true,
+      "matching_text": null,
+      "merchant_id": "<merchant:1>",
+      "merchant_name": "Corner Market",
+      "method": "merchant_exact",
+      "notes": null,
+      "priority": 100,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:23>",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > rules: update 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 2,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "amount_max": null,
+    "amount_min": null,
+    "budget_item_id": "<budget_item:2>",
+    "created_at": "<instant>",
+    "id": "<rule:1>",
+    "is_active": false,
+    "matching_text": "CORNER",
+    "merchant_id": null,
+    "method": "starts_with",
+    "notes": null,
+    "priority": 100,
+    "updated_at": "<instant>",
+    "uuid": "<uuid:22>",
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > rules: update one that is not there 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 2,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Rule not found",
+    "message": "The specified matching rule does not exist",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > rules: update without a method 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 2,
+    "transactions_in_periods": 7,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "method",
+        "message": "Method must be one of: exact, contains, starts_with, ends_with, regex, merchant_exact",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Method must be one of: exact, contains, starts_with, ends_with, regex, merchant_exact",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > transfer: a period that is not there 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Budget period not found",
+    "message": "Budget period not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > transfer: by the period id 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Not found",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > transfer: default description 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "amount": 1.1,
+    "fromItem": "Car fund",
+    "message": "Successfully transferred $1.10 from Car fund to Pay",
+    "success": true,
+    "toItem": "Pay",
+    "transferUuid": "<uuid:18>",
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > transfer: into another period 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Budget period items not found or not in the same period",
+    "message": "Budget period items not found or not in the same period",
+    "requestId": "<request>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > transfer: more than it has 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "code": "INSUFFICIENT_FUNDS",
+    "error": "Insufficient funds. Available: 149.15, Requested: 5000",
+    "message": "Insufficient funds. Available: 149.15, Requested: 5000",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > transfer: move money 1`] = `
+{
+  "after": {
+    "events": 10,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "amount": 20.25,
+    "fromItem": "Car fund",
+    "message": "Successfully transferred $20.25 from Car fund to Groceries",
+    "success": true,
+    "toItem": "Groceries",
+    "transferUuid": "<uuid:17>",
+  },
+  "status": 200,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > transfer: to itself 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "toBudgetPeriodItemId",
+        "message": "Cannot transfer to the same budget item",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Cannot transfer to the same budget item",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > transfer: without a source 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "fromBudgetPeriodItemId",
+        "message": "From and To budget period item IDs are required",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "From and To budget period item IDs are required",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Budget, budget-period and goal routes: whole answers > answers every budget route as before > transfer: zero 1`] = `
+{
+  "after": {
+    "events": 12,
+    "events_net": "1420.50",
+    "goal_accounts": 0,
+    "goal_envelopes": 0,
+    "items": 3,
+    "period_items": 9,
+    "periods": 3,
+    "rules": 0,
+    "transactions_in_periods": 3,
+  },
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "amount",
+        "message": "Amount must be greater than zero",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Amount must be greater than zero",
+    "requestId": "<request>",
+  },
+  "status": 400,
+}
+`;

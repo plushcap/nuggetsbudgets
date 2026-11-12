@@ -1,0 +1,212 @@
+# Docker Secrets Configuration
+secrets:
+  # Data-at-rest key (backups, SimpleFin URL, OneDrive tokens).
+  data_encryption_key:
+    file: ${DataEncryptionKey_FILE_PATH:-./secrets/data_encryption_key.txt}
+  db_password:
+    file: ${DB_PASSWORD_FILE_PATH:-./secrets/db_password.txt}
+  # The serving role's (nuggets_app) password; scripts/generate-secrets.js creates it.
+  app_db_password:
+    file: ${APP_DB_PASSWORD_FILE_PATH:-./secrets/app_db_password.txt}
+  jwt_secret:
+    file: ${JWT_SECRET_FILE_PATH:-./secrets/jwt_secret.txt}
+  session_secret:
+    file: ${SESSION_SECRET_FILE_PATH:-./secrets/session_secret.txt}
+  csrf_secret:
+    file: ${CSRF_SECRET_FILE_PATH:-./secrets/csrf_secret.txt}
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
+    container_name: nuggets_postgres
+    restart: unless-stopped
+    # Bounded on-disk log retention (readable by Dozzle and `docker logs`)
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: nuggets_db
+      POSTGRES_USER: nuggetsApp_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      # Containers run UTC; the household's zone is the application_timezone setting.
+      TZ: UTC
+    secrets:
+      - db_password
+    ports:
+      # Bind to localhost only so the dev database isn't exposed on the host's
+      # external interfaces (it still reaches the backend over the compose network).
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # Postgres 18 keeps its data in /var/lib/postgresql/18/docker: mount the parent.
+      # At .../data (the pre-18 path) it won't start, or keeps its data outside the
+      # volume.
+      - postgres_data:/var/lib/postgresql
+      - ${BACKUPS_PATH:-./data/backups}:/backups
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - nuggets_network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+
+  # Backend Service
+  backend:
+    build:
+      # Context is the repo root: the image installs the npm workspace there and builds
+      # shared, mcp and the backend.
+      context: .
+      dockerfile: backend/Dockerfile.dev
+    container_name: nuggets_backend
+    restart: unless-stopped
+    # Time to let a running backup or restore finish, or stop it cleanly, before Docker
+    # kills the container (Docker's default is 10 s; the backend waits up to 55 s).
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+    ports:
+      # Loopback only: this is a development server (NODE_ENV=development).
+      - "127.0.0.1:5000:5000"
+    env_file:
+      - .env
+    # The same role split as production: the app serves as the unprivileged nuggets_app
+    # role, so row-level security applies; migrations run on start (docker-entrypoint.sh)
+    # as the owner, which gives nuggets_app its login from the app_db_password secret.
+    # These win over the same names in .env.
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: nuggets_db
+      DB_USER: nuggets_app
+      MIGRATION_DB_USER: nuggetsApp_user
+      TZ: UTC
+      USE_DOCKER_SECRETS: "true"
+      RUN_MIGRATIONS: "${RUN_MIGRATIONS:-true}"
+    # The SMTP password is set in the app (Settings → Email Notifications), stored
+    # encrypted. Never hardcode it here.
+    secrets:
+      - data_encryption_key
+      - db_password
+      - app_db_password
+      - jwt_secret
+      - session_secret
+      - csrf_secret
+    volumes:
+      - ./backend:/app/backend
+      - ./mcp:/app/mcp
+      # The dependencies are the image's /app/node_modules (the workspace root's, which no
+      # bind mount covers). These keep a host checkout's own backend/ and mcp/ node_modules
+      # (a dependency npm kept out of the root there) from shadowing the image's.
+      - /app/backend/node_modules
+      # Run the image's freshly-compiled dist, not the host's (the bind mount
+      # above would otherwise shadow it with a stale ./backend/dist).
+      - /app/backend/dist
+      - /app/mcp/node_modules
+      - /app/mcp/dist
+      - ${UPLOADS_PATH:-./data/uploads}:/app/backend/uploads:rw
+      - ${BACKUPS_PATH:-./data/backups}:/app/backend/backups:rw
+      - ${TEMP_PATH:-./data/temp}:/app/backend/temp:rw
+      - ${LOGS_PATH:-./data/logs}:/app/backend/logs:rw
+    depends_on:
+      - postgres
+    networks:
+      - nuggets_network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # Frontend Service
+  frontend:
+    build:
+      # Context is the repo root: the image installs the npm workspace there and builds
+      # shared.
+      context: .
+      dockerfile: frontend/Dockerfile.dev
+    container_name: nuggets_frontend
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+    ports:
+      # Loopback only, like the backend's: this dev server proxies /api to a backend in
+      # development mode, which is not for other machines to reach.
+      - "127.0.0.1:3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000
+      - TZ=UTC
+    volumes:
+      - ./frontend:/app/frontend
+      # The dependencies are the image's /app/node_modules (the workspace root's, which no
+      # bind mount covers); this keeps a host checkout's frontend/node_modules from
+      # shadowing them. @nuggets/shared is the image's /app/shared, built at build time,
+      # so after editing shared/, rebuild: `npm run dev`.
+      - /app/frontend/node_modules
+    depends_on:
+      - backend
+    networks:
+      - nuggets_network
+    deploy:
+      resources:
+        limits:
+          # Vite's dependency optimiser peaks at about 790 MiB on a cold start; under 512M the
+          # dev server was OOM-killed.
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # Dozzle - lightweight real-time log viewer (replaces Loki/Promtail/Grafana).
+  # Reads container stdout/stderr directly via the Docker API (socket mounted
+  # read-only); stores nothing itself — history is the json-file rotation above.
+  dozzle:
+    image: amir20/dozzle:v11.4.0@sha256:d23d23ce02c8cc96416dfbad4a7de225d01fdc03ad310203d64d580034dd120d
+    container_name: nuggets_dozzle
+    restart: unless-stopped
+    ports:
+      # Localhost only — Dozzle streams all container logs and has no auth, so it
+      # must not be reachable from outside the dev machine.
+      - "127.0.0.1:8888:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - nuggets_network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+
+# Volumes are now configurable via environment variables
+# Default paths: ./data/postgres, ./data/uploads, ./data/backups, ./data/temp, ./data/logs
+# Override in .env file or set environment variables to customize locations
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  nuggets_network:
+    driver: bridge

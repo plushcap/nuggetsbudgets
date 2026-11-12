@@ -1,0 +1,34 @@
+FROM node:26-slim@sha256:e4db4c914bf8ad241bd24804fc25d272d89bad97e68cdc8a1414862790a02c39
+
+# This Dockerfile expects the build context to be the REPO ROOT (not ./frontend):
+# it installs the npm workspace there (package.json's workspaces, one package-lock.json),
+# laid out at /app as in the repository, so the frontend's @nuggets/shared is the
+# workspace's /app/shared, built here.
+
+WORKDIR /app
+
+# --- Install the workspace ---
+# Its lockfile and shared's and the frontend's manifests first, so this layer stays cached
+# until one of their dependencies changes. --workspace installs only their dependencies:
+# the versions the lockfile pins, the ones CI tests, never newer. They are hoisted to
+# /app/node_modules, outside the frontend directory docker-compose.yml bind-mounts, with one
+# Zod for the app and @nuggets/shared, as the production build has.
+COPY package.json package-lock.json ./
+COPY shared/package.json shared/
+COPY frontend/package.json frontend/
+RUN npm ci --no-audit --no-fund --workspace shared --workspace frontend
+
+# --- Build @nuggets/shared (the frontend resolves it from its compiled dist/) ---
+COPY shared/tsconfig.json shared/
+COPY shared/src shared/src
+RUN npm run build -w shared
+
+# Copy source code
+COPY frontend/. frontend/
+WORKDIR /app/frontend
+
+# Expose port
+EXPOSE 3000
+
+# Start Vite development server
+CMD ["npm", "run", "dev"]

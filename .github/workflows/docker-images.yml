@@ -1,0 +1,157 @@
+name: Docker images
+
+# Builds the three production images (amd64 only) and runs scripts/smoke-test.sh against
+# them: the stack from docker-compose.portainer.yml, first-run setup and sign-in through
+# the API, a backup and a restore. Beside it, the dev-stack job runs the development
+# quickstart (npm run setup, then the dev compose). It takes several minutes, so it runs
+# only when a pull request changes what goes into the images or how they are deployed (the
+# paths below), and not on draft pull requests or develop pushes. ci-cd.yml's deploy-lint
+# job lints the same files on every pull request. Run it by hand from the Actions tab
+# (workflow_dispatch).
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [ opened, synchronize, reopened, ready_for_review ]
+    paths:
+      - '**/Dockerfile*'
+      - '**/.dockerignore'
+      - '*compose*.yml'
+      - 'scripts/**'
+      - '**/*.sh'
+      - 'backend/init.sql'
+      # What `npm run setup` and the dev stack read (the dev-stack job); package.json is also
+      # the npm workspace's root (its workspaces, overrides and build scripts), which every
+      # Node image installs and builds from.
+      - '.env.example'
+      - 'package.json'
+      # The frontend image's static server: its dependencies are in no test job.
+      - 'frontend/static-server/**'
+      - '.github/workflows/docker-images.yml'
+    # Not the packages' dependency or migration changes (package-lock.json, the packages'
+    # package.json files, backend/migrations): ci-cd.yml's test jobs already install, build
+    # and migrate with them on every pull request, and those paths would run this on about
+    # two pull requests in three (the Actions minutes cost several times more).
+  workflow_dispatch:
+
+# A newer push to the same pull request cancels the run in progress.
+concurrency:
+  group: docker-images-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-smoke-test:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # The tag the images are built under; smoke-test.sh runs the manifest with it.
+      NUGGETS_IMAGE_TAG: ci
+      # The version baked into the backend image (APP_VERSION, below), which
+      # smoke-test.sh expects /api/health to report.
+      SMOKE_EXPECT_APP_VERSION: ci
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+    # Each image is loaded into the runner's Docker for the smoke test, not pushed. The
+    # GitHub Actions cache keeps their layers between runs of the same pull request (a
+    # pull request can't read another's cache), in scopes apart from the release builds'.
+    - name: Build backend image
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+      with:
+        context: .
+        file: ./backend/Dockerfile.prod
+        platforms: linux/amd64
+        load: true
+        tags: ghcr.io/plushcap/nuggets-backend:ci
+        # The version the backend reports; the smoke test checks /api/health says it.
+        build-args: |
+          APP_VERSION=${{ env.NUGGETS_IMAGE_TAG }}
+          GIT_SHA=${{ github.sha }}
+        cache-from: type=gha,scope=ci-backend
+        cache-to: type=gha,mode=max,scope=ci-backend
+
+    - name: Build frontend image
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+      with:
+        context: .
+        file: ./frontend/Dockerfile.prod
+        platforms: linux/amd64
+        load: true
+        tags: ghcr.io/plushcap/nuggets-frontend:ci
+        cache-from: type=gha,scope=ci-frontend
+        cache-to: type=gha,mode=max,scope=ci-frontend
+
+    - name: Build postgres image
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+      with:
+        context: .
+        file: ./Dockerfile.postgres
+        platforms: linux/amd64
+        load: true
+        tags: ghcr.io/plushcap/nuggets-postgres:ci
+        cache-from: type=gha,scope=ci-postgres
+        cache-to: type=gha,mode=max,scope=ci-postgres
+
+    - name: Smoke test
+      run: scripts/smoke-test.sh
+
+  # The development quickstart: `npm run setup` on a fresh checkout, then the dev
+  # compose's database and backend. The backend must migrate the database on start, serve
+  # as the unprivileged nuggets_app role and be ready (/api/ready). The frontend's dev image
+  # (a Vite server the backend doesn't depend on) is left out to save the build.
+  dev-stack:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Setup Node.js
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: '26'
+
+    - name: npm run setup
+      run: npm run setup
+
+    - name: Start the database and the backend (docker compose up --build)
+      run: docker compose up -d --build postgres backend
+
+    - name: The backend migrated the database and serves
+      run: |
+        healthy=""
+        for _ in $(seq 1 90); do
+          if curl -fsS -o /dev/null http://127.0.0.1:5000/api/ready; then healthy=1; break; fi
+          sleep 2
+        done
+        [ -n "$healthy" ] || { curl -sS http://127.0.0.1:5000/api/ready || true; echo "::error::the backend never answered /api/ready"; exit 1; }
+        db() { docker exec nuggets_postgres psql -X -tA -U nuggetsApp_user -d nuggets_db -c "$1"; }
+        # The baseline's own row (init.sql), then one per migration file newer than it.
+        applied=$(db "SELECT count(*) FROM schema_migrations")
+        files=$(find backend/migrations -maxdepth 1 -name '[0-9]*.sql' | wc -l)
+        echo "schema_migrations rows: $applied, for the baseline and $files migration(s)"
+        [ "$applied" -eq "$((files + 1))" ] || { echo "::error::$applied schema_migrations rows, for the baseline and $files migrations"; exit 1; }
+        serving=$(db "SELECT count(*) FROM pg_stat_activity WHERE datname = 'nuggets_db' AND usename = 'nuggets_app'")
+        [ "$serving" -gt 0 ] || { echo "::error::the backend doesn't serve as nuggets_app"; exit 1; }
+        docker compose logs --no-color backend | grep -q 'First-run setup' \
+          || { echo "::error::the backend logged no first-run setup token"; exit 1; }
+
+    - name: Logs
+      if: failure()
+      run: docker compose logs --no-color --tail=200 postgres backend
+
+    - name: Tear down
+      if: always()
+      run: docker compose down -v --remove-orphans --timeout 10

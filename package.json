@@ -1,0 +1,41 @@
+{
+  "name": "nuggets",
+  "private": true,
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "workspaces": [
+    "shared",
+    "mcp",
+    "backend",
+    "frontend",
+    "e2e"
+  ],
+  "scripts": {
+    "setup": "bash scripts/bootstrap.sh",
+    "dev": "docker compose rm --stop --force --volumes backend frontend && docker compose up --build",
+    "dev:detached": "docker compose rm --stop --force --volumes backend frontend && docker compose up -d --build",
+    "prod": "docker compose -f docker-compose.prod.yml up --build",
+    "down": "docker compose down",
+    "down:volumes": "docker compose down -v",
+    "logs": "docker compose logs -f",
+    "clean": "docker compose down --rmi local --remove-orphans",
+    "security:generate": "node scripts/generate-secrets.js",
+    "build": "npm run build:server && npm run build -w frontend",
+    "build:server": "npm run build -w shared && npm run build -w mcp && npm run build -w backend"
+  },
+  "overrides": {
+    "fast-xml-parser": "^5.4.2",
+    "hono": "^4.13.11",
+    "html-minifier": "npm:html-minifier-terser@^7.2.0",
+    "jws": "^4.0.1",
+    "lodash": "^4.17.23",
+    "minimatch": "^9.0.5",
+    "validator": "^13.15.22",
+    "eslint-plugin-jsx-a11y": {
+      "eslint": "^10.13.0",
+      "minimatch@^3": "^3.1.5"
+    }
+  },
+  "engines": {
+    "node": ">=26"
+  }
+}

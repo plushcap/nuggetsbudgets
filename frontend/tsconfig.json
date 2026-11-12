@@ -1,0 +1,18 @@
+// A solution file: it checks nothing itself and names the three projects, so an editor
+// opens each file under the project that holds it, and Vite and Vitest find each file's
+// settings the same way.
+// - tsconfig.app.json: the app's source, with exactOptionalPropertyTypes and
+//   noUncheckedIndexedAccess on.
+// - tsconfig.test.json: the tests and their helpers (src/**/__tests__, *.test.ts(x),
+//   src/test), with both flags off.
+// - tsconfig.node.json: vite.config.ts and vitest.config.ts.
+// `npm run type-check` checks all three; a bare `tsc --noEmit` here checks nothing (name a
+// project with -p, as the script does).
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.test.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}

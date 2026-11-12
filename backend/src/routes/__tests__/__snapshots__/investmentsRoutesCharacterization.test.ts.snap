@@ -1,0 +1,2392 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /export/dividends.csv 1`] = `
+{
+  "body": "ticker,pay_date,total_amount,is_qualified,is_reinvested
+AAA,2025-04-01,3.5,true,false",
+  "contentType": "text/csv; charset=utf-8",
+  "disposition": "attachment; filename="dividends.csv"; filename*=UTF-8''dividends.csv",
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /export/holdings.csv 1`] = `
+{
+  "body": "ticker,name,total_shares,average_cost_per_share,latest_price,market_value,total_cost_basis,unrealized_gain_loss
+AAA,Alpha Co,7,10.1,8.5,59.5,70.7,-11.2
+HLD,Held Two,2.5,50.4,50,125,126,-1",
+  "contentType": "text/csv; charset=utf-8",
+  "disposition": "attachment; filename="holdings.csv"; filename*=UTF-8''holdings.csv",
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /export/realized-gain-loss.csv 1`] = `
+{
+  "body": "ticker,sell_date,shares_consumed,basis_consumed,proceeds,realized_gain_loss,is_long_term,is_wash_sale
+AAA,2025-06-02,3,30.3,45,14.7,false,false",
+  "contentType": "text/csv; charset=utf-8",
+  "disposition": "attachment; filename="realized-gain-loss.csv"; filename*=UTF-8''realized-gain-loss.csv",
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/concentration 1`] = `
+{
+  "body": {
+    "rows": [
+      {
+        "exceedsThreshold": true,
+        "marketValue": 125,
+        "netWorthPct": null,
+        "portfolioPct": 55.07,
+        "securityId": "<securityId:1>",
+        "ticker": "HLD",
+      },
+      {
+        "exceedsThreshold": false,
+        "marketValue": 102,
+        "netWorthPct": null,
+        "portfolioPct": 44.93,
+        "securityId": "<securityId:2>",
+        "ticker": "AAA",
+      },
+    ],
+    "threshold_pct": 50,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/cost-of-ownership 1`] = `
+{
+  "body": {
+    "account_level_fees": 2.25,
+    "note": "Imputed expense-ratio drag is an estimate (current market value used as the period average).",
+    "per_holding": [
+      {
+        "average_holding_value": 59.5,
+        "effectiveCostPct": 0,
+        "explicitFees": 0,
+        "imputedDrag": 0,
+        "imputed_drag_is_estimated": true,
+        "security_id": "<security_id:1>",
+        "ticker": "AAA",
+        "totalCost": 0,
+      },
+      {
+        "average_holding_value": 125,
+        "effectiveCostPct": 0.03,
+        "explicitFees": 0,
+        "imputedDrag": 0.04,
+        "imputed_drag_is_estimated": true,
+        "security_id": "<security_id:2>",
+        "ticker": "HLD",
+        "totalCost": 0.04,
+      },
+    ],
+    "total_cost": 2.29,
+    "total_explicit_fees": 2.25,
+    "total_imputed_drag": 0.04,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/dividend-history 1`] = `
+{
+  "body": {
+    "ordinary": 0,
+    "qualified": 3.5,
+    "records": [
+      {
+        "is_qualified": true,
+        "is_reinvested": false,
+        "pay_date": "2025-04-01",
+        "ticker": "AAA",
+        "total_amount": 3.5,
+      },
+    ],
+    "total": 3.5,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/fees 1`] = `
+{
+  "body": {
+    "by_type": [
+      {
+        "count": 1,
+        "fee_type": "advisory",
+        "total": 2.25,
+      },
+    ],
+    "total": 2.25,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/lookthrough 1`] = `
+{
+  "body": {
+    "buckets": [
+      {
+        "amount": 184.5,
+        "dimensionValue": "unknown",
+        "percentage": 100,
+      },
+    ],
+    "dimension": "sector",
+    "totalValue": 184.5,
+    "unknownValue": 184.5,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/lot-suggestions 1`] = `
+{
+  "body": {
+    "lots": [
+      {
+        "acquisitionDate": "2025-01-02",
+        "costBasisPerShare": 10.1,
+        "holdingPeriodStart": "2025-01-02",
+        "id": "<row:1>",
+        "isCovered": true,
+        "sharesRemaining": 7,
+        "totalCostBasis": 70.7,
+        "unrealizedGain": -7.7,
+        "uuid": "<uuid:12>",
+      },
+    ],
+    "objective": "maximize_loss",
+    "price_per_share": 9,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/performance 1`] = `
+{
+  "body": {
+    "account": "<uuid:19>",
+    "annualized_return": 0.3989,
+    "begin_value": 0,
+    "current_value": 75,
+    "end_date": "2025-06-30",
+    "irr": 0.6662,
+    "net_invested": 63.5,
+    "note": "IRR is money-weighted; TWR is Modified Dietz. Returns are before standalone fee events. Timeline shows cumulative net invested vs current value (not daily mark-to-market).",
+    "start_date": "2025-01-01",
+    "timeline": [
+      {
+        "date": "2025-03-03",
+        "net_invested": 63.5,
+      },
+    ],
+    "total_contributed": 63.5,
+    "total_distributed": 0,
+    "total_fees": 0,
+    "total_return": 0.1811,
+    "twr": 0.2755,
+    "unpriced_securities": 0,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/realized-gain-loss 1`] = `
+{
+  "body": [
+    {
+      "basis_consumed": 30.3,
+      "is_long_term": false,
+      "is_wash_sale": false,
+      "proceeds": 45,
+      "realized_gain_loss": 14.7,
+      "security_id": "<security_id:1>",
+      "sell_date": "2025-06-02",
+      "shares_consumed": 3,
+      "ticker": "AAA",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/reconciliation 1`] = `
+{
+  "body": {
+    "accounts": [
+      {
+        "absDifference": 0,
+        "account_name": "Brokerage",
+        "account_uuid": "<uuid:15>",
+        "calculated_value": 184.5,
+        "cash_value": 0,
+        "difference": 0,
+        "flagged": false,
+        "holdings_value": 184.5,
+        "imported_balance": null,
+        "imported_balance_date": null,
+        "pctDifference": null,
+        "reason": "No imported balance: the account isn't synced.",
+        "threshold": 50,
+      },
+      {
+        "absDifference": 37.5,
+        "account_name": "IRA",
+        "account_uuid": "<uuid:19>",
+        "calculated_value": 42.5,
+        "cash_value": 0,
+        "difference": -37.5,
+        "flagged": false,
+        "holdings_value": 42.5,
+        "imported_balance": 80,
+        "imported_balance_date": "2025-07-01T16:00:00.000Z",
+        "pctDifference": -46.88,
+        "reason": null,
+        "threshold": 50,
+      },
+    ],
+    "flagged_count": 0,
+    "note": "Imported balance is the broker's total (securities and cash) from the SimpleFin sync. Calculated is the open lots at their latest prices plus the account's cash: its balance in Nuggets, without pending transactions. Resolve discrepancies by recording the missing event, adding a lot, updating prices, or correcting the account's transactions.",
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/securities-needing-data 1`] = `
+{
+  "body": {
+    "category": "price",
+    "securities": [
+      {
+        "name": "Pass Fund",
+        "ticker": "FND",
+        "uuid": "<uuid:3>",
+      },
+      {
+        "name": "100% Growth Inc",
+        "ticker": "PCT",
+        "uuid": "<uuid:5>",
+      },
+    ],
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/securities-needing-data composition 1`] = `
+{
+  "body": {
+    "category": "composition",
+    "securities": [
+      {
+        "name": "Pass Fund",
+        "ticker": "FND",
+        "uuid": "<uuid:3>",
+      },
+    ],
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/securities-needing-data expense_ratio 1`] = `
+{
+  "body": {
+    "category": "expense_ratio",
+    "securities": [
+      {
+        "name": "Pass Fund",
+        "ticker": "FND",
+        "uuid": "<uuid:3>",
+      },
+    ],
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/sell-tax-impact 1`] = `
+{
+  "body": {
+    "estimated": true,
+    "method": "fifo",
+    "plan": {
+      "consumptions": [
+        {
+          "basisConsumed": 20.2,
+          "holdingPeriodDays": 180,
+          "isLongTerm": false,
+          "lotId": "<lotId:1>",
+          "proceeds": 19,
+          "realizedGainLoss": -1.2,
+          "sharesConsumed": 2,
+        },
+      ],
+      "longTermRealized": 0,
+      "shortTermRealized": -1.2,
+      "totalBasis": 20.2,
+      "totalProceeds": 19,
+      "totalRealized": -1.2,
+    },
+    "price_per_share": 9.5,
+    "tax": {
+      "estimatedLongTermTax": 0,
+      "estimatedShortTermTax": -0.29,
+      "estimatedTotalTax": -0.29,
+      "longTermGain": 0,
+      "netProceedsAfterTax": 19.29,
+      "shortTermGain": -1.2,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/sell-tax-impact latest price 1`] = `
+{
+  "body": {
+    "estimated": true,
+    "method": "fifo",
+    "plan": {
+      "consumptions": [
+        {
+          "basisConsumed": 15.15,
+          "holdingPeriodDays": 180,
+          "isLongTerm": false,
+          "lotId": "<lotId:1>",
+          "proceeds": 12.75,
+          "realizedGainLoss": -2.4,
+          "sharesConsumed": 1.5,
+        },
+      ],
+      "longTermRealized": 0,
+      "shortTermRealized": -2.4,
+      "totalBasis": 15.15,
+      "totalProceeds": 12.75,
+      "totalRealized": -2.4,
+    },
+    "price_per_share": 8.5,
+    "tax": {
+      "estimatedLongTermTax": 0,
+      "estimatedShortTermTax": -0.58,
+      "estimatedTotalTax": -0.58,
+      "longTermGain": 0,
+      "netProceedsAfterTax": 13.33,
+      "shortTermGain": -2.4,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/tax-loss-harvest 1`] = `
+{
+  "body": {
+    "candidates": [
+      {
+        "lot_uuid": "<uuid:13>",
+        "market_value": 42.5,
+        "security_id": "<security_id:1>",
+        "ticker": "AAA",
+        "unrealized_loss": 21,
+      },
+      {
+        "lot_uuid": "<uuid:12>",
+        "market_value": 59.5,
+        "security_id": "<security_id:1>",
+        "ticker": "AAA",
+        "unrealized_loss": 11.2,
+      },
+    ],
+    "note": "Check wash-sale risk before harvesting (a buy of the same security within 30 days disallows the loss).",
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/underlying-exposure 1`] = `
+{
+  "body": {
+    "below_a_cent": {
+      "amount": 0,
+      "percentage": 0,
+      "securities": 0,
+    },
+    "exposures": [
+      {
+        "amount": 125,
+        "name": "Held Two",
+        "percentage": 55.07,
+        "security_uuid": "<uuid:4>",
+        "ticker": "HLD",
+      },
+      {
+        "amount": 102,
+        "name": "Alpha Co",
+        "percentage": 44.93,
+        "security_uuid": "<uuid:1>",
+        "ticker": "AAA",
+      },
+    ],
+    "total_value": 227,
+    "unknown_value": 0,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/unrealized-gain-loss 1`] = `
+{
+  "body": [
+    {
+      "account_id": "<account_id:1>",
+      "average_cost_per_share": 10.1,
+      "latest_price": 8.5,
+      "market_value": 59.5,
+      "name": "Alpha Co",
+      "security_id": "<security_id:1>",
+      "security_uuid": "<uuid:1>",
+      "ticker": "AAA",
+      "total_cost_basis": 70.7,
+      "total_shares": 7,
+      "unrealized_gain_loss": -11.2,
+    },
+    {
+      "account_id": "<account_id:2>",
+      "average_cost_per_share": 12.7,
+      "latest_price": 8.5,
+      "market_value": 42.5,
+      "name": "Alpha Co",
+      "security_id": "<security_id:1>",
+      "security_uuid": "<uuid:1>",
+      "ticker": "AAA",
+      "total_cost_basis": 63.5,
+      "total_shares": 5,
+      "unrealized_gain_loss": -21,
+    },
+    {
+      "account_id": "<account_id:1>",
+      "average_cost_per_share": 50.4,
+      "latest_price": 50,
+      "market_value": 125,
+      "name": "Held Two",
+      "security_id": "<security_id:2>",
+      "security_uuid": "<uuid:4>",
+      "ticker": "HLD",
+      "total_cost_basis": 126,
+      "total_shares": 2.5,
+      "unrealized_gain_loss": -1,
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/value-series 1`] = `
+{
+  "body": {
+    "series": [
+      {
+        "cost_basis": 101,
+        "snapshot_date": "2025-01-02",
+        "stale_securities": 0,
+        "total_value": 100,
+      },
+      {
+        "cost_basis": 101,
+        "snapshot_date": "2025-01-03",
+        "stale_securities": 1,
+        "total_value": 100,
+      },
+      {
+        "cost_basis": 101,
+        "snapshot_date": "2025-01-06",
+        "stale_securities": 0,
+        "total_value": 110,
+      },
+    ],
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/value-series default 1`] = `
+{
+  "body": {
+    "series": [
+      {
+        "cost_basis": null,
+        "snapshot_date": "2024-12-31",
+        "stale_securities": 0,
+        "total_value": 0,
+      },
+      {
+        "cost_basis": 101,
+        "snapshot_date": "2025-01-02",
+        "stale_securities": 0,
+        "total_value": 100,
+      },
+      {
+        "cost_basis": 101,
+        "snapshot_date": "2025-01-03",
+        "stale_securities": 1,
+        "total_value": 100,
+      },
+      {
+        "cost_basis": 101,
+        "snapshot_date": "2025-01-06",
+        "stale_securities": 0,
+        "total_value": 110,
+      },
+      {
+        "cost_basis": 101,
+        "snapshot_date": "2025-01-07",
+        "stale_securities": 0,
+        "total_value": 111.11,
+      },
+    ],
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /reports/wash-sales 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /securities/:uuid/price-gaps 1`] = `
+{
+  "body": {
+    "first_price": "2025-01-02",
+    "gaps": [
+      {
+        "after": "2025-01-20",
+        "before": "2025-06-02",
+        "gap_days": 133,
+      },
+    ],
+    "last_price": "2025-07-01",
+    "security_uuid": "<uuid:1>",
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > answers the reports their queries ask for > GET /securities/:uuid/price-gaps default 1`] = `
+{
+  "body": {
+    "first_price": "2025-01-02",
+    "gaps": [
+      {
+        "after": "2025-01-02",
+        "before": "2025-01-20",
+        "gap_days": 18,
+      },
+      {
+        "after": "2025-01-20",
+        "before": "2025-06-02",
+        "gap_days": 133,
+      },
+      {
+        "after": "2025-06-02",
+        "before": "2025-07-01",
+        "gap_days": 29,
+      },
+    ],
+    "last_price": "2025-07-01",
+    "security_uuid": "<uuid:1>",
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > cleans up unused securities > DELETE /securities/cleanup/pass-through-unused 1`] = `
+{
+  "body": {
+    "deleted": 1,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > cleans up unused securities > DELETE /securities/cleanup/pass-through-unused again 1`] = `
+{
+  "body": {
+    "deleted": 0,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > cleans up unused securities > GET /securities/cleanup/pass-through-unused 1`] = `
+{
+  "body": {
+    "count": 1,
+    "samples": [
+      {
+        "name": "Pass Fund",
+        "ticker": "FND",
+        "uuid": "<uuid:3>",
+      },
+    ],
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > cleans up unused securities > GET /securities/cleanup/unused 1`] = `
+{
+  "body": {
+    "count": 4,
+    "items": [
+      {
+        "currently_underlying": false,
+        "is_custom": true,
+        "is_pass_through": false,
+        "name": "Beta stub",
+        "security_type": "stock",
+        "ticker": "BBB",
+        "uuid": "<uuid:2>",
+      },
+      {
+        "currently_underlying": false,
+        "is_custom": false,
+        "is_pass_through": true,
+        "name": "Pass Fund",
+        "security_type": "mutual_fund",
+        "ticker": "FND",
+        "uuid": "<uuid:3>",
+      },
+      {
+        "currently_underlying": false,
+        "is_custom": false,
+        "is_pass_through": false,
+        "name": "Idle Co",
+        "security_type": "stock",
+        "ticker": "IDL",
+        "uuid": "<uuid:6>",
+      },
+      {
+        "currently_underlying": false,
+        "is_custom": false,
+        "is_pass_through": false,
+        "name": "100% Growth Inc",
+        "security_type": "stock",
+        "ticker": "PCT",
+        "uuid": "<uuid:5>",
+      },
+    ],
+    "returned": 4,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > cleans up unused securities > GET /securities/cleanup/unused filtered 1`] = `
+{
+  "body": {
+    "count": 1,
+    "items": [
+      {
+        "currently_underlying": false,
+        "is_custom": true,
+        "is_pass_through": false,
+        "name": "Beta stub",
+        "security_type": "stock",
+        "ticker": "BBB",
+        "uuid": "<uuid:2>",
+      },
+    ],
+    "returned": 1,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > cleans up unused securities > GET /securities/cleanup/unused limited 1`] = `
+{
+  "body": {
+    "count": 4,
+    "items": [
+      {
+        "currently_underlying": false,
+        "is_custom": true,
+        "is_pass_through": false,
+        "name": "Beta stub",
+        "security_type": "stock",
+        "ticker": "BBB",
+        "uuid": "<uuid:2>",
+      },
+      {
+        "currently_underlying": false,
+        "is_custom": false,
+        "is_pass_through": true,
+        "name": "Pass Fund",
+        "security_type": "mutual_fund",
+        "ticker": "FND",
+        "uuid": "<uuid:3>",
+      },
+    ],
+    "returned": 2,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > deletes securities, one or several, but not a held one > DELETE /securities/:uuid 1`] = `
+{
+  "body": {
+    "deleted": 1,
+    "uuid": "<uuid:5>",
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > deletes securities, one or several, but not a held one > DELETE /securities/:uuid again 1`] = `
+{
+  "body": {
+    "code": "SECURITY_NOT_FOUND",
+    "error": "Security not found",
+    "message": "Security not found",
+    "requestId": "<requestId>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Investments routes: whole answers > deletes securities, one or several, but not a held one > DELETE /securities/:uuid held 1`] = `
+{
+  "body": {
+    "code": "CONFLICT",
+    "error": "Cannot delete: this security has positions or transaction history. Remove its holdings first.",
+    "message": "Cannot delete: this security has positions or transaction history. Remove its holdings first.",
+    "requestId": "<requestId>",
+  },
+  "status": 409,
+}
+`;
+
+exports[`Investments routes: whole answers > deletes securities, one or several, but not a held one > DELETE /securities/:uuid malformed 1`] = `
+{
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Not found",
+    "requestId": "<requestId>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Investments routes: whole answers > deletes securities, one or several, but not a held one > GET /securities after deletes 1`] = `
+{
+  "body": [
+    {
+      "created_at": "<instant>",
+      "currency": "USD",
+      "exchange": null,
+      "expense_ratio_percentage": null,
+      "id": "<security:1>",
+      "is_active": true,
+      "is_custom": false,
+      "is_pass_through": false,
+      "last_composition_update_at": null,
+      "last_expense_ratio_update_at": null,
+      "last_price_update_at": "<instant>",
+      "latest_price": "8.5000",
+      "name": "Alpha Co",
+      "notes": null,
+      "security_type": "stock",
+      "tenant_id": "<tenant_id:1>",
+      "ticker": "AAA",
+      "ticker_key": "AAA",
+      "track_underlying_holdings": false,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:1>",
+    },
+    {
+      "created_at": "<instant>",
+      "currency": "USD",
+      "exchange": null,
+      "expense_ratio_percentage": "0.0300",
+      "id": "<security:4>",
+      "is_active": true,
+      "is_custom": false,
+      "is_pass_through": false,
+      "last_composition_update_at": null,
+      "last_expense_ratio_update_at": null,
+      "last_price_update_at": "<instant>",
+      "latest_price": "50.0000",
+      "name": "Held Two",
+      "notes": null,
+      "security_type": "etf",
+      "tenant_id": "<tenant_id:1>",
+      "ticker": "HLD",
+      "ticker_key": "HLD",
+      "track_underlying_holdings": false,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:4>",
+    },
+    {
+      "created_at": "<instant>",
+      "currency": "USD",
+      "exchange": null,
+      "expense_ratio_percentage": null,
+      "id": "<security:6>",
+      "is_active": false,
+      "is_custom": false,
+      "is_pass_through": false,
+      "last_composition_update_at": null,
+      "last_expense_ratio_update_at": null,
+      "last_price_update_at": null,
+      "latest_price": null,
+      "name": "Idle Co",
+      "notes": null,
+      "security_type": "stock",
+      "tenant_id": "<tenant_id:1>",
+      "ticker": "IDL",
+      "ticker_key": "IDL",
+      "track_underlying_holdings": false,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:6>",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > deletes securities, one or several, but not a held one > POST /securities/bulk-delete 1`] = `
+{
+  "body": {
+    "deleted": 1,
+    "deletedUuids": [
+      "<uuid:2>",
+    ],
+    "skipped": [
+      {
+        "reason": "held: has positions or transaction history",
+        "uuid": "<uuid:1>",
+      },
+      {
+        "reason": "not found",
+        "uuid": "<uuid:22>",
+      },
+      {
+        "reason": "not found",
+        "uuid": "not-a-uuid",
+      },
+      {
+        "reason": "held: has positions or transaction history",
+        "uuid": "<uuid:1>",
+      },
+    ],
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > deletes securities, one or several, but not a held one > POST /securities/bulk-delete no list 1`] = `
+{
+  "body": {
+    "code": "BAD_REQUEST",
+    "details": [
+      {
+        "field": "uuids",
+        "message": "uuids[] is required",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "uuids[] is required",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > deletes securities, one or several, but not a held one > POST /securities/bulk-delete none 1`] = `
+{
+  "body": {
+    "code": "BAD_REQUEST",
+    "details": [
+      {
+        "field": "uuids",
+        "message": "uuids[] is required",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "uuids[] is required",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > deletes securities, one or several, but not a held one > POST /securities/bulk-delete too many 1`] = `
+{
+  "body": {
+    "code": "BAD_REQUEST",
+    "details": [
+      {
+        "field": "uuids",
+        "message": "at most 1000 uuids per call",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "at most 1000 uuids per call",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > lists and pages securities > GET /securities 1`] = `
+{
+  "body": [
+    {
+      "created_at": "<instant>",
+      "currency": "USD",
+      "exchange": null,
+      "expense_ratio_percentage": null,
+      "id": "<security:1>",
+      "is_active": true,
+      "is_custom": false,
+      "is_pass_through": false,
+      "last_composition_update_at": null,
+      "last_expense_ratio_update_at": null,
+      "last_price_update_at": "<instant>",
+      "latest_price": "8.5000",
+      "name": "Alpha Co",
+      "notes": null,
+      "security_type": "stock",
+      "tenant_id": "<tenant_id:1>",
+      "ticker": "AAA",
+      "ticker_key": "AAA",
+      "track_underlying_holdings": false,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:1>",
+    },
+    {
+      "created_at": "<instant>",
+      "currency": "USD",
+      "exchange": null,
+      "expense_ratio_percentage": null,
+      "id": "<security:2>",
+      "is_active": true,
+      "is_custom": true,
+      "is_pass_through": false,
+      "last_composition_update_at": null,
+      "last_expense_ratio_update_at": null,
+      "last_price_update_at": "<instant>",
+      "latest_price": "3.2100",
+      "name": "Beta stub",
+      "notes": "imported",
+      "security_type": "stock",
+      "tenant_id": "<tenant_id:1>",
+      "ticker": "BBB",
+      "ticker_key": "BBB",
+      "track_underlying_holdings": false,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:2>",
+    },
+    {
+      "created_at": "<instant>",
+      "currency": "USD",
+      "exchange": null,
+      "expense_ratio_percentage": null,
+      "id": "<security:3>",
+      "is_active": true,
+      "is_custom": false,
+      "is_pass_through": true,
+      "last_composition_update_at": null,
+      "last_expense_ratio_update_at": null,
+      "last_price_update_at": null,
+      "latest_price": null,
+      "name": "Pass Fund",
+      "notes": null,
+      "security_type": "mutual_fund",
+      "tenant_id": "<tenant_id:1>",
+      "ticker": "FND",
+      "ticker_key": "FND",
+      "track_underlying_holdings": false,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:3>",
+    },
+    {
+      "created_at": "<instant>",
+      "currency": "USD",
+      "exchange": null,
+      "expense_ratio_percentage": "0.0300",
+      "id": "<security:4>",
+      "is_active": true,
+      "is_custom": false,
+      "is_pass_through": false,
+      "last_composition_update_at": null,
+      "last_expense_ratio_update_at": null,
+      "last_price_update_at": "<instant>",
+      "latest_price": "50.0000",
+      "name": "Held Two",
+      "notes": null,
+      "security_type": "etf",
+      "tenant_id": "<tenant_id:1>",
+      "ticker": "HLD",
+      "ticker_key": "HLD",
+      "track_underlying_holdings": false,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:4>",
+    },
+    {
+      "created_at": "<instant>",
+      "currency": "USD",
+      "exchange": null,
+      "expense_ratio_percentage": null,
+      "id": "<security:5>",
+      "is_active": true,
+      "is_custom": false,
+      "is_pass_through": false,
+      "last_composition_update_at": null,
+      "last_expense_ratio_update_at": null,
+      "last_price_update_at": null,
+      "latest_price": null,
+      "name": "100% Growth",
+      "notes": null,
+      "security_type": "stock",
+      "tenant_id": "<tenant_id:1>",
+      "ticker": "PCT",
+      "ticker_key": "PCT",
+      "track_underlying_holdings": false,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:5>",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > lists and pages securities > GET /securities include_inactive 1`] = `
+{
+  "body": [
+    {
+      "created_at": "<instant>",
+      "currency": "USD",
+      "exchange": null,
+      "expense_ratio_percentage": null,
+      "id": "<security:1>",
+      "is_active": true,
+      "is_custom": false,
+      "is_pass_through": false,
+      "last_composition_update_at": null,
+      "last_expense_ratio_update_at": null,
+      "last_price_update_at": "<instant>",
+      "latest_price": "8.5000",
+      "name": "Alpha Co",
+      "notes": null,
+      "security_type": "stock",
+      "tenant_id": "<tenant_id:1>",
+      "ticker": "AAA",
+      "ticker_key": "AAA",
+      "track_underlying_holdings": false,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:1>",
+    },
+    {
+      "created_at": "<instant>",
+      "currency": "USD",
+      "exchange": null,
+      "expense_ratio_percentage": null,
+      "id": "<security:2>",
+      "is_active": true,
+      "is_custom": true,
+      "is_pass_through": false,
+      "last_composition_update_at": null,
+      "last_expense_ratio_update_at": null,
+      "last_price_update_at": "<instant>",
+      "latest_price": "3.2100",
+      "name": "Beta stub",
+      "notes": "imported",
+      "security_type": "stock",
+      "tenant_id": "<tenant_id:1>",
+      "ticker": "BBB",
+      "ticker_key": "BBB",
+      "track_underlying_holdings": false,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:2>",
+    },
+    {
+      "created_at": "<instant>",
+      "currency": "USD",
+      "exchange": null,
+      "expense_ratio_percentage": null,
+      "id": "<security:3>",
+      "is_active": true,
+      "is_custom": false,
+      "is_pass_through": true,
+      "last_composition_update_at": null,
+      "last_expense_ratio_update_at": null,
+      "last_price_update_at": null,
+      "latest_price": null,
+      "name": "Pass Fund",
+      "notes": null,
+      "security_type": "mutual_fund",
+      "tenant_id": "<tenant_id:1>",
+      "ticker": "FND",
+      "ticker_key": "FND",
+      "track_underlying_holdings": false,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:3>",
+    },
+    {
+      "created_at": "<instant>",
+      "currency": "USD",
+      "exchange": null,
+      "expense_ratio_percentage": "0.0300",
+      "id": "<security:4>",
+      "is_active": true,
+      "is_custom": false,
+      "is_pass_through": false,
+      "last_composition_update_at": null,
+      "last_expense_ratio_update_at": null,
+      "last_price_update_at": "<instant>",
+      "latest_price": "50.0000",
+      "name": "Held Two",
+      "notes": null,
+      "security_type": "etf",
+      "tenant_id": "<tenant_id:1>",
+      "ticker": "HLD",
+      "ticker_key": "HLD",
+      "track_underlying_holdings": false,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:4>",
+    },
+    {
+      "created_at": "<instant>",
+      "currency": "USD",
+      "exchange": null,
+      "expense_ratio_percentage": null,
+      "id": "<security:6>",
+      "is_active": false,
+      "is_custom": false,
+      "is_pass_through": false,
+      "last_composition_update_at": null,
+      "last_expense_ratio_update_at": null,
+      "last_price_update_at": null,
+      "latest_price": null,
+      "name": "Idle Co",
+      "notes": null,
+      "security_type": "stock",
+      "tenant_id": "<tenant_id:1>",
+      "ticker": "IDL",
+      "ticker_key": "IDL",
+      "track_underlying_holdings": false,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:6>",
+    },
+    {
+      "created_at": "<instant>",
+      "currency": "USD",
+      "exchange": null,
+      "expense_ratio_percentage": null,
+      "id": "<security:5>",
+      "is_active": true,
+      "is_custom": false,
+      "is_pass_through": false,
+      "last_composition_update_at": null,
+      "last_expense_ratio_update_at": null,
+      "last_price_update_at": null,
+      "latest_price": null,
+      "name": "100% Growth",
+      "notes": null,
+      "security_type": "stock",
+      "tenant_id": "<tenant_id:1>",
+      "ticker": "PCT",
+      "ticker_key": "PCT",
+      "track_underlying_holdings": false,
+      "updated_at": "<instant>",
+      "uuid": "<uuid:5>",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > lists and pages securities > GET /securities/paginated 1`] = `
+{
+  "body": {
+    "data": [
+      {
+        "created_at": "<instant>",
+        "currency": "USD",
+        "exchange": null,
+        "expense_ratio_percentage": null,
+        "id": "<security:1>",
+        "is_active": true,
+        "is_custom": false,
+        "is_pass_through": false,
+        "last_composition_update_at": null,
+        "last_expense_ratio_update_at": null,
+        "last_price_update_at": "<instant>",
+        "latest_price": "8.5000",
+        "name": "Alpha Co",
+        "notes": null,
+        "security_type": "stock",
+        "tenant_id": "<tenant_id:1>",
+        "ticker": "AAA",
+        "ticker_key": "AAA",
+        "track_underlying_holdings": false,
+        "updated_at": "<instant>",
+        "uuid": "<uuid:1>",
+      },
+      {
+        "created_at": "<instant>",
+        "currency": "USD",
+        "exchange": null,
+        "expense_ratio_percentage": null,
+        "id": "<security:2>",
+        "is_active": true,
+        "is_custom": true,
+        "is_pass_through": false,
+        "last_composition_update_at": null,
+        "last_expense_ratio_update_at": null,
+        "last_price_update_at": "<instant>",
+        "latest_price": "3.2100",
+        "name": "Beta stub",
+        "notes": "imported",
+        "security_type": "stock",
+        "tenant_id": "<tenant_id:1>",
+        "ticker": "BBB",
+        "ticker_key": "BBB",
+        "track_underlying_holdings": false,
+        "updated_at": "<instant>",
+        "uuid": "<uuid:2>",
+      },
+    ],
+    "pagination": {
+      "limit": 2,
+      "page": 1,
+      "total": 5,
+      "totalPages": 3,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > lists and pages securities > GET /securities/paginated capped limit 1`] = `
+{
+  "body": {
+    "data": [
+      {
+        "created_at": "<instant>",
+        "currency": "USD",
+        "exchange": null,
+        "expense_ratio_percentage": null,
+        "id": "<security:1>",
+        "is_active": true,
+        "is_custom": false,
+        "is_pass_through": false,
+        "last_composition_update_at": null,
+        "last_expense_ratio_update_at": null,
+        "last_price_update_at": "<instant>",
+        "latest_price": "8.5000",
+        "name": "Alpha Co",
+        "notes": null,
+        "security_type": "stock",
+        "tenant_id": "<tenant_id:1>",
+        "ticker": "AAA",
+        "ticker_key": "AAA",
+        "track_underlying_holdings": false,
+        "updated_at": "<instant>",
+        "uuid": "<uuid:1>",
+      },
+      {
+        "created_at": "<instant>",
+        "currency": "USD",
+        "exchange": null,
+        "expense_ratio_percentage": null,
+        "id": "<security:2>",
+        "is_active": true,
+        "is_custom": true,
+        "is_pass_through": false,
+        "last_composition_update_at": null,
+        "last_expense_ratio_update_at": null,
+        "last_price_update_at": "<instant>",
+        "latest_price": "3.2100",
+        "name": "Beta stub",
+        "notes": "imported",
+        "security_type": "stock",
+        "tenant_id": "<tenant_id:1>",
+        "ticker": "BBB",
+        "ticker_key": "BBB",
+        "track_underlying_holdings": false,
+        "updated_at": "<instant>",
+        "uuid": "<uuid:2>",
+      },
+      {
+        "created_at": "<instant>",
+        "currency": "USD",
+        "exchange": null,
+        "expense_ratio_percentage": null,
+        "id": "<security:3>",
+        "is_active": true,
+        "is_custom": false,
+        "is_pass_through": true,
+        "last_composition_update_at": null,
+        "last_expense_ratio_update_at": null,
+        "last_price_update_at": null,
+        "latest_price": null,
+        "name": "Pass Fund",
+        "notes": null,
+        "security_type": "mutual_fund",
+        "tenant_id": "<tenant_id:1>",
+        "ticker": "FND",
+        "ticker_key": "FND",
+        "track_underlying_holdings": false,
+        "updated_at": "<instant>",
+        "uuid": "<uuid:3>",
+      },
+    ],
+    "pagination": {
+      "limit": 500,
+      "page": 1,
+      "total": 3,
+      "totalPages": 1,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > lists and pages securities > GET /securities/paginated page 2 1`] = `
+{
+  "body": {
+    "data": [
+      {
+        "created_at": "<instant>",
+        "currency": "USD",
+        "exchange": null,
+        "expense_ratio_percentage": null,
+        "id": "<security:3>",
+        "is_active": true,
+        "is_custom": false,
+        "is_pass_through": true,
+        "last_composition_update_at": null,
+        "last_expense_ratio_update_at": null,
+        "last_price_update_at": null,
+        "latest_price": null,
+        "name": "Pass Fund",
+        "notes": null,
+        "security_type": "mutual_fund",
+        "tenant_id": "<tenant_id:1>",
+        "ticker": "FND",
+        "ticker_key": "FND",
+        "track_underlying_holdings": false,
+        "updated_at": "<instant>",
+        "uuid": "<uuid:3>",
+      },
+      {
+        "created_at": "<instant>",
+        "currency": "USD",
+        "exchange": null,
+        "expense_ratio_percentage": "0.0300",
+        "id": "<security:4>",
+        "is_active": true,
+        "is_custom": false,
+        "is_pass_through": false,
+        "last_composition_update_at": null,
+        "last_expense_ratio_update_at": null,
+        "last_price_update_at": "<instant>",
+        "latest_price": "50.0000",
+        "name": "Held Two",
+        "notes": null,
+        "security_type": "etf",
+        "tenant_id": "<tenant_id:1>",
+        "ticker": "HLD",
+        "ticker_key": "HLD",
+        "track_underlying_holdings": false,
+        "updated_at": "<instant>",
+        "uuid": "<uuid:4>",
+      },
+    ],
+    "pagination": {
+      "limit": 2,
+      "page": 2,
+      "total": 6,
+      "totalPages": 3,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > lists and pages securities > GET /securities/paginated search 1`] = `
+{
+  "body": {
+    "data": [
+      {
+        "created_at": "<instant>",
+        "currency": "USD",
+        "exchange": null,
+        "expense_ratio_percentage": null,
+        "id": "<security:5>",
+        "is_active": true,
+        "is_custom": false,
+        "is_pass_through": false,
+        "last_composition_update_at": null,
+        "last_expense_ratio_update_at": null,
+        "last_price_update_at": null,
+        "latest_price": null,
+        "name": "100% Growth",
+        "notes": null,
+        "security_type": "stock",
+        "tenant_id": "<tenant_id:1>",
+        "ticker": "PCT",
+        "ticker_key": "PCT",
+        "track_underlying_holdings": false,
+        "updated_at": "<instant>",
+        "uuid": "<uuid:5>",
+      },
+    ],
+    "pagination": {
+      "limit": 100,
+      "page": 1,
+      "total": 1,
+      "totalPages": 1,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > lists lots and events > GET /events 1`] = `
+{
+  "body": {
+    "data": [
+      {
+        "account_name": "Brokerage",
+        "account_uuid": "<uuid:15>",
+        "adjusted_for_splits": false,
+        "description": null,
+        "event_date": "2025-06-02",
+        "event_type": "sell",
+        "fee_type": null,
+        "fees": "0.00",
+        "price_per_share": "15.0000",
+        "security_uuid": "<uuid:1>",
+        "shares": "3.000000",
+        "source": "manual",
+        "ticker": "AAA",
+        "total_amount": "45.00",
+        "uuid": "<uuid:14>",
+      },
+      {
+        "account_name": "Brokerage",
+        "account_uuid": "<uuid:15>",
+        "adjusted_for_splits": false,
+        "description": "Q2 advisory",
+        "event_date": "2025-05-01",
+        "event_type": "fee",
+        "fee_type": "advisory",
+        "fees": "0.00",
+        "price_per_share": null,
+        "security_uuid": null,
+        "shares": null,
+        "source": "manual",
+        "ticker": null,
+        "total_amount": "2.25",
+        "uuid": "<uuid:16>",
+      },
+      {
+        "account_name": "Brokerage",
+        "account_uuid": "<uuid:15>",
+        "adjusted_for_splits": false,
+        "description": null,
+        "event_date": "2025-04-01",
+        "event_type": "dividend",
+        "fee_type": null,
+        "fees": "0.00",
+        "price_per_share": null,
+        "security_uuid": "<uuid:1>",
+        "shares": null,
+        "source": "manual",
+        "ticker": "AAA",
+        "total_amount": "3.50",
+        "uuid": "<uuid:17>",
+      },
+      {
+        "account_name": "IRA",
+        "account_uuid": "<uuid:19>",
+        "adjusted_for_splits": false,
+        "description": null,
+        "event_date": "2025-03-03",
+        "event_type": "buy",
+        "fee_type": null,
+        "fees": "1.00",
+        "price_per_share": "12.5000",
+        "security_uuid": "<uuid:1>",
+        "shares": "5.000000",
+        "source": "manual",
+        "ticker": "AAA",
+        "total_amount": "63.50",
+        "uuid": "<uuid:18>",
+      },
+      {
+        "account_name": "Brokerage",
+        "account_uuid": "<uuid:15>",
+        "adjusted_for_splits": false,
+        "description": null,
+        "event_date": "2025-02-03",
+        "event_type": "buy",
+        "fee_type": null,
+        "fees": "1.00",
+        "price_per_share": "50.0000",
+        "security_uuid": "<uuid:4>",
+        "shares": "2.500000",
+        "source": "manual",
+        "ticker": "HLD",
+        "total_amount": "126.00",
+        "uuid": "<uuid:20>",
+      },
+      {
+        "account_name": "Brokerage",
+        "account_uuid": "<uuid:15>",
+        "adjusted_for_splits": false,
+        "description": null,
+        "event_date": "2025-01-02",
+        "event_type": "buy",
+        "fee_type": null,
+        "fees": "1.00",
+        "price_per_share": "10.0000",
+        "security_uuid": "<uuid:1>",
+        "shares": "10.000000",
+        "source": "manual",
+        "ticker": "AAA",
+        "total_amount": "101.00",
+        "uuid": "<uuid:21>",
+      },
+    ],
+    "pagination": {
+      "limit": 50,
+      "page": 1,
+      "total": 6,
+      "totalPages": 1,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > lists lots and events > GET /events all types 1`] = `
+{
+  "body": {
+    "data": [
+      {
+        "account_name": "IRA",
+        "account_uuid": "<uuid:19>",
+        "adjusted_for_splits": false,
+        "description": null,
+        "event_date": "2025-03-03",
+        "event_type": "buy",
+        "fee_type": null,
+        "fees": "1.00",
+        "price_per_share": "12.5000",
+        "security_uuid": "<uuid:1>",
+        "shares": "5.000000",
+        "source": "manual",
+        "ticker": "AAA",
+        "total_amount": "63.50",
+        "uuid": "<uuid:18>",
+      },
+      {
+        "account_name": "Brokerage",
+        "account_uuid": "<uuid:15>",
+        "adjusted_for_splits": false,
+        "description": null,
+        "event_date": "2025-02-03",
+        "event_type": "buy",
+        "fee_type": null,
+        "fees": "1.00",
+        "price_per_share": "50.0000",
+        "security_uuid": "<uuid:4>",
+        "shares": "2.500000",
+        "source": "manual",
+        "ticker": "HLD",
+        "total_amount": "126.00",
+        "uuid": "<uuid:20>",
+      },
+      {
+        "account_name": "Brokerage",
+        "account_uuid": "<uuid:15>",
+        "adjusted_for_splits": false,
+        "description": null,
+        "event_date": "2025-01-02",
+        "event_type": "buy",
+        "fee_type": null,
+        "fees": "1.00",
+        "price_per_share": "10.0000",
+        "security_uuid": "<uuid:1>",
+        "shares": "10.000000",
+        "source": "manual",
+        "ticker": "AAA",
+        "total_amount": "101.00",
+        "uuid": "<uuid:21>",
+      },
+    ],
+    "pagination": {
+      "limit": 50,
+      "page": 1,
+      "total": 3,
+      "totalPages": 1,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > lists lots and events > GET /events filtered 1`] = `
+{
+  "body": {
+    "data": [
+      {
+        "account_name": "Brokerage",
+        "account_uuid": "<uuid:15>",
+        "adjusted_for_splits": false,
+        "description": null,
+        "event_date": "2025-01-02",
+        "event_type": "buy",
+        "fee_type": null,
+        "fees": "1.00",
+        "price_per_share": "10.0000",
+        "security_uuid": "<uuid:1>",
+        "shares": "10.000000",
+        "source": "manual",
+        "ticker": "AAA",
+        "total_amount": "101.00",
+        "uuid": "<uuid:21>",
+      },
+    ],
+    "pagination": {
+      "limit": 50,
+      "page": 1,
+      "total": 1,
+      "totalPages": 1,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > lists lots and events > GET /events page 1`] = `
+{
+  "body": {
+    "data": [
+      {
+        "account_name": "Brokerage",
+        "account_uuid": "<uuid:15>",
+        "adjusted_for_splits": false,
+        "description": null,
+        "event_date": "2025-04-01",
+        "event_type": "dividend",
+        "fee_type": null,
+        "fees": "0.00",
+        "price_per_share": null,
+        "security_uuid": "<uuid:1>",
+        "shares": null,
+        "source": "manual",
+        "ticker": "AAA",
+        "total_amount": "3.50",
+        "uuid": "<uuid:17>",
+      },
+      {
+        "account_name": "IRA",
+        "account_uuid": "<uuid:19>",
+        "adjusted_for_splits": false,
+        "description": null,
+        "event_date": "2025-03-03",
+        "event_type": "buy",
+        "fee_type": null,
+        "fees": "1.00",
+        "price_per_share": "12.5000",
+        "security_uuid": "<uuid:1>",
+        "shares": "5.000000",
+        "source": "manual",
+        "ticker": "AAA",
+        "total_amount": "63.50",
+        "uuid": "<uuid:18>",
+      },
+    ],
+    "pagination": {
+      "limit": 2,
+      "page": 2,
+      "total": 6,
+      "totalPages": 3,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > lists lots and events > GET /holdings 1`] = `
+{
+  "body": [
+    {
+      "account_id": "<account_id:1>",
+      "average_cost_per_share": 10.1,
+      "latest_price": 8.5,
+      "market_value": 59.5,
+      "name": "Alpha Co",
+      "security_id": "<security_id:1>",
+      "security_uuid": "<uuid:1>",
+      "ticker": "AAA",
+      "total_cost_basis": 70.7,
+      "total_shares": 7,
+      "unrealized_gain_loss": -11.2,
+    },
+    {
+      "account_id": "<account_id:2>",
+      "average_cost_per_share": 12.7,
+      "latest_price": 8.5,
+      "market_value": 42.5,
+      "name": "Alpha Co",
+      "security_id": "<security_id:1>",
+      "security_uuid": "<uuid:1>",
+      "ticker": "AAA",
+      "total_cost_basis": 63.5,
+      "total_shares": 5,
+      "unrealized_gain_loss": -21,
+    },
+    {
+      "account_id": "<account_id:1>",
+      "average_cost_per_share": 50.4,
+      "latest_price": 50,
+      "market_value": 125,
+      "name": "Held Two",
+      "security_id": "<security_id:2>",
+      "security_uuid": "<uuid:4>",
+      "ticker": "HLD",
+      "total_cost_basis": 126,
+      "total_shares": 2.5,
+      "unrealized_gain_loss": -1,
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > lists lots and events > GET /holdings account 1`] = `
+{
+  "body": [
+    {
+      "account_id": "<account_id:2>",
+      "average_cost_per_share": 12.7,
+      "latest_price": 8.5,
+      "market_value": 42.5,
+      "name": "Alpha Co",
+      "security_id": "<security_id:1>",
+      "security_uuid": "<uuid:1>",
+      "ticker": "AAA",
+      "total_cost_basis": 63.5,
+      "total_shares": 5,
+      "unrealized_gain_loss": -21,
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > lists lots and events > GET /holdings/:uuid/lots 1`] = `
+{
+  "body": [
+    {
+      "account_id": "<account_id:1>",
+      "acquisition_date": "2025-01-02",
+      "acquisition_method": "purchase",
+      "cost_basis_per_share": "10.1000",
+      "created_at": "<instant>",
+      "created_by_event_id": "<created_by_event_id:1>",
+      "data_quality": "complete",
+      "external_reference": null,
+      "holding_period_start": "2025-01-02",
+      "id": "<lot:1>",
+      "is_covered": true,
+      "is_open": true,
+      "metadata": null,
+      "parent_lot_id": null,
+      "security_id": "<security_id:1>",
+      "shares_original": "10.000000",
+      "shares_remaining": "7.000000",
+      "tenant_id": "<tenant_id:1>",
+      "total_cost_basis": "70.70",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:12>",
+    },
+    {
+      "account_id": "<account_id:2>",
+      "acquisition_date": "2025-03-03",
+      "acquisition_method": "purchase",
+      "cost_basis_per_share": "12.7000",
+      "created_at": "<instant>",
+      "created_by_event_id": "<created_by_event_id:2>",
+      "data_quality": "complete",
+      "external_reference": null,
+      "holding_period_start": "2025-03-03",
+      "id": "<lot:2>",
+      "is_covered": true,
+      "is_open": true,
+      "metadata": null,
+      "parent_lot_id": null,
+      "security_id": "<security_id:1>",
+      "shares_original": "5.000000",
+      "shares_remaining": "5.000000",
+      "tenant_id": "<tenant_id:1>",
+      "total_cost_basis": "63.50",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:13>",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > lists lots and events > GET /holdings/:uuid/lots account 1`] = `
+{
+  "body": [
+    {
+      "account_id": "<account_id:2>",
+      "acquisition_date": "2025-03-03",
+      "acquisition_method": "purchase",
+      "cost_basis_per_share": "12.7000",
+      "created_at": "<instant>",
+      "created_by_event_id": "<created_by_event_id:2>",
+      "data_quality": "complete",
+      "external_reference": null,
+      "holding_period_start": "2025-03-03",
+      "id": "<lot:2>",
+      "is_covered": true,
+      "is_open": true,
+      "metadata": null,
+      "parent_lot_id": null,
+      "security_id": "<security_id:1>",
+      "shares_original": "5.000000",
+      "shares_remaining": "5.000000",
+      "tenant_id": "<tenant_id:1>",
+      "total_cost_basis": "63.50",
+      "updated_at": "<instant>",
+      "uuid": "<uuid:13>",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > lists lots and events > GET /holdings/:uuid/lots unknown 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > reads, updates and prices one security > GET /securities/:uuid 1`] = `
+{
+  "body": {
+    "created_at": "<instant>",
+    "currency": "USD",
+    "exchange": null,
+    "expense_ratio_percentage": "0.0300",
+    "id": "<security:4>",
+    "is_active": true,
+    "is_custom": false,
+    "is_pass_through": false,
+    "last_composition_update_at": null,
+    "last_expense_ratio_update_at": null,
+    "last_price_update_at": "<instant>",
+    "name": "Held Two",
+    "notes": null,
+    "security_type": "etf",
+    "tenant_id": "<tenant_id:1>",
+    "ticker": "HLD",
+    "ticker_key": "HLD",
+    "track_underlying_holdings": false,
+    "updated_at": "<instant>",
+    "uuid": "<uuid:4>",
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > reads, updates and prices one security > GET /securities/:uuid malformed 1`] = `
+{
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Not found",
+    "requestId": "<requestId>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Investments routes: whole answers > reads, updates and prices one security > GET /securities/:uuid unknown 1`] = `
+{
+  "body": {
+    "code": "SECURITY_NOT_FOUND",
+    "error": "Security not found",
+    "message": "Security not found",
+    "requestId": "<requestId>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Investments routes: whole answers > reads, updates and prices one security > GET /securities/:uuid/prices 1`] = `
+{
+  "body": [
+    {
+      "adjusted_close": null,
+      "close": "8.5000",
+      "created_at": "<instant>",
+      "id": "<price:1>",
+      "price_date": "2025-07-01",
+      "security_id": "<security_id:1>",
+      "source": "test",
+      "tenant_id": "<tenant_id:1>",
+      "updated_at": "<instant>",
+      "user_id": null,
+      "uuid": "<uuid:7>",
+      "volume": null,
+    },
+    {
+      "adjusted_close": null,
+      "close": "15.0000",
+      "created_at": "<instant>",
+      "id": "<price:2>",
+      "price_date": "2025-06-02",
+      "security_id": "<security_id:1>",
+      "source": "test",
+      "tenant_id": "<tenant_id:1>",
+      "updated_at": "<instant>",
+      "user_id": null,
+      "uuid": "<uuid:8>",
+      "volume": null,
+    },
+    {
+      "adjusted_close": null,
+      "close": "11.0000",
+      "created_at": "<instant>",
+      "id": "<price:3>",
+      "price_date": "2025-01-20",
+      "security_id": "<security_id:1>",
+      "source": "test",
+      "tenant_id": "<tenant_id:1>",
+      "updated_at": "<instant>",
+      "user_id": null,
+      "uuid": "<uuid:9>",
+      "volume": null,
+    },
+    {
+      "adjusted_close": null,
+      "close": "10.0000",
+      "created_at": "<instant>",
+      "id": "<price:4>",
+      "price_date": "2025-01-02",
+      "security_id": "<security_id:1>",
+      "source": "test",
+      "tenant_id": "<tenant_id:1>",
+      "updated_at": "<instant>",
+      "user_id": null,
+      "uuid": "<uuid:10>",
+      "volume": null,
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > reads, updates and prices one security > GET /securities/:uuid/prices unknown 1`] = `
+{
+  "body": {
+    "code": "SECURITY_NOT_FOUND",
+    "error": "Security not found",
+    "message": "Security not found",
+    "requestId": "<requestId>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Investments routes: whole answers > reads, updates and prices one security > POST /prices 1`] = `
+{
+  "body": {
+    "price_date": "2025-02-03",
+    "uuid": "<uuid:11>",
+  },
+  "status": 201,
+}
+`;
+
+exports[`Investments routes: whole answers > reads, updates and prices one security > POST /prices unknown security 1`] = `
+{
+  "body": {
+    "code": "SECURITY_NOT_FOUND",
+    "error": "Security not found",
+    "message": "Security not found",
+    "requestId": "<requestId>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Investments routes: whole answers > reads, updates and prices one security > POST /prices/bulk 1`] = `
+{
+  "body": {
+    "results": [
+      {
+        "index": 0,
+        "ok": true,
+      },
+      {
+        "error": "Security not found",
+        "index": 1,
+        "ok": false,
+      },
+      {
+        "index": 2,
+        "ok": true,
+      },
+    ],
+    "succeeded": 2,
+    "total": 3,
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > reads, updates and prices one security > PUT /securities/:uuid 1`] = `
+{
+  "body": {
+    "created_at": "<instant>",
+    "currency": "USD",
+    "exchange": null,
+    "expense_ratio_percentage": "0.1250",
+    "id": "<security:5>",
+    "is_active": true,
+    "is_custom": false,
+    "is_pass_through": false,
+    "last_composition_update_at": null,
+    "last_expense_ratio_update_at": null,
+    "last_price_update_at": null,
+    "name": "100% Growth Inc",
+    "notes": null,
+    "security_type": "stock",
+    "tenant_id": "<tenant_id:1>",
+    "ticker": "PCT",
+    "ticker_key": "PCT",
+    "track_underlying_holdings": false,
+    "updated_at": "<instant>",
+    "uuid": "<uuid:5>",
+  },
+  "status": 200,
+}
+`;
+
+exports[`Investments routes: whole answers > reads, updates and prices one security > PUT /securities/:uuid unknown 1`] = `
+{
+  "body": {
+    "code": "SECURITY_NOT_FOUND",
+    "error": "Security not found",
+    "message": "Security not found",
+    "requestId": "<requestId>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Investments routes: whole answers > refuses query values that are not ones > refusal: NUL 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "search",
+        "message": "search can't contain a NUL character (\\u0000)",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "search can't contain a NUL character (\\u0000)",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > refuses query values that are not ones > refusal: choice 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "method",
+        "message": "method must be one of fifo, lifo, hifo, specific_id, average_cost",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "method must be one of fifo, lifo, hifo, specific_id, average_cost",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > refuses query values that are not ones > refusal: count 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "limit",
+        "message": "limit must be a positive whole number",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "limit must be a positive whole number",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > refuses query values that are not ones > refusal: count text 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "limit",
+        "message": "limit must be a positive whole number",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "limit must be a positive whole number",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > refuses query values that are not ones > refusal: day out of range 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "end_date",
+        "message": "end_date must be a real YYYY-MM-DD date, from 1800 to 2999",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "end_date must be a real YYYY-MM-DD date, from 1800 to 2999",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > refuses query values that are not ones > refusal: list for a number 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "threshold",
+        "message": "threshold must be a number",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "threshold must be a number",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > refuses query values that are not ones > refusal: malformed account 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "account",
+        "message": "account must be a uuid",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "account must be a uuid",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > refuses query values that are not ones > refusal: malformed day 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "start_date",
+        "message": "start_date must be a real YYYY-MM-DD date, from 1800 to 2999",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "start_date must be a real YYYY-MM-DD date, from 1800 to 2999",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > refuses query values that are not ones > refusal: malformed security 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "security",
+        "message": "security must be a uuid",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "security must be a uuid",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > refuses query values that are not ones > refusal: min_loss not digits 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "min_loss",
+        "message": "min_loss must be an amount in dollars, written in digits (such as 100 or 99.95)",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "min_loss must be an amount in dollars, written in digits (such as 100 or 99.95)",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > refuses query values that are not ones > refusal: min_loss too precise 1`] = `
+{
+  "body": {
+    "code": "INVALID_AMOUNT",
+    "error": "min_loss must be a number with at most 2 decimal places",
+    "message": "min_loss must be a number with at most 2 decimal places",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > refuses query values that are not ones > refusal: missing holding 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "security",
+        "message": "account and security are required",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "account and security are required",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > refuses query values that are not ones > refusal: negative min_loss 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "min_loss",
+        "message": "min_loss must not be negative",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "min_loss must not be negative",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > refuses query values that are not ones > refusal: number 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "shares",
+        "message": "shares must be a number",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "shares must be a number",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > refuses query values that are not ones > refusal: objective 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "objective",
+        "message": "objective must be one of minimize_gain, maximize_loss, longest_held, highest_cost",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "objective must be one of minimize_gain, maximize_loss, longest_held, highest_cost",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Investments routes: whole answers > refuses query values that are not ones > refusal: shares not positive 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "shares",
+        "message": "shares must be a positive number",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "shares must be a positive number",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;

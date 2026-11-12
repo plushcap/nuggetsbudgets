@@ -1,0 +1,424 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Sankey report > answers the whole report, and its refusals, as pinned > malformed root 1`] = `
+{
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Not found",
+    "requestId": "<requestId>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Sankey report > answers the whole report, and its refusals, as pinned > no window 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "(root)",
+        "message": "Provide start_date+end_date or budget_period_uuid",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "Provide start_date+end_date or budget_period_uuid",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Sankey report > answers the whole report, and its refusals, as pinned > not a root 1`] = `
+{
+  "body": {
+    "code": "BAD_REQUEST",
+    "error": "Not a report root",
+    "message": "The provided tag is not marked as a report namespace root",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Sankey report > answers the whole report, and its refusals, as pinned > open-ended 1`] = `
+{
+  "body": {
+    "_drilldown": {
+      "<uuid:2>": [
+        {
+          "budget_item_name": "Salary",
+          "budget_item_uuid": "<uuid:5>",
+          "contribution": 3000.1,
+          "rule_applied": "income_transactions",
+        },
+      ],
+      "<uuid:3>": [
+        {
+          "budget_item_name": "Groceries",
+          "budget_item_uuid": "<uuid:6>",
+          "contribution": -185.35,
+          "rule_applied": "expense_transactions",
+        },
+        {
+          "budget_item_name": "Dining",
+          "budget_item_uuid": "<uuid:7>",
+          "contribution": -220.2,
+          "rule_applied": "expense_transactions",
+        },
+      ],
+      "<uuid:4>": [
+        {
+          "budget_item_name": "Rent",
+          "budget_item_uuid": "<uuid:8>",
+          "contribution": -3000,
+          "rule_applied": "expense_transactions",
+        },
+      ],
+      "untagged": [
+        {
+          "budget_item_name": "Misc",
+          "budget_item_uuid": "<uuid:10>",
+          "contribution": -12.34,
+          "rule_applied": "expense_transactions",
+        },
+      ],
+    },
+    "direction": "lr",
+    "links": [
+      {
+        "source": "tag:<uuid:2>",
+        "target": "tag:<uuid:1>",
+        "value": 3000.1,
+      },
+      {
+        "source": "tag:<uuid:1>",
+        "target": "tag:<uuid:4>",
+        "value": 3405.55,
+      },
+      {
+        "source": "tag:<uuid:4>",
+        "target": "tag:<uuid:3>",
+        "value": 405.55,
+      },
+      {
+        "source": "tag:<uuid:1>",
+        "target": "untagged",
+        "value": 12.34,
+      },
+    ],
+    "namespace": {
+      "flow_measure": "effective",
+      "max_depth": 2,
+      "name": "Cash Flow",
+      "uuid": "<uuid:1>",
+    },
+    "nodes": [
+      {
+        "color": "#3B82F6",
+        "id": "tag:<uuid:2>",
+        "label": "Income",
+        "level": 1,
+      },
+      {
+        "color": "#3B82F6",
+        "id": "tag:<uuid:1>",
+        "label": "Cash Flow",
+        "level": 0,
+      },
+      {
+        "color": "#3B82F6",
+        "id": "tag:<uuid:3>",
+        "label": "Food",
+        "level": 2,
+      },
+      {
+        "color": "#3B82F6",
+        "id": "tag:<uuid:4>",
+        "label": "Living",
+        "level": 1,
+      },
+      {
+        "color": "#9ca3af",
+        "id": "untagged",
+        "label": "Untagged",
+        "level": 1,
+      },
+    ],
+    "period": {
+      "budget_period_uuid": null,
+      "end_date": null,
+      "start_date": "2026-10-01",
+    },
+    "totals": {
+      "balance_check": {
+        "income_total": 3000.1,
+        "outflow_total": 3417.89,
+        "unallocated_residual": -417.79,
+      },
+      "by_root_child": [
+        {
+          "label": "Income",
+          "tag_uuid": "<uuid:2>",
+          "total": 3000.1,
+        },
+        {
+          "label": "Living",
+          "tag_uuid": "<uuid:4>",
+          "total": 3405.55,
+        },
+      ],
+      "untagged_total": 12.34,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`Sankey report > answers the whole report, and its refusals, as pinned > period 1`] = `
+{
+  "body": {
+    "_drilldown": {
+      "<uuid:4>": [
+        {
+          "budget_item_name": "Vacation",
+          "budget_item_uuid": "<uuid:9>",
+          "contribution": 250.5,
+          "rule_applied": "allocated_override",
+        },
+      ],
+    },
+    "direction": "lr",
+    "links": [
+      {
+        "source": "tag:<uuid:1>",
+        "target": "tag:<uuid:4>",
+        "value": 250.5,
+      },
+    ],
+    "namespace": {
+      "flow_measure": "allocated",
+      "max_depth": 1,
+      "name": "Cash Flow",
+      "uuid": "<uuid:1>",
+    },
+    "nodes": [
+      {
+        "color": "#3B82F6",
+        "id": "tag:<uuid:4>",
+        "label": "Living",
+        "level": 1,
+      },
+      {
+        "color": "#3B82F6",
+        "id": "tag:<uuid:1>",
+        "label": "Cash Flow",
+        "level": 0,
+      },
+    ],
+    "period": {
+      "budget_period_uuid": "<uuid:11>",
+      "end_date": "2026-10-31",
+      "start_date": "2026-10-01",
+    },
+    "totals": {
+      "balance_check": {
+        "income_total": 0,
+        "outflow_total": 250.5,
+        "unallocated_residual": -250.5,
+      },
+      "by_root_child": [
+        {
+          "label": "Living",
+          "tag_uuid": "<uuid:4>",
+          "total": 250.5,
+        },
+      ],
+      "untagged_total": 0,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`Sankey report > answers the whole report, and its refusals, as pinned > unknown measure 1`] = `
+{
+  "body": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "field": "flow_measure_override",
+        "message": "flow_measure_override must be 'actual', 'allocated', or 'effective'",
+      },
+    ],
+    "error": "Validation failed",
+    "message": "flow_measure_override must be 'actual', 'allocated', or 'effective'",
+    "requestId": "<requestId>",
+  },
+  "status": 400,
+}
+`;
+
+exports[`Sankey report > answers the whole report, and its refusals, as pinned > unknown period 1`] = `
+{
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Budget period not found",
+    "message": "No budget period with the provided uuid",
+    "requestId": "<requestId>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Sankey report > answers the whole report, and its refusals, as pinned > unknown root 1`] = `
+{
+  "body": {
+    "code": "NOT_FOUND",
+    "error": "Report root not found",
+    "message": "No tag found with the provided rootTagUuid",
+    "requestId": "<requestId>",
+  },
+  "status": 404,
+}
+`;
+
+exports[`Sankey report > answers the whole report, and its refusals, as pinned > window 1`] = `
+{
+  "body": {
+    "_drilldown": {
+      "<uuid:2>": [
+        {
+          "budget_item_name": "Salary",
+          "budget_item_uuid": "<uuid:5>",
+          "contribution": 3000.1,
+          "rule_applied": "income_transactions",
+        },
+      ],
+      "<uuid:3>": [
+        {
+          "budget_item_name": "Groceries",
+          "budget_item_uuid": "<uuid:6>",
+          "contribution": -185.35,
+          "rule_applied": "expense_transactions",
+        },
+        {
+          "budget_item_name": "Dining",
+          "budget_item_uuid": "<uuid:7>",
+          "contribution": -220.2,
+          "rule_applied": "expense_transactions",
+        },
+      ],
+      "<uuid:4>": [
+        {
+          "budget_item_name": "Rent",
+          "budget_item_uuid": "<uuid:8>",
+          "contribution": -1500,
+          "rule_applied": "expense_transactions",
+        },
+        {
+          "budget_item_name": "Vacation",
+          "budget_item_uuid": "<uuid:9>",
+          "contribution": 250.5,
+          "rule_applied": "rollover_allocation",
+        },
+      ],
+      "untagged": [
+        {
+          "budget_item_name": "Misc",
+          "budget_item_uuid": "<uuid:10>",
+          "contribution": -12.34,
+          "rule_applied": "expense_transactions",
+        },
+      ],
+    },
+    "direction": "rl",
+    "links": [
+      {
+        "source": "tag:<uuid:2>",
+        "target": "tag:<uuid:1>",
+        "value": 3000.1,
+      },
+      {
+        "source": "tag:<uuid:1>",
+        "target": "tag:<uuid:4>",
+        "value": 2156.05,
+      },
+      {
+        "source": "tag:<uuid:4>",
+        "target": "tag:<uuid:3>",
+        "value": 405.55,
+      },
+      {
+        "source": "tag:<uuid:1>",
+        "target": "untagged",
+        "value": 12.34,
+      },
+    ],
+    "namespace": {
+      "flow_measure": "effective",
+      "max_depth": 2,
+      "name": "Cash Flow",
+      "uuid": "<uuid:1>",
+    },
+    "nodes": [
+      {
+        "color": "#3B82F6",
+        "id": "tag:<uuid:2>",
+        "label": "Income",
+        "level": 1,
+      },
+      {
+        "color": "#3B82F6",
+        "id": "tag:<uuid:1>",
+        "label": "Cash Flow",
+        "level": 0,
+      },
+      {
+        "color": "#3B82F6",
+        "id": "tag:<uuid:3>",
+        "label": "Food",
+        "level": 2,
+      },
+      {
+        "color": "#3B82F6",
+        "id": "tag:<uuid:4>",
+        "label": "Living",
+        "level": 1,
+      },
+      {
+        "color": "#9ca3af",
+        "id": "untagged",
+        "label": "Untagged",
+        "level": 1,
+      },
+    ],
+    "period": {
+      "budget_period_uuid": null,
+      "end_date": "2026-10-31",
+      "start_date": "2026-10-01",
+    },
+    "totals": {
+      "balance_check": {
+        "income_total": 3000.1,
+        "outflow_total": 2168.39,
+        "unallocated_residual": 831.71,
+      },
+      "by_root_child": [
+        {
+          "label": "Income",
+          "tag_uuid": "<uuid:2>",
+          "total": 3000.1,
+        },
+        {
+          "label": "Living",
+          "tag_uuid": "<uuid:4>",
+          "total": 2156.05,
+        },
+      ],
+      "untagged_total": 12.34,
+    },
+  },
+  "status": 200,
+}
+`;

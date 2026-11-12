@@ -1,0 +1,26 @@
+# Nuggets Postgres image — the baseline schema baked in.
+#
+# WHY THIS EXISTS
+#   Postgres runs every script in /docker-entrypoint-initdb.d/ the first time it
+#   initializes an EMPTY data directory. The previous compose bind-mounted
+#   backend/init.sql into that directory, which is fragile for distribution:
+#   if the source path isn't present where the deploy resolves it (a Portainer
+#   web-editor paste, `docker compose up` from just the compose file, etc.),
+#   Docker SILENTLY creates the mount source as an empty *directory* and Postgres
+#   init fails with `could not read from input file: Is a directory`. See
+#   docker/compose#9955 and Docker's pre-seeding guide.
+#
+#   Baking init.sql into the image removes the bind mount entirely: a fresh deploy
+#   initializes correctly with no host files, on any deploy method.
+#
+# WHAT init.sql IS
+#   A full pg_dump-style baseline (plain CREATE TABLE — requires a pristine DB)
+#   that also seeds schema_migrations, so the backend's migration runner finds
+#   0 pending on a fresh database and only applies anything newer than this image.
+#   Regenerate it with backend/scripts/regen-init-sql.sh, then rebuild this image.
+#
+# Build context is the repo root (so this can COPY backend/init.sql):
+#   docker build -f Dockerfile.postgres -t ghcr.io/plushcap/nuggets-postgres:latest .
+FROM postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
+
+COPY backend/init.sql /docker-entrypoint-initdb.d/init.sql

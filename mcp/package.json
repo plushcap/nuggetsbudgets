@@ -1,0 +1,55 @@
+{
+  "name": "nuggets-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP server exposing the Nuggets REST API to Claude Code and other MCP clients",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "main": "dist/httpHandler.js",
+  "exports": {
+    ".": "./dist/httpHandler.js",
+    "./server": "./dist/server.js",
+    "./client": "./dist/client.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "type-check": "tsc --noEmit -p tsconfig.build.json && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint 'src/**/*.ts' '__tests__/**/*.ts' --max-warnings 0",
+    "lint:fix": "eslint 'src/**/*.ts' '__tests__/**/*.ts' --fix --max-warnings 0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@nuggets/shared": "file:../shared",
+    "zod": "^4.6.6"
+  },
+  "peerDependencies": {
+    "express": "^5.3.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.6",
+    "@vitest/coverage-v8": "^5.0.5",
+    "eslint": "^10.13.0",
+    "express": "^5.3.0",
+    "globals": "^17.13.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5"
+  },
+  "homepage": "https://github.com/plushcap/nuggetsbudgets#readme",
+  "bugs": {
+    "url": "https://github.com/plushcap/nuggetsbudgets/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/plushcap/nuggetsbudgets.git",
+    "directory": "mcp"
+  },
+  "engines": {
+    "node": ">=26"
+  }
+}
