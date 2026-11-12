@@ -171,7 +171,7 @@ export const SETTINGS = {
   }),
   CLIENT_URL: setting({
     group: 'Server',
-    description: 'The browser-facing origin, when it differs from `DOMAIN_URL`: CORS, links in emails and push notifications. Checked like `DOMAIN_URL` in production',
+    description: 'The browser-facing origin, when it differs from `DOMAIN_URL`: CORS, links in emails and push notifications, and the OneDrive redirect URI the Backup page starts with. Checked like `DOMAIN_URL` in production',
     defaultText: '`DOMAIN_URL`',
     parse: optionalText(),
   }),
@@ -569,7 +569,6 @@ export const SETTINGS = {
   CSRF_SECRET: secret('Keys the CSRF token (secret `csrf_secret`)'),
   MIGRATION_DB_PASSWORD: secret('The owner\'s password, over the `db_password` secret, for migrations, backups and restores'),
   BACKUP_DB_PASSWORD: secret('Overrides the owner\'s password for backups, restores and the schema download only'),
-  ENCRYPTION_KEY: secret('Development only: the key OneDrive tokens are sealed with when there is no data encryption key (at least 32 bytes; 64 hex characters are read as hex)'),
 } as const satisfies Record<string, SettingSpec<unknown>>;
 
 export type SettingName = keyof typeof SETTINGS;

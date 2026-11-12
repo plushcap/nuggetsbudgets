@@ -46,8 +46,6 @@ describe('a server without a data encryption key', () => {
   let dir: string;
 
   beforeAll(async () => {
-    // Nor the development fallback.
-    delete process.env.ENCRYPTION_KEY;
     dir = await mkdtemp(path.join(os.tmpdir(), 'no-data-key-'));
     process.env.BACKUP_LOCATION = dir;
   });

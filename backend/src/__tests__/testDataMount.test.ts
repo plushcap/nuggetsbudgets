@@ -33,9 +33,6 @@ vi.mock('../middleware/tenant.js', async (importOriginal) => ({
 
 const lifecycleStub = new Proxy({}, { get: (_t, prop) => (prop === 'then' ? undefined : async () => undefined) }) as unknown as ApplicationLifecycleService;
 
-// The OneDrive routes need a key to construct; CI has no data-encryption secret.
-process.env.ENCRYPTION_KEY ??= 'ab'.repeat(32);
-
 const appFor = (settings?: Partial<ReturnType<typeof config>>) => {
   const app = createApp();
   mountRoutes(app, { lifecycleService: lifecycleStub, ...(settings ? { config: { ...config(), ...settings } } : {}) });

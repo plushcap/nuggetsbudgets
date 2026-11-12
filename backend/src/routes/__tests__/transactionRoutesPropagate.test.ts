@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest
 
 vi.hoisted(() => {
   process.env.LOG_LEVEL ??= 'silent';
-  process.env.ENCRYPTION_KEY ??= 'transaction-routes-propagate-key-0123456789';
 });
 
 import request from 'supertest';

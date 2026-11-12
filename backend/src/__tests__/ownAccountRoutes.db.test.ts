@@ -62,7 +62,6 @@ describeDb("A person's own account through its routes", () => {
     previousRounds = process.env.BCRYPT_ROUNDS;
     process.env.BCRYPT_ROUNDS = '10';
     passwordHash = bcrypt.hashSync(PASSWORD, 10);
-    process.env.ENCRYPTION_KEY ??= 'own-account-routes-test-encryption-key-0123456789';
     const app = createApp();
     mountRoutes(app, { lifecycleService: lifecycleStub });
     server = http.createServer(app);

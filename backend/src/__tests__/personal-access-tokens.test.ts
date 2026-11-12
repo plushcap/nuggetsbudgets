@@ -162,7 +162,6 @@ describeDb('Personal access tokens: reach, scopes, verification and step-up', ()
   const secret = initializeSecrets().jwtSecret as string;
 
   beforeAll(async () => {
-    process.env.ENCRYPTION_KEY ??= 'personal-access-tokens-test-encryption-key-0123456789';
     server = http.createServer();
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
     // The MCP tools call the REST API at this address with the caller's own token.

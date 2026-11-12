@@ -32,9 +32,6 @@ import logger from '../../utils/logger.js';
  * text into the page. Before, the state was the encrypted user id (replayable,
  * never expiring, any user), and error_description was written into an inline script.
  */
-// OneDriveService needs a key to encrypt tokens; CI has no data-encryption secret.
-process.env.ENCRYPTION_KEY ??= 'ab'.repeat(32);
-
 describe('GET /api/onedrive/callback', () => {
   const app = express();
   // The app's own helmet defaults, which the callback has to override.

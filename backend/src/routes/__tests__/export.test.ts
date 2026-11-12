@@ -198,7 +198,6 @@ describe('CSV exports', () => {
   }
 
   beforeAll(async () => {
-    process.env.ENCRYPTION_KEY ??= 'export-test-encryption-key-0123456789abcdef';
     app = createApp();
     mountRoutes(app, { lifecycleService: lifecycleStub });
 

@@ -5,6 +5,7 @@ import type { DB } from '../../db/schema.generated.js';
 import { BackupScheduler } from '../../services/BackupScheduler.js';
 import type { BackupService } from '../../services/BackupService.js';
 import type { OneDriveService } from '../../services/OneDriveService.js';
+import logger from '../../utils/logger.js';
 
 /**
  * The backup scheduler under fake timers. Pure unit: system_settings comes from a fake
@@ -36,7 +37,11 @@ function backupAt(iso: string): Backup {
   return { fileName, filePath: `/backups/${fileName}`, size: 1, created };
 }
 
-function setup(settings: Record<string, string>, existing: Backup[] = [], options: { keyExists?: boolean } = {}) {
+function setup(
+  settings: Record<string, string>,
+  existing: Backup[] = [],
+  options: { keyExists?: boolean; oneDriveConfigured?: boolean; autoSyncUsers?: number[] } = {}
+) {
   const backups = [...existing];
   const key = { exists: options.keyExists ?? true };
   const backupService = {
@@ -51,11 +56,15 @@ function setup(settings: Record<string, string>, existing: Backup[] = [], option
       backups.splice(backups.findIndex((b) => b.fileName === fileName), 1);
     }),
   };
-  const oneDrive = { isConfigured: vi.fn(async () => false) };
+  const oneDrive = {
+    isConfigured: vi.fn(async () => options.oneDriveConfigured ?? false),
+    getUserIdsWithAutoSync: vi.fn(async () => options.autoSyncUsers ?? []),
+    uploadFile: vi.fn(async (_userId: number, _filePath: string, _fileName: string) => undefined),
+  };
   const scheduler = new BackupScheduler(backupService as unknown as BackupService, oneDrive as unknown as OneDriveService, {
     db: new Kysely<DB>({ dialect: new PostgresDialect({ pool: settingsPool(settings) }) }),
   });
-  return { scheduler, backupService, backups, settings, key };
+  return { scheduler, backupService, oneDrive, backups, settings, key };
 }
 
 const enabled = (overrides: Record<string, string> = {}) => ({
@@ -290,6 +299,40 @@ describe('BackupScheduler', () => {
       await vi.advanceTimersByTimeAsync(60_000);
       expect(t.backupService.createBackup).not.toHaveBeenCalled();
       expect(await scheduler.getNextScheduledBackupTime()).toEqual(new Date('2026-01-16T03:00:00Z'));
+    });
+  });
+
+  describe('OneDrive copies', () => {
+    const NOT_SAVED = 'Scheduled backup not copied to OneDrive: its app registration is not saved on the Backup page';
+    const run = async (options: { oneDriveConfigured: boolean; autoSyncUsers: number[] }) => {
+      vi.setSystemTime(new Date('2026-01-10T12:00:00Z'));
+      const t = setup(enabled(), [backupAt('2026-01-01T03:00:00Z')], options);
+      scheduler = t.scheduler;
+      const warn = vi.spyOn(logger, 'warn');
+      await scheduler.startScheduler();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(t.backupService.createBackup).toHaveBeenCalledTimes(1);
+      return { ...t, warned: warn.mock.calls.filter(([, message]) => message === NOT_SAVED) };
+    };
+
+    it('copies the backup to each admin who turned copies on', async () => {
+      const t = await run({ oneDriveConfigured: true, autoSyncUsers: [4, 9] });
+      expect(t.oneDrive.uploadFile.mock.calls.map(([userId]) => userId)).toEqual([4, 9]);
+      expect(t.warned).toEqual([]);
+    });
+
+    it('says so when copies are on but the app registration is not saved', async () => {
+      // A stack that set the registration in its environment, which is no longer read.
+      const t = await run({ oneDriveConfigured: false, autoSyncUsers: [4] });
+      expect(t.oneDrive.uploadFile).not.toHaveBeenCalled();
+      expect(t.warned).toHaveLength(1);
+      expect(t.warned[0]?.[0]).toMatchObject({ users: 1 });
+    });
+
+    it('says nothing when nobody turned copies on', async () => {
+      const t = await run({ oneDriveConfigured: false, autoSyncUsers: [] });
+      expect(t.oneDrive.uploadFile).not.toHaveBeenCalled();
+      expect(t.warned).toEqual([]);
     });
   });
 

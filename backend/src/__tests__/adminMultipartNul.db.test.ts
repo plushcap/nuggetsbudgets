@@ -64,7 +64,6 @@ describe('A NUL character in a deployment admin\'s multipart body', () => {
   const uploads = () => (fs.existsSync(path.join(tempDir, 'uploads')) ? fs.readdirSync(path.join(tempDir, 'uploads')) : []);
 
   beforeAll(async () => {
-    process.env.ENCRYPTION_KEY ??= 'admin-nul-test-encryption-key-0123456789abcdef';
     const app = createApp();
     mountRoutes(app, { lifecycleService: lifecycleStub, backupService: backupStub });
     server = http.createServer(app);

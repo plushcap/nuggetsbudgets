@@ -13,7 +13,6 @@ import { randomBytes } from 'crypto';
 import * as path from 'path';
 import { getDirname } from '../utils/esm-compat.js';
 import { config } from '../config.js';
-import { envSecret } from '../utils/docker-secrets.js';
 
 const __dirname = getDirname(import.meta.url);
 
@@ -43,12 +42,16 @@ interface TokenResponse {
 const AUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const pendingAuthStates = new Map<string, { userId: number; expiresAt: number }>();
 
-/** This server's OAuth callback (DOMAIN_URL's `/api/onedrive/callback`), or '' without a DOMAIN_URL. */
+/**
+ * This server's OAuth callback on the origin the browser uses (CLIENT_URL, else DOMAIN_URL):
+ * the sign-in's state cookie is set there, so Microsoft must send the browser back there.
+ * '' without either.
+ */
 function defaultRedirectUri(): string {
-  const domain = config().DOMAIN_URL;
-  if (!domain) return '';
+  const origin = config().CLIENT_URL || config().DOMAIN_URL;
+  if (!origin) return '';
   try {
-    return new URL('/api/onedrive/callback', domain).href;
+    return new URL('/api/onedrive/callback', origin).href;
   } catch {
     return '';
   }
@@ -77,32 +80,19 @@ export class OneDriveService {
   }
 
   /**
-   * The token key (see tokenKeyCache): from the data encryption secret (the same secret
-   * backups use), else, for development, the ENCRYPTION_KEY variable. Throws
-   * EncryptionKeyUnavailableError (a 503) when there is neither, or the variable is too short.
+   * The token key (see tokenKeyCache): from the data encryption secret, the same secret
+   * backups and the app registration use (development gets one from `npm run setup`). Throws
+   * EncryptionKeyUnavailableError (a 503) when there is none.
    */
   private tokenKey(): { key: Buffer; keyId: number } {
     if (this.tokenKeyCache) return this.tokenKeyCache;
-    let material: string | Buffer;
+    let material: string;
     try {
       material = readDataEncryptionSecretSync();
       logger.info('OneDrive encryption key loaded from Docker secret');
     } catch (secretError) {
-      const encryptionKeyEnv = envSecret('ENCRYPTION_KEY');
-      if (!encryptionKeyEnv) {
-        logger.error({ err: secretError }, 'OneDrive is unavailable: there is no data encryption key to seal its tokens with');
-        throw new EncryptionKeyUnavailableError({ cause: secretError });
-      }
-      // In development, assume it's a hex string or UTF-8 string.
-      material = encryptionKeyEnv.length === 64
-        ? Buffer.from(encryptionKeyEnv, 'hex')  // 64 hex chars = 32 bytes
-        : Buffer.from(encryptionKeyEnv, 'utf8');  // Direct string
-      if (material.length < 32) {
-        const tooShort = new Error(`Encryption key must be at least 32 bytes (found ${material.length})`);
-        logger.error({ err: tooShort }, 'OneDrive is unavailable: ENCRYPTION_KEY is too short to seal its tokens with');
-        throw new EncryptionKeyUnavailableError({ cause: tooShort });
-      }
-      logger.warn('OneDrive using environment variable for encryption (development mode)');
+      logger.error({ err: secretError }, 'OneDrive is unavailable: there is no data encryption key to seal its tokens with');
+      throw new EncryptionKeyUnavailableError({ cause: secretError });
     }
     this.tokenKeyCache = { key: deriveKey(material, DOMAIN.onedrive), keyId: keyIdOf(material) };
     return this.tokenKeyCache;
@@ -122,7 +112,7 @@ export class OneDriveService {
    * deployment's variables can't hold it. The client id and secret are encrypted at rest
    * (credential-domain key, like the SMTP password / SimpleFin access URL); the redirect URI
    * is non-secret plaintext, and until one is saved it is this server's own callback
-   * (DOMAIN_URL's `/api/onedrive/callback`), the address the app registration needs.
+   * (defaultRedirectUri), the address the app registration needs.
    */
   private async resolveClientConfig(): Promise<{ clientId: string; clientSecret: string; redirectUri: string }> {
     let clientId = '';

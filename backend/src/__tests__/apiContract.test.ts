@@ -6,9 +6,6 @@ import type { ApplicationLifecycleService } from '../services/ApplicationLifecyc
 
 vi.hoisted(() => {
   process.env.LOG_LEVEL ??= 'silent';
-  // The backup and OneDrive routers build their services when mounted; without the Docker
-  // secret they take the development key. This test never encrypts anything.
-  process.env.ENCRYPTION_KEY ??= 'unit-test-encryption-key-of-at-least-32-bytes';
 });
 
 /**

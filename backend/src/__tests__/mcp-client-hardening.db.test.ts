@@ -99,7 +99,6 @@ describeDb('a request that reaches the deployment-admin toggle by accident demot
   let victim: { id: number; uuid: string };
 
   beforeAll(async () => {
-    process.env.ENCRYPTION_KEY ??= 'mcp-client-hardening-test-encryption-key-0123456789';
     server = http.createServer();
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
     // The MCP tools call the REST API at this address with the caller's own token.

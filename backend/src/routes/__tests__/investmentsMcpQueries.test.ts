@@ -38,7 +38,6 @@ describeDb('the MCP investments tools pass the routes query schemas', () => {
   let security: string;
 
   beforeAll(async () => {
-    process.env.ENCRYPTION_KEY ??= 'investments-mcp-queries-test-encryption-key-0123456789';
     server = http.createServer();
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
     // The MCP tools call the REST API at this address with the caller's own token.

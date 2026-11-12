@@ -131,7 +131,6 @@ describeDb('Organization membership', () => {
     first<{ is_locked: boolean; login_disabled: boolean }>('SELECT is_locked, login_disabled FROM users WHERE id = $1', [userId]);
 
   beforeAll(async () => {
-    process.env.ENCRYPTION_KEY ??= 'organization-membership-test-encryption-key-0123456789';
     const app = createApp();
     mountRoutes(app, { lifecycleService: lifecycleStub });
     server = http.createServer(app);

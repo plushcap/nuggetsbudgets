@@ -17,7 +17,6 @@ import { createTestTenant, type TestTenant } from '../../test/testTenant.js';
  */
 
 const SECRET = vi.hoisted(() => {
-  process.env.ENCRYPTION_KEY ??= 'internal-error-text-test-encryption-key-0123456789'; // the backup routes' OneDrive service
   return 'internal_secret_xyz';
 });
 const dbFailure = vi.hoisted(

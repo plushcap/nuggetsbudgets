@@ -60,7 +60,6 @@ describe('Deployment admin: the Users page', () => {
   const MISSING = '00000000-0000-7000-8000-000000000000';
 
   beforeAll(async () => {
-    process.env.ENCRYPTION_KEY ??= 'admin-users-test-encryption-key-0123456789abcdef';
     const app = createApp();
     mountRoutes(app, { lifecycleService: lifecycleStub });
     server = http.createServer(app);

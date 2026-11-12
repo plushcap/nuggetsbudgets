@@ -77,7 +77,6 @@ describeDb('Ledger settings stay in their ledger', () => {
   };
 
   beforeAll(async () => {
-    process.env.ENCRYPTION_KEY ??= 'settings-isolation-test-encryption-key-0123456789';
     const app = createApp();
     mountRoutes(app, { lifecycleService: lifecycleStub });
     server = http.createServer(app);

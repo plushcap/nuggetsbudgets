@@ -46,7 +46,6 @@ describeDb('Ledger admin routes: bulk deletion and bank connection', () => {
   let orgAdmin: string; // an admin of A's organization, a member of ledger A
 
   beforeAll(async () => {
-    process.env.ENCRYPTION_KEY ??= 'ledger-admin-routes-test-encryption-key-0123456789';
     const app = createApp();
     mountRoutes(app, { lifecycleService: lifecycleStub });
     server = http.createServer(app);

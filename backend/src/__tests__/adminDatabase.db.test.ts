@@ -61,7 +61,6 @@ describe('Deployment admin: Settings → Utilities downloads', () => {
   }
 
   beforeAll(async () => {
-    process.env.ENCRYPTION_KEY ??= 'admin-database-test-encryption-key-0123456789abcdef';
     const app = createApp();
     mountRoutes(app, { lifecycleService: lifecycleStub });
     server = http.createServer(app);

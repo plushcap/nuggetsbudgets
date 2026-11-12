@@ -160,7 +160,6 @@ describeDb('Tenant isolation through the API', () => {
   let fingerprintBefore: Map<string, string>;
 
   beforeAll(async () => {
-    process.env.ENCRYPTION_KEY ??= 'tenant-isolation-test-encryption-key-0123456789';
     const app = createApp();
     mountRoutes(app, { lifecycleService: lifecycleStub });
     server = http.createServer(app);

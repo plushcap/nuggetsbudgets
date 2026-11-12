@@ -57,7 +57,7 @@ describe('the settings registry', () => {
     expect(missing.map(([name, file]) => `${name} (${file})`)).toEqual([]);
     // The scan finds what it should (a regression in it would pass the check above).
     expect(read.has('DB_POOL_MAX') && read.has('RETENTION_SESSION_DAYS') && read.has('APP_DB_PASSWORD')).toBe(true);
-    expect(read.has('ENCRYPTION_KEY') && read.has('SHUTDOWN_DRAIN_MS')).toBe(true);
+    expect(read.has('BACKUP_DB_PASSWORD') && read.has('SHUTDOWN_DRAIN_MS')).toBe(true);
   });
 
   it('lists nothing nobody reads', () => {
