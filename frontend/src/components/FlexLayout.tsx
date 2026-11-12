@@ -64,6 +64,9 @@ const MainMenu: React.FC<{
               >
                 <Icon size={20} aria-hidden="true" />
                 <span>{item.name}</span>
+                {/* Between the name and the count, so their text reads "Activity 2", not "Activity2"
+                    (a checker comparing it with the link's name); a flex container doesn't draw it. */}
+                {unread > 0 && ' '}
                 {unread > 0 && (
                   <Badge color="amber" variant="solid" radius="full" ml="auto" aria-hidden="true">
                     {unread}
