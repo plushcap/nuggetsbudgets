@@ -3,7 +3,7 @@ import { Button, Dialog, Flex, Select, Text } from '@radix-ui/themes';
 import toast from 'react-hot-toast';
 import type { BudgetPeriod } from '../../services/api';
 import { useCreateBudgetPeriodMutation } from '../../hooks/queries';
-import { errorResponseData } from '../../utils/errors';
+import { apiErrorMessage, errorCode } from '../../utils/errors';
 import { logger } from '../../utils/logger';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({
@@ -41,14 +41,16 @@ const CreatePeriodDialog: React.FC<{
       setOpen(false);
     } catch (err) {
       // Another member created the month since this list loaded: show theirs.
-      if (errorResponseData(err)?.code === 'BUDGET_PERIOD_EXISTS') {
+      if (errorCode(err) === 'BUDGET_PERIOD_EXISTS') {
         await showPeriod((p) => p.year === year && p.month_number === month);
         toast(`${monthLabel} already has a budget period, so it's shown instead`);
         setOpen(false);
         return;
       }
+      // The server's reason, e.g. a busy transaction of the month's (TRANSACTION_BUSY:
+      // nothing was saved, try again).
       logger.error({ err }, 'Failed to create budget period');
-      toast.error('Failed to create budget period');
+      toast.error(apiErrorMessage(err, 'Failed to create budget period'));
     }
   };
 
@@ -96,7 +98,7 @@ const CreatePeriodDialog: React.FC<{
           <Dialog.Close>
             <Button variant="soft" color="gray">Cancel</Button>
           </Dialog.Close>
-          <Button onClick={create}>Create Period</Button>
+          <Button onClick={create} loading={createPeriod.isPending}>Create Period</Button>
         </Flex>
       </Dialog.Content>
     </Dialog.Root>
