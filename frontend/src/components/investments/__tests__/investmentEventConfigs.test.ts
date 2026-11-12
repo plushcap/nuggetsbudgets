@@ -119,11 +119,10 @@ describe('buy', () => {
 
   it('refuses a submit through the resolver, by control id, and passes the values once it may go', async () => {
     const resolver = investmentEventResolver(buyEventConfig);
-    const options = { fields: {}, shouldUseNativeValidation: false } as Parameters<typeof resolver>[2];
-    const refused = await resolver(buy({ security_uuid: '' }), undefined, options);
+    const refused = await resolver(buy({ security_uuid: '' }), undefined);
     expect(refused.values).toEqual({});
     expect(refused.errors).toEqual({ 'buy-security': { type: 'validate', message: 'Choose a security.' } });
-    const taken = await resolver(buy(), undefined, options);
+    const taken = await resolver(buy(), undefined);
     expect(taken).toEqual({ values: buy(), errors: {} });
   });
 });

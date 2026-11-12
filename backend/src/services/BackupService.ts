@@ -1150,7 +1150,6 @@ export class BackupService {
 
       if (options.verifyOnly) {
         await this.dropDatabase(scratch);
-        scratchCreated = false;
         return { manifest, signature, rowCounts, previousDatabase: null, previousUploads: null, uploadedFilesRestored: 0, cutover };
       }
 

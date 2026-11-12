@@ -277,7 +277,7 @@ export function InvestmentEventForm<T extends FieldValues, C, B>({ config }: { c
     defaultValues: defaultValues as DefaultValues<T>,
     // Given anew each render (react-hook-form reads the latest), with this render's lookups
     // (below) as its context: it runs only when a submit or a change is checked, after them.
-    resolver: (submitted, _context, options) => investmentEventResolver(config)(submitted, lookups, options),
+    resolver: (submitted) => investmentEventResolver(config)(submitted, lookups),
     // The first field with a problem is focused by its id, after the render that shows it.
     shouldFocusError: false,
   });
