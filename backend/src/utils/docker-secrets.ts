@@ -75,8 +75,11 @@ export function envSecret(name: string, env: NodeJS.ProcessEnv = process.env): s
   return env[name] || undefined;
 }
 
-/** The variables startup copied into the environment from their files (copySecretsIntoEnvironment). */
-const copiedFromFiles = new Set<string>();
+/**
+ * What startup copied into the environment from the files (copySecretsIntoEnvironment), by
+ * variable: a variable still holding that value is the server's own, not a stack's.
+ */
+const copiedFromFiles = new Map<string, string>();
 
 /**
  * Copy the secrets read from their files into the environment, where envSecret's readers
@@ -92,7 +95,7 @@ export function copySecretsIntoEnvironment(secrets: SecretsConfig): void {
   };
   for (const [name, value] of Object.entries(copies)) {
     process.env[name] = value;
-    copiedFromFiles.add(name);
+    copiedFromFiles.set(name, value);
   }
 }
 
@@ -101,7 +104,8 @@ export function copySecretsIntoEnvironment(secrets: SecretsConfig): void {
  * production never reads a secret from (startup copies aside). Undefined otherwise.
  */
 export function refusedVariable(variable: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
-  if (configFor(env).NODE_ENV !== 'production' || !envSecret(variable, env) || copiedFromFiles.has(variable)) return undefined;
+  const value = envSecret(variable, env);
+  if (configFor(env).NODE_ENV !== 'production' || !value || copiedFromFiles.get(variable) === value) return undefined;
   return `${variable} is set in the environment, which production never reads a secret from`;
 }
 

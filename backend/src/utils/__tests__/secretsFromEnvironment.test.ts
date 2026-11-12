@@ -128,16 +128,19 @@ describe('secrets and the environment', () => {
     );
   });
 
-  it('is checked by every command that runs in production, the server before it copies the files', () => {
-    const src = path.join(getDirname(import.meta.url), '..', '..');
-    const read = (file: string) => readFileSync(path.join(src, file), 'utf8');
-    for (const file of ['scripts/migrate.ts', 'scripts/restore.ts', 'scripts/rewrap-secrets.ts', 'scripts/setup-token.ts']) {
-      expect(read(file), file).toMatch(/secretsInEnvironment\(\)/);
-    }
-    const index = read('index.ts');
-    const check = index.indexOf('secretsInEnvironment()');
-    expect(check).toBeGreaterThan(-1);
-    expect(index.indexOf('copySecretsIntoEnvironment(')).toBeGreaterThan(check);
+  it.each([
+    // Each command that runs in production, and the first thing it does with a secret or the database.
+    ['index.ts', 'copySecretsIntoEnvironment('],
+    ['scripts/migrate.ts', 'switch (command)'],
+    ['scripts/restore.ts', "await import('pg')"],
+    ['scripts/rewrap-secrets.ts', 'createMigrationPool()'],
+    ['scripts/setup-token.ts', "await import('../db.js')"],
+    ['scripts/migrate-images-to-db.ts', 'createMigrationPool()'],
+  ])('%s refuses a secret in the environment before %s', (file, first) => {
+    const source = readFileSync(path.join(getDirname(import.meta.url), '..', '..', file), 'utf8');
+    const check = source.search(/secretsInEnvironment\(\)\]?;\n\s*if \((refused|problems|secretsFromEnvironment)\.length > 0\)/);
+    expect(check, 'the check, and its result acted on').toBeGreaterThan(-1);
+    expect(source.indexOf(first), first).toBeGreaterThan(check);
   });
 
   it("doesn't fall back to a secret's variable in production", () => {

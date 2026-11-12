@@ -213,7 +213,8 @@ function calculateEntropy(str: string): number {
 export function validateNuggetsSecurityConfig(config?: SecurityConfig): SecurityValidationResult {
   const current = settings();
   const securityConfig: SecurityConfig = config || {
-    // Secrets: index.ts copies the Docker secrets into these when USE_DOCKER_SECRETS=true.
+    // Secrets: index.ts copies the Docker secrets into these (always in production, elsewhere
+    // with USE_DOCKER_SECRETS=true).
     jwtSecret: envSecret('JWT_SECRET'),
     dbPassword: envSecret('DB_PASSWORD'),
     dbHost: current.DB_HOST,

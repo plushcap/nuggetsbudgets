@@ -38,7 +38,8 @@ if (secretsFromEnvironment.length > 0) {
 
 // Load Docker secrets into process.env before security validation, where envSecret reads
 // them: always in production, which has no other source, elsewhere with USE_DOCKER_SECRETS.
-if (config().USE_DOCKER_SECRETS || config().NODE_ENV === 'production') {
+const readsSecretFiles = config().USE_DOCKER_SECRETS || config().NODE_ENV === 'production';
+if (readsSecretFiles) {
   copySecretsIntoEnvironment(initializeSecrets());
 }
 
@@ -63,7 +64,7 @@ logger.info({
   nodeEnv: config().NODE_ENV,
   port: PORT,
   trustProxy: resolveTrustProxy(),
-  useDockerSecrets: config().USE_DOCKER_SECRETS,
+  useDockerSecrets: readsSecretFiles,
   // Production always limits, whatever API_RATE_LIMITING says.
   rateLimitingEnabled: isApiRateLimitingEnabled(),
   domainUrl: config().DOMAIN_URL || 'not configured',
