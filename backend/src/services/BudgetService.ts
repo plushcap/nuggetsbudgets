@@ -10,6 +10,7 @@ import { DomainError, type RefusalStatus } from './domainErrors.js';
 import { isLockConflict, lockRowsForDelete, lockTransactions } from './transactions/locks.js';
 import { transferItemsNotInPeriod } from './budgetPeriods/BudgetPeriodError.js';
 import { budgetPeriodItemIdOf, budgetPeriodOf } from './budgetPeriods/periodLookups.js';
+import { notTakenOut } from './budgetPeriods/takenOut.js';
 import { budgetEventType, budgetItemStatus } from '@nuggets/shared';
 
 const logger = createLogger({ service: 'BudgetService' });
@@ -455,9 +456,10 @@ export class BudgetService {
      * Create a month's period for the two create routes (POST /api/budgets/periods, the
      * Budget page's, and POST /api/budget-periods, the settings page's: one method, each
      * answering in its own shape): the period with an item for each budget item
-     * ({@link createBudgetPeriod}) and the month's transactions that have no period yet,
-     * unless `associateTransactions` is false. A month that has its period (made before, or
-     * by a concurrent request) is refused: 409 BudgetPeriodExistsError.
+     * ({@link createBudgetPeriod}) and the month's transactions that have no period yet
+     * ({@link takeInPeriodTransactions}: not one a member took out of a period), unless
+     * `associateTransactions` is false. A month that has its period (made before, or by a
+     * concurrent request) is refused: 409 BudgetPeriodExistsError.
      */
     async createMonthPeriod(
         year: number,
@@ -478,16 +480,21 @@ export class BudgetService {
 
     /**
      * Put the transactions dated within the period's own first and last days that have no
-     * period into it, but an opening balance (not the month's activity). Locked in id
-     * order first, as every write of several transactions locks them: a busy one is a
-     * 409 TRANSACTION_BUSY. The number taken in.
+     * period into it, but an opening balance (not the month's activity) and one a member took
+     * out of a period, which the bank sync keeps out too ({@link notTakenOut}: a member who
+     * moved a row to another month's period, then took it out, chose no period; one taken out
+     * of its own month's period, deleted since, goes back in the month's new one). Locked in id
+     * order first, as every write of several transactions locks them: a busy one is a 409
+     * TRANSACTION_BUSY. The number taken in.
      */
     private async takeInPeriodTransactions(periodId: number): Promise<number> {
+        const start = sql`(SELECT start_date FROM budget_period WHERE id = ${periodId})`;
         await lockTransactions(() => sql<SqlBool>`
             budget_period_id IS NULL
             AND type IS DISTINCT FROM 'starting balance'
-            AND transaction_date BETWEEN (SELECT start_date FROM budget_period WHERE id = ${periodId})
+            AND transaction_date BETWEEN ${start}
                                      AND (SELECT end_date FROM budget_period WHERE id = ${periodId})
+            AND ${notTakenOut(start)}
         `);
         const { rows } = await sql<{ id: number }>`
             UPDATE transactions t
@@ -497,6 +504,7 @@ export class BudgetService {
               AND t.budget_period_id IS NULL
               AND t.type IS DISTINCT FROM 'starting balance'
               AND t.transaction_date BETWEEN bp.start_date AND bp.end_date
+              AND ${notTakenOut(sql`bp.start_date`, 't')}
             RETURNING t.id
         `.execute(getDb());
         return rows.length;
