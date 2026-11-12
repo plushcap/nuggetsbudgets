@@ -1,5 +1,6 @@
 import type { PushSendResult } from '@nuggets/shared';
-import webpush, { WebPushError } from 'web-push';
+// web-push is an ES module with named exports only (no default export since 4.0).
+import { generateVAPIDKeys, sendNotification, WebPushError } from 'web-push';
 import { sql } from 'kysely';
 import { globalDb } from '../db/withTenant.js';
 import { EncryptionService } from './EncryptionService.js';
@@ -90,7 +91,7 @@ export class PushNotificationService {
 
     let stored = await this.readStoredKeys();
     if (!stored) {
-      const generated = webpush.generateVAPIDKeys();
+      const generated = generateVAPIDKeys();
       const encryptedPrivate = await this.encryption.encryptString(generated.privateKey);
       // Two backends starting together could both generate; ON CONFLICT DO
       // NOTHING plus the re-read makes them agree on whichever pair landed first.
@@ -224,7 +225,7 @@ export class PushNotificationService {
     for (const subscription of subscriptions) {
       try {
         const keys = JSON.parse(await this.encryption.decryptString(subscription.keys_encrypted));
-        await webpush.sendNotification(
+        await sendNotification(
           { endpoint: subscription.endpoint, keys },
           payload,
           // A day: an alert older than that is stale enough to drop if the phone stayed offline.

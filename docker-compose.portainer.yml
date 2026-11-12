@@ -443,7 +443,7 @@ services:
   # networks, or the app containers would inherit a log-reading API).
   socket-proxy:
     # Pinned by version and digest; Dependabot proposes updates monthly.
-    image: lscr.io/linuxserver/socket-proxy:3.4.7@sha256:4e5e59efd3338205561c54262581992036e5a36ccca97d487b1d4ec41f9adc58
+    image: lscr.io/linuxserver/socket-proxy:3.4.7@sha256:823dda971e9a3951257eb251586a804199819fe1587c35faa43adc7b52a2ff16
     container_name: nuggets_socket_proxy
     restart: unless-stopped
     logging:
@@ -492,7 +492,7 @@ services:
   # so app containers cannot reach the UI laterally.
   dozzle:
     # Pinned by version and digest; Dependabot proposes updates monthly.
-    image: amir20/dozzle:v11.4.0@sha256:d23d23ce02c8cc96416dfbad4a7de225d01fdc03ad310203d64d580034dd120d
+    image: amir20/dozzle:v11.4.2@sha256:08cd5230e21e364241f3dcf26191f293166f7835654eb7e41168b9c685f0947b
     container_name: nuggets_dozzle
     restart: unless-stopped
     logging:
