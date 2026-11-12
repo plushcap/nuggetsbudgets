@@ -296,8 +296,9 @@ These are the patterns most likely to be violated. Treat them as hard rules.
   Password sign-in is throttled per account (`LoginThrottleService`): charge before
   checking, refund on a correct password.
 - Secrets come from Docker secret files (in `SECRETS_PATH`); production refuses one set in the
-  environment (`secretsInEnvironment`, at startup and in migrate), where the variables stand in for
-  the files only in development and the tests — never commit them. CI's `repository-checks.yml` (every
+  environment (`secretsInEnvironment`: the server at startup, and each command in
+  `backend/src/scripts/` before it reads one), where the variables stand in for the files only in
+  development and the tests — never commit them. CI's `repository-checks.yml` (every
   PR, a Markdown-only one too) runs gitleaks on the tree and on a PR's commits (`.gitleaks.toml`; a
   made-up test value carries `gitleaks:allow`, and each new one is listed for the reviewer) and
   `scripts/check-tracked-files.sh`, which refuses tracked uploads, dumps, exports, local settings,
