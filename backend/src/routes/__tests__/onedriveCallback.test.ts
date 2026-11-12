@@ -49,7 +49,8 @@ describe('GET /api/onedrive/callback', () => {
     request(app).get('/api/onedrive/callback').set('Cookie', `${OAUTH_STATE_COOKIE}=${query.state ?? ''}`).query(query);
 
   beforeEach(() => {
-    // The real state handling; the network and token storage are stubbed.
+    // The real state handling; the network, the token key and token storage are stubbed.
+    vi.spyOn(OneDriveService.prototype, 'assertTokenKeyAvailable').mockImplementation(() => undefined);
     vi.spyOn(OneDriveService.prototype as unknown as { resolveClientConfig: () => Promise<unknown> }, 'resolveClientConfig').mockResolvedValue({
       clientId: 'client',
       clientSecret: 'secret',
