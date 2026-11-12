@@ -303,7 +303,7 @@ describe('BackupScheduler', () => {
   });
 
   describe('OneDrive copies', () => {
-    const NOT_SAVED = 'Scheduled backup not copied to OneDrive: its app registration is not saved on the Backup page';
+    const NOT_SET_UP = "Scheduled backup not copied to OneDrive: its app registration isn't set up (Settings → Database Backup)";
     const run = async (options: { oneDriveConfigured: boolean; autoSyncUsers: number[] }) => {
       vi.setSystemTime(new Date('2026-01-10T12:00:00Z'));
       const t = setup(enabled(), [backupAt('2026-01-01T03:00:00Z')], options);
@@ -312,7 +312,7 @@ describe('BackupScheduler', () => {
       await scheduler.startScheduler();
       await vi.advanceTimersByTimeAsync(60_000);
       expect(t.backupService.createBackup).toHaveBeenCalledTimes(1);
-      return { ...t, warned: warn.mock.calls.filter(([, message]) => message === NOT_SAVED) };
+      return { ...t, warned: warn.mock.calls.filter(([, message]) => message === NOT_SET_UP) };
     };
 
     it('copies the backup to each admin who turned copies on', async () => {

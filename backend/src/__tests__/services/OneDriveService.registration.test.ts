@@ -4,7 +4,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
  * OneDrive's app registration comes only from what the Backup page saved. The client id,
  * secret and redirect URI used to fall back to ONEDRIVE_* variables, which put a secret
  * in the stack's environment, and the tokens' key to an ENCRYPTION_KEY variable. Here the
- * saved settings are a map, and "encrypted" is a prefix: nothing touches a database.
+ * saved settings are a map, "encrypted" is a prefix, and there is no data encryption key:
+ * nothing touches a database or a secret file.
  */
 
 const saved = vi.hoisted(() => new Map<string, string>());
@@ -26,6 +27,13 @@ vi.mock('../../services/EncryptionService.js', async (importOriginal) => ({
     }
   },
 }));
+// No data encryption key, wherever the test runs (a dev container mounts one in /run/secrets).
+vi.mock('../../utils/data-encryption-secret.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../utils/data-encryption-secret.js')>()),
+  readDataEncryptionSecretSync: () => {
+    throw new Error('no data encryption secret found');
+  },
+}));
 
 const { OneDriveService } = await import('../../services/OneDriveService.js');
 const { EncryptionKeyUnavailableError } = await import('../../services/EncryptionService.js');
@@ -37,7 +45,6 @@ const VARIABLES = [
   'ENCRYPTION_KEY',
   'DOMAIN_URL',
   'CLIENT_URL',
-  'DATA_ENCRYPTION_KEY_FILE',
 ] as const;
 
 describe('the OneDrive app registration', () => {
@@ -95,7 +102,6 @@ describe('the OneDrive app registration', () => {
   });
 
   it('has no key for its tokens from ENCRYPTION_KEY: only the data encryption key seals them', () => {
-    process.env.DATA_ENCRYPTION_KEY_FILE = '/nonexistent/data_encryption_key';
     process.env.ENCRYPTION_KEY = 'ab'.repeat(32); // gitleaks:allow (made-up)
     expect(() => new OneDriveService().assertTokenKeyAvailable()).toThrow(EncryptionKeyUnavailableError);
   });

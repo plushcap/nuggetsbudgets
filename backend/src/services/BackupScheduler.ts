@@ -417,13 +417,14 @@ export class BackupScheduler implements Scheduler {
           }
         }
       } else {
-        // Copies were asked for but the app registration isn't saved (a stack that set it in
-        // the environment, which is no longer read): say so rather than skip them in silence.
+        // Copies were asked for but there is no app registration to use: none saved (a stack
+        // that set it in the environment, which is no longer read), or it can't be read. Say
+        // so rather than skip them in silence.
         const waiting = (await this.oneDriveService.getUserIdsWithAutoSync()).length;
         if (waiting > 0) {
           logger.warn(
             { users: waiting, fileName: result.fileName },
-            'Scheduled backup not copied to OneDrive: its app registration is not saved on the Backup page'
+            "Scheduled backup not copied to OneDrive: its app registration isn't set up (Settings → Database Backup)"
           );
         }
       }
