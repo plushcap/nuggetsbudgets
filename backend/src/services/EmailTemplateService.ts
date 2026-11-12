@@ -28,6 +28,44 @@ const TEMPLATES: Readonly<Record<string, { file: string; required: readonly stri
   },
 };
 
+/** Remove every match of `pattern` (a global regex), again until none is left. */
+function removeAll(text: string, pattern: RegExp): string {
+  let previous: string;
+  let current = text;
+  do {
+    previous = current;
+    current = current.replace(pattern, '');
+  } while (current !== previous);
+  return current;
+}
+
+/** The named character references the emails' HTML has: Handlebars' escapes, MJML's and the footer's. */
+const NAMED_CHARACTER_REFERENCES = new Map([
+  ['amp', '&'],
+  ['lt', '<'],
+  ['gt', '>'],
+  ['quot', '"'],
+  ['apos', "'"],
+  ['nbsp', ' '],
+  ['copy', '\u00a9'],
+]);
+
+/**
+ * Decode the character references in `text` in one pass: the named ones above, and every
+ * numeric one (Handlebars writes `'` as `&#x27;`). One it can't read is left as it is.
+ */
+function decodeCharacterReferences(text: string): string {
+  return text.replace(
+    /&(?:#([0-9]{1,7})|#[xX]([0-9a-fA-F]{1,6})|([a-zA-Z][a-zA-Z0-9]{0,31}));/g,
+    (reference: string, decimal?: string, hex?: string, name?: string) => {
+      if (name !== undefined) return NAMED_CHARACTER_REFERENCES.get(name) ?? reference;
+      const code = decimal !== undefined ? Number.parseInt(decimal, 10) : Number.parseInt(hex ?? '', 16);
+      const isScalarValue = code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff);
+      return isScalarValue ? String.fromCodePoint(code) : reference;
+    }
+  );
+}
+
 /**
  * EmailTemplateService
  *
@@ -154,30 +192,28 @@ export class EmailTemplateService {
   }
 
   /**
-   * Convert HTML to plain text
-   * Simple implementation - strips HTML tags and decodes entities
+   * The email's plain-text part, from its HTML: what a reader sees, without the markup.
+   * Comments go first, with what Outlook's conditional ones hide, then the head, scripts
+   * and styles with their content. A link keeps its address after its text (the button, the
+   * unsubscribe link), then every other tag goes. Each removal repeats until nothing more
+   * matches, since a removal can join the pieces of another. The character references are
+   * decoded last, in one pass, so text that came out of one (`&amp;lt;` reads `&lt;`) isn't
+   * decoded again.
    */
   private htmlToPlainText(html: string): string {
-    return html
-      // Remove script and style tags and their content
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-      // Convert <br> to newlines
-      .replace(/<br\s*\/?>/gi, '\n')
-      // Convert </p> and </div> to double newlines
-      .replace(/<\/(p|div)>/gi, '\n\n')
-      // Remove all remaining HTML tags
-      .replace(/<[^>]+>/g, '')
-      // Decode common HTML entities
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      // Clean up multiple newlines
+    let text = removeAll(html, /<!--[\s\S]*?--!?>/g);
+    text = removeAll(text, /<(head|script|style)\b[^>]*>[\s\S]*?<\/\1\b[^>]*>/gi);
+    text = text.replace(
+      /<a\b[^>]*?\shref\s*=\s*"([^"]*)"[^>]*>([\s\S]*?)<\/a\b[^>]*>/gi,
+      (_link: string, href: string, label: string) => (removeAll(label, /<[^>]*>/g).trim() ? `${label.trim()} (${href})` : href)
+    );
+    text = text.replace(/<br\b[^>]*>/gi, '\n').replace(/<\/(p|div)\b[^>]*>/gi, '\n\n');
+    text = removeAll(text, /<[^>]*>/g);
+    return decodeCharacterReferences(text)
+      .split('\n')
+      .map((line) => line.trim())
+      .join('\n')
       .replace(/\n{3,}/g, '\n\n')
-      // Trim whitespace
       .trim();
   }
 

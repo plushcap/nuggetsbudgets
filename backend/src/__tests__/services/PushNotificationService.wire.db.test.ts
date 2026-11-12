@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createServer, type Server } from 'node:https';
+import { createServer, globalAgent, type Server } from 'node:https';
 import { createECDH, createPublicKey, createVerify, randomBytes } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -34,16 +34,18 @@ describe('PushNotificationService on the wire', () => {
   const received: { headers: Record<string, string | string[] | undefined>; body: Buffer }[] = [];
   let userId: number;
   let certDir: string;
-  const tlsRejectUnauthorized = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+  const trustedCas = globalAgent.options.ca;
 
   beforeAll(async () => {
     certDir = mkdtempSync(join(tmpdir(), 'push-wire-'));
     execFileSync('openssl', [
       'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=127.0.0.1',
+      '-addext', 'subjectAltName=IP:127.0.0.1',
       '-keyout', join(certDir, 'key.pem'), '-out', join(certDir, 'cert.pem'),
     ], { stdio: 'ignore' });
-    // Only for this file's self-signed stand-in; restored in afterAll.
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    // web-push sends through https' global agent: it trusts the stand-in's certificate, and
+    // only that one, for this file (restored in afterAll). Certificates are still checked.
+    globalAgent.options.ca = readFileSync(join(certDir, 'cert.pem'));
 
     server = createServer({ key: readFileSync(join(certDir, 'key.pem')), cert: readFileSync(join(certDir, 'cert.pem')) }, (req, res) => {
       const chunks: Buffer[] = [];
@@ -69,8 +71,8 @@ describe('PushNotificationService on the wire', () => {
     await globalDb.deleteFrom('users').where('id', '=', userId).execute();
     await new Promise((resolve) => server.close(resolve));
     rmSync(certDir, { recursive: true, force: true });
-    if (tlsRejectUnauthorized === undefined) delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-    else process.env.NODE_TLS_REJECT_UNAUTHORIZED = tlsRejectUnauthorized;
+    if (trustedCas === undefined) delete globalAgent.options.ca;
+    else globalAgent.options.ca = trustedCas;
   });
 
   it('delivers an aes128gcm payload the subscriber can decrypt, signed with the stored VAPID key', async () => {

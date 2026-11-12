@@ -747,7 +747,8 @@ export function settingsMarkdown(backendEnv?: ReadonlyMap<string, ComposeEnvEntr
       spec.readBy ? `Read by \`${spec.readBy}\`.` : '',
       backendEnv ? stackNote(stackReach(name, spec, backendEnv)) : '',
     ].filter(Boolean);
-    const description = [spec.description.replace(/\|/g, '\\|') + '.', ...notes].join(' ').replace(/\.\./g, '.');
+    // A cell's `|` would end it: escaped, after the backslashes, so a `\` before one stays text.
+    const description = [spec.description.replace(/\\/g, '\\\\').replace(/\|/g, '\\|') + '.', ...notes].join(' ').replace(/\.\./g, '.');
     const rows = groups.get(spec.group) ?? [];
     rows.push(`| \`${name}\` | ${spec.defaultText} | ${description} |`);
     groups.set(spec.group, rows);

@@ -41,8 +41,8 @@ export function allowedSimpleFinHosts(): Set<string> {
   return new Set([...DEFAULT_ALLOWED_HOSTS, ...extra]);
 }
 
-/** Parse `raw` and throw a SimpleFinUrlError unless it may be requested. */
-export function assertSimpleFinUrl(raw: string | URL): URL {
+/** `raw` parsed, and the allowed host it names, as the allowlist spells it; else a SimpleFinUrlError. */
+function parseAllowed(raw: string | URL): { url: URL; allowedHost: string } {
   let url: URL;
   try {
     url = new URL(String(raw));
@@ -54,10 +54,16 @@ export function assertSimpleFinUrl(raw: string | URL): URL {
   }
   // URL normalizes the host to lowercase and drops the default port (443).
   const host = url.port ? `${url.hostname}:${url.port}` : url.hostname;
-  if (!allowedSimpleFinHosts().has(host)) {
+  const allowedHost = [...allowedSimpleFinHosts()].find((allowed) => allowed === host);
+  if (allowedHost === undefined) {
     throw new SimpleFinUrlError(`${url.hostname} is not an allowed SimpleFin host (SIMPLEFIN_ALLOWED_HOSTS)`);
   }
-  return url;
+  return { url, allowedHost };
+}
+
+/** Parse `raw` and throw a SimpleFinUrlError unless it may be requested. */
+export function assertSimpleFinUrl(raw: string | URL): URL {
+  return parseAllowed(raw).url;
 }
 
 export interface SimpleFinRequest {
@@ -82,9 +88,11 @@ export interface SimpleFinResponse {
  * a redirect or a network failure.
  */
 export async function simplefinRequest(raw: string | URL, options: SimpleFinRequest = {}): Promise<SimpleFinResponse> {
-  const url = assertSimpleFinUrl(raw);
+  const { url, allowedHost } = parseAllowed(raw);
   const { method = 'GET', headers, timeoutMs = 15_000, maxBytes = 1024 * 1024 } = options;
-  const response = await fetch(url, {
+  // The host connected to is the allowlist's own entry; only the path and query come from
+  // `raw`. Written out after the host, a path can't name another one (`//host` included).
+  const response = await fetch(`https://${allowedHost}${url.pathname}${url.search}`, {
     method,
     ...(headers && { headers }),
     redirect: 'error',
