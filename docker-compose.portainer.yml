@@ -2,9 +2,8 @@
 # This file is optimized for Portainer stack deployment
 #
 # INSTRUCTIONS FOR PORTAINER:
-# 1. While the images are private, give Portainer access to the GitHub Container Registry
-#    (Registries > Add registry > Custom: URL ghcr.io, a GitHub username, and a token
-#    with read:packages as the password)
+# 1. The images are public on the GitHub Container Registry (ghcr.io/plushcap): Portainer
+#    pulls them without a registry login
 # 2. Create the external networks ONCE on the host (compose will not create them):
 #      docker network create frontend
 #      docker network create admin
