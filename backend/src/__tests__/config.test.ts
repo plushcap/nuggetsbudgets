@@ -35,6 +35,7 @@ function variablesRead(source: string): string[] {
     /\bstrictSetting\(\s*['"]([A-Z][A-Z0-9_]+)['"]/g,
     /\breadDockerSecret\(\s*['"][a-z_]+['"]\s*,\s*['"]([A-Z][A-Z0-9_]+)['"]/g,
     /\benvSecret\(\s*['"]([A-Z][A-Z0-9_]+)['"]/g,
+    /\boptionalSecret\(\s*['"]([A-Z][A-Z0-9_]+)['"]/g,
   ];
   return patterns.flatMap((re) => [...source.matchAll(re)].map((m) => m[1]));
 }

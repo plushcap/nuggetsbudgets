@@ -22,7 +22,7 @@ import { SERVING_ROLE, syncServingRoleLogin } from '../db/servingRoleLogin.js';
 import { allowConnectionsHint, describeError, isDatabaseNotAcceptingConnections, isDatabaseUnreachable } from '../utils/dbErrors.js';
 import { dbErrorLine } from '../utils/dbErrorText.js';
 import { getDbLocation } from '../db/dbConfig.js';
-import { initializeSecrets } from '../utils/docker-secrets.js';
+import { initializeSecrets, secretsInEnvironment } from '../utils/docker-secrets.js';
 import { MigrationRefusal, MigrationService } from '../services/MigrationService.js';
 import { nextMigrationVersion } from '../db/baseline.js';
 import type { MigrationFailureInput } from '../services/migrationFailureFiles.js';
@@ -305,8 +305,9 @@ async function main(): Promise<void> {
   const command = args[0] || 'migrate';
 
   // The server refuses to start with these; the migration runs first (docker-entrypoint.sh),
-  // so it refuses too rather than act on a default nobody chose (a DB_PORT it can't read).
-  const problems = configProblems();
+  // so it refuses too rather than act on a default nobody chose (a DB_PORT it can't read),
+  // or sign in with a secret production doesn't take from the environment.
+  const problems = [...configProblems(), ...secretsInEnvironment()];
   if (problems.length > 0) {
     console.error(`❌ Fix the configuration first:\n${problems.map((p) => `  - ${p}`).join('\n')}`);
     process.exit(1);

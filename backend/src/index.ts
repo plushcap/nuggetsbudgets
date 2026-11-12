@@ -4,7 +4,7 @@ import pool, { poolSettings } from './db.js';
 import { retentionPolicy } from './services/maintenance/retention.js';
 import { checkSecretsForStartup } from './utils/security-validator.js';
 import { config } from './config.js';
-import { initializeSecrets } from './utils/docker-secrets.js';
+import { initializeSecrets, secretsInEnvironment } from './utils/docker-secrets.js';
 import { createApp } from './app.js';
 import { mountRoutes } from './routes.js';
 import { ImportService } from './services/ImportService.js';
@@ -18,11 +18,22 @@ import { resolveTrustProxy } from './utils/trustProxy.js';
 import { bcryptRounds, warmPasswordHashing } from './utils/passwords.js';
 import { getPasswordPolicy } from './utils/validation.js';
 import { breachCheckEnabled } from './services/breachedPasswords.js';
-import { validateStartupConfig } from './utils/productionConfig.js';
+import { ProductionConfigError, validateStartupConfig } from './utils/productionConfig.js';
 import { isApiRateLimitingEnabled } from './middleware/security.js';
 
 // Load environment variables first
 dotenv.config();
+
+// In production a secret comes only from its Docker secret file: one in the environment (the
+// stack's settings, a .env) is refused. Checked first, before the secrets read from the files
+// are copied into the environment, and before a file missing beside the variable is reported.
+// Rethrown so the reason reaches stderr even if the async log transport hasn't flushed.
+const secretsFromEnvironment = secretsInEnvironment();
+if (secretsFromEnvironment.length > 0) {
+  const err = new ProductionConfigError(secretsFromEnvironment);
+  logger.fatal({ err }, 'Refusing to start: fix the configuration');
+  throw err;
+}
 
 // Load Docker secrets into process.env before security validation
 if (config().USE_DOCKER_SECRETS) {

@@ -28,6 +28,18 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
   minimatch to 11 and glob to 14. The server never matches a glob: only ESLint and mjml's
   command-line tool do.
 
+- Production reads secrets only from their Docker secret files, and refuses to start with
+  one set in the environment: `DB_PASSWORD`, `APP_DB_PASSWORD`, `JWT_SECRET`,
+  `SESSION_SECRET`, `CSRF_SECRET`, `MIGRATION_DB_PASSWORD` or `BACKUP_DB_PASSWORD`. The
+  error names the variable and the file it belongs in. The two owner-password overrides
+  have files of their own now, `migration_db_password` and `backup_db_password` (optional).
+  Development and the tests still take the variables.
+
+  **Upgrading:** nothing to do with the provided compose files, which pass no secret in the
+  environment. If your stack or `.env` sets one of those variables, put its value in the
+  secret file named after it (`jwt_secret` for `JWT_SECRET`) and remove the variable; the
+  server won't start until you do.
+
 ### Fixed
 
 - The plain-text part of notification emails reads as the email does: apostrophes, `=` and

@@ -1,14 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { createLogger } from './logger.js';
-import { config, configFor } from '../config.js';
+import { config, configFor, SETTINGS } from '../config.js';
 
 const logger = createLogger({ service: 'DockerSecrets' });
 
 /**
- * Docker Secrets Utility
- * Provides functions to read Docker secrets from the filesystem
- * Falls back to environment variables if secrets are not available
+ * Docker secrets: files in SECRETS_PATH (/run/secrets in a container). Outside production a
+ * secret may also come from its environment variable, for development and the tests;
+ * production reads only the files, and refuses to start with one in the environment
+ * (secretsInEnvironment), so the stack's settings never hold a secret.
  */
 
 export interface SecretsConfig {
@@ -29,7 +30,7 @@ const unusableSecretFiles = new Map<string, string>();
 /**
  * Read a Docker secret from the filesystem
  * @param secretName - Name of the secret (matches the secret key in docker-compose.yml)
- * @param fallbackEnvVar - Environment variable to use as fallback
+ * @param fallbackEnvVar - Environment variable to use as fallback, outside production only
  * @returns The secret value or undefined if not found
  */
 export const readDockerSecret = (secretName: string, fallbackEnvVar?: string): string | undefined => {
@@ -53,8 +54,8 @@ export const readDockerSecret = (secretName: string, fallbackEnvVar?: string): s
     logger.warn({ err: error, secretName }, 'Failed to read Docker secret');
   }
 
-  // Fallback to environment variable
-  if (fallbackEnvVar && process.env[fallbackEnvVar]) {
+  // Fallback to environment variable, outside production (production refuses one at startup)
+  if (fallbackEnvVar && process.env[fallbackEnvVar] && config().NODE_ENV !== 'production') {
     logger.warn({ secretName, fallbackEnvVar }, 'Using environment variable fallback for secret');
     return process.env[fallbackEnvVar];
   }
@@ -65,13 +66,55 @@ export const readDockerSecret = (secretName: string, fallbackEnvVar?: string): s
 /**
  * A secret as the environment holds it, or undefined when it is unset or empty: one
  * index.ts copied there from its Docker secret at startup (JWT_SECRET, DB_PASSWORD,
- * SESSION_SECRET, CSRF_SECRET), or an override of the owner's password for one task
- * (MIGRATION_DB_PASSWORD, BACKUP_DB_PASSWORD). config() leaves secrets out, so code reads them here or with
+ * SESSION_SECRET, CSRF_SECRET), or, outside production, one set as a variable.
+ * config() leaves secrets out, so code reads them here or with
  * readDockerSecret, never from process.env itself (eslint.config.mjs). A function
  * that takes an environment to read (its tests pass another) passes it as `env`.
  */
 export function envSecret(name: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
   return env[name] || undefined;
+}
+
+/**
+ * An optional secret read for one task, by the environment it is given: its file in
+ * SECRETS_PATH (the variable's name in lower case: `migration_db_password` for
+ * MIGRATION_DB_PASSWORD), else, outside production, the variable. Undefined when neither.
+ */
+export function optionalSecret(
+  variable: 'MIGRATION_DB_PASSWORD' | 'BACKUP_DB_PASSWORD',
+  env: NodeJS.ProcessEnv = process.env
+): string | undefined {
+  const settings = configFor(env);
+  try {
+    const value = fs.readFileSync(path.join(settings.SECRETS_PATH, secretFileName(variable)), 'utf8').trim();
+    if (value) return value;
+  } catch {
+    // no file: the variable, outside production
+  }
+  return settings.NODE_ENV === 'production' ? undefined : envSecret(variable, env);
+}
+
+/** The variables config.ts lists as secrets (DB_PASSWORD, JWT_SECRET, …). */
+export const SECRET_VARIABLES: readonly string[] = Object.entries(SETTINGS)
+  .filter(([, spec]) => (spec as { secret?: boolean }).secret === true)
+  .map(([name]) => name);
+
+/** The Docker secret file a secret variable stands in for: its name in lower case. */
+export const secretFileName = (variable: string): string => variable.toLowerCase();
+
+/**
+ * In production, a problem for each secret set in the environment `env` (as it was before
+ * index.ts copied the Docker secrets into it): production reads secrets only from their
+ * files, so one in a stack's settings is a mistake to fix, not a value to use. None outside
+ * production, where the variables are how development and the tests set them.
+ */
+export function secretsInEnvironment(env: NodeJS.ProcessEnv = process.env): string[] {
+  if (configFor(env).NODE_ENV !== 'production') return [];
+  return SECRET_VARIABLES.filter((name) => envSecret(name, env)).map(
+    (name) =>
+      `${name} is set in the environment, which production never reads a secret from: put it in the ` +
+      `${secretFileName(name)} Docker secret file (in SECRETS_PATH) and remove the variable`
+  );
 }
 
 /**
@@ -169,12 +212,22 @@ export const loadSecrets = (): SecretsConfig => {
   if (!secrets.csrfSecret) missingSecrets.push('csrf_secret');
 
   if (missingSecrets.length > 0) {
+    const production = config().NODE_ENV === 'production';
     const described = missingSecrets.map((name) => {
-      const why = unusableSecretFiles.get(name);
-      return why ? `${name} (${why})` : name;
+      // In production a variable left where the file should be is the likeliest cause: name it.
+      const variable = name.toUpperCase();
+      const reasons = [
+        unusableSecretFiles.get(name),
+        production && envSecret(variable)
+          ? `${variable} is set in the environment, which production never reads a secret from: put it in this file and remove the variable`
+          : undefined,
+      ].filter(Boolean);
+      return reasons.length > 0 ? `${name} (${reasons.join('; ')})` : name;
     });
     throw new Error(`Missing required secrets: ${described.join(', ')}. ` +
-      'Ensure Docker secrets are configured or environment variables are set.');
+      (production
+        ? 'Mount each as a Docker secret file (production reads no secret from the environment).'
+        : 'Ensure Docker secrets are configured or environment variables are set.'));
   }
 
   // Weak secrets stop a production server; in development they're a warning.
