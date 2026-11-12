@@ -87,6 +87,15 @@ describe('SimpleFin requests', () => {
     }
   });
 
+  it('refuses a URL that carries credentials, before connecting: they go in the Authorization header', async () => {
+    for (const url of ['https://user:secret@bridge.simplefin.org/simplefin/claim/abc', 'https://user@bridge.simplefin.org/x']) {
+      // The access URL holds them, so checking one is fine; requesting it is not.
+      expect(() => assertSimpleFinUrl(url)).not.toThrow();
+      await expect(simplefinRequest(url)).rejects.toThrow(SimpleFinUrlError);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('refuses an answer larger than the cap, declared or streamed', async () => {
     fetchMock.mockResolvedValueOnce(new Response('x'.repeat(100), { headers: { 'content-length': '100' } }));
     await expect(simplefinRequest('https://bridge.simplefin.org/a', { maxBytes: 10 })).rejects.toThrow(

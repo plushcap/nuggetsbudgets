@@ -83,12 +83,17 @@ export interface SimpleFinResponse {
 
 /**
  * Request a SimpleFin URL (without credentials in it; send them in `headers`). Throws
- * SimpleFinUrlError before connecting if the URL isn't allowed, a TimeoutError when it
- * times out, SimpleFinResponseTooLargeError for an oversized answer, and a TypeError for
- * a redirect or a network failure.
+ * SimpleFinUrlError before connecting if the URL isn't allowed or carries credentials, a
+ * TimeoutError when it times out, SimpleFinResponseTooLargeError for an oversized answer,
+ * and a TypeError for a redirect or a network failure.
  */
 export async function simplefinRequest(raw: string | URL, options: SimpleFinRequest = {}): Promise<SimpleFinResponse> {
   const { url, allowedHost } = parseAllowed(raw);
+  // Credentials go in `headers`. fetch refuses a URL that carries them, and so does this,
+  // rather than send the request without them.
+  if (url.username || url.password) {
+    throw new SimpleFinUrlError('Send SimpleFin credentials in the Authorization header, not in the URL');
+  }
   const { method = 'GET', headers, timeoutMs = 15_000, maxBytes = 1024 * 1024 } = options;
   // The host connected to is the allowlist's own entry; only the path and query come from
   // `raw`. Written out after the host, a path can't name another one (`//host` included).
