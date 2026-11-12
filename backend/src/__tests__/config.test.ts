@@ -155,6 +155,14 @@ describe('the settings registry', () => {
     for (const name of Object.keys(SETTINGS)) expect(filled).toContain(`| \`${name}\` |`);
     expect(() => withEnvTable('# Settings\n')).toThrow(/no env-table markers/);
   });
+
+  it('has descriptions the table writes as they are, with only `|` escaped: none has a backslash', () => {
+    // A description is Markdown, code spans included. In a table cell a backslash before `|`
+    // would end the cell, and one escaped for that would show doubled inside a code span.
+    for (const [name, spec] of Object.entries(SETTINGS)) {
+      expect((spec as { description: string }).description, name).not.toContain('\\');
+    }
+  });
 });
 
 describe('loadConfig', () => {

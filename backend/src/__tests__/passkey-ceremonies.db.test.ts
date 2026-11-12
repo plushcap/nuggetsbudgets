@@ -840,7 +840,8 @@ describeDb('Passkey ceremonies', () => {
     it('refuses a credential id that is not base64url like any unknown passkey, without asking the database', async () => {
       const find = vi.spyOn(passkeyService as unknown as { findCredentialForAssertion: () => Promise<unknown> }, 'findCredentialForAssertion');
       try {
-        for (const id of ['not base64url!', 'A'.repeat(1365)]) {
+        // The last: a run of `=` that a trailing-padding regex took seconds to trim.
+        for (const id of ['not base64url!', 'A'.repeat(1365), `${'='.repeat(200_000)}x`]) {
           const res = await signInWith((c) => ({ ...alice.passkey.assertion(c), id, rawId: id }));
           expect(answer(res), JSON.stringify(id).slice(0, 30)).toEqual({
             status: 401,

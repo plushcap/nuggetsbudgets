@@ -130,10 +130,23 @@ export function presentedUserHandle(response: unknown): string | null | undefine
   return bytes.length >= 1 && bytes.length <= 64 ? bytes.toString('base64url') : null;
 }
 
-/** A credential id as stored: base64url without padding (a browser may send base64). */
-const asStoredCredentialId = (id: string): string => id.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 // WebAuthn's credential ids are at most 1023 bytes: 1364 characters of base64url.
 const STORABLE_CREDENTIAL_ID_RE = /^[A-Za-z0-9_-]{1,1364}$/;
+// The longest id a sign-in may present: that, and room for padding.
+const MAX_PRESENTED_CREDENTIAL_ID_LENGTH = 1368;
+
+/**
+ * A credential id as stored: base64url without padding (a browser may send base64). One
+ * longer than any credential id can be is no passkey's: it becomes '', which is refused,
+ * before any work on it. The padding is trimmed in a loop, not with a regex: `/=+$/` took
+ * time quadratic in a run of `=`, and the sign-in that sends it is public.
+ */
+const asStoredCredentialId = (id: string): string => {
+  if (id.length > MAX_PRESENTED_CREDENTIAL_ID_LENGTH) return '';
+  let end = id.length;
+  while (end > 0 && id[end - 1] === '=') end -= 1;
+  return id.slice(0, end).replace(/\+/g, '-').replace(/\//g, '_');
+};
 
 /**
  * Whether `credentialId` could be a stored passkey's: base64url, as every one is stored. One

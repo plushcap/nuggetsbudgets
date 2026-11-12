@@ -70,6 +70,32 @@ describe('SimpleFin requests', () => {
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
+  it('connects to the allowed host as the allowlist spells it, with only the path and query of the URL given', async () => {
+    vi.stubEnv('SIMPLEFIN_ALLOWED_HOSTS', 'bridge.home.example:8443');
+    fetchMock.mockImplementation(async () => new Response('ok', { status: 200 }));
+    for (const [given, requested] of [
+      ['https://BRIDGE.simplefin.org:443/simplefin/accounts?version=2#frag', 'https://bridge.simplefin.org/simplefin/accounts?version=2'],
+      ['https://bridge.home.example:8443/simplefin', 'https://bridge.home.example:8443/simplefin'],
+      // A path that starts with `//` stays a path on the allowed host.
+      ['https://bridge.simplefin.org//attacker.example/x', 'https://bridge.simplefin.org//attacker.example/x'],
+    ]) {
+      fetchMock.mockClear();
+      await simplefinRequest(given);
+      const [url] = fetchMock.mock.calls[0];
+      expect(String(url)).toBe(requested);
+      expect(new URL(String(url)).host).toBe(new URL(requested).host);
+    }
+  });
+
+  it('refuses a URL that carries credentials, before connecting: they go in the Authorization header', async () => {
+    for (const url of ['https://user:secret@bridge.simplefin.org/simplefin/claim/abc', 'https://user@bridge.simplefin.org/x']) {
+      // The access URL holds them, so checking one is fine; requesting it is not.
+      expect(() => assertSimpleFinUrl(url)).not.toThrow();
+      await expect(simplefinRequest(url)).rejects.toThrow(SimpleFinUrlError);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('refuses an answer larger than the cap, declared or streamed', async () => {
     fetchMock.mockResolvedValueOnce(new Response('x'.repeat(100), { headers: { 'content-length': '100' } }));
     await expect(simplefinRequest('https://bridge.simplefin.org/a', { maxBytes: 10 })).rejects.toThrow(

@@ -47,6 +47,9 @@ const ruleData = {
   fromName: 'The Smiths',
   unsubscribeUrl: 'https://app.example.com/unsubscribe#token',
 };
+const plainText = (html: string): string =>
+  (new EmailTemplateService() as unknown as { htmlToPlainText(html: string): string }).htmlToPlainText(html);
+
 describe('EmailTemplateService', () => {
   beforeAll(() => {
     // Templates use the currency/formatDate/pluralize helpers; they register on
@@ -93,6 +96,31 @@ describe('EmailTemplateService', () => {
 
       expect(out.text).toContain('Hi Alex,');
       expect(out.text).not.toMatch(/<[a-z!/][\s\S]*?>/i); // no tags / doctype left
+    });
+
+    it('decodes what the HTML escaped once, and only once, in the plain text', async () => {
+      const out = await new EmailTemplateService().renderTemplate('rule_message', {
+        ...ruleData,
+        heading: 'Bob\'s = "Groceries" & `more`',
+        // Typed by a member as it reads: it stays as typed, not decoded a second time.
+        paragraphs: ['Tom &amp; Jerry, a &lt; b'],
+      });
+
+      expect(out.text).toContain('Bob\'s = "Groceries" & `more`');
+      expect(out.text).toContain('Tom &amp; Jerry, a &lt; b');
+      expect(out.text).toContain('\u00a9 ' + new Date().getFullYear());
+      // Nothing else is left encoded.
+      expect(out.text.replace('Tom &amp; Jerry, a &lt; b', '')).not.toMatch(/&#?[a-z0-9]+;/i);
+    });
+
+    it('keeps the links\' addresses, and leaves out the head, styles and Outlook-only markup', async () => {
+      const out = await new EmailTemplateService().renderTemplate('rule_message', ruleData);
+
+      expect(out.text).toContain('Open the budget item (https://app.example.com/budget-items/abc/view)');
+      expect(out.text).toContain('Stop these emails (https://app.example.com/unsubscribe#token)');
+      expect(out.text).not.toMatch(/\{|mso|PixelsPerInch|^96$|fonts\.googleapis/m);
+      expect(out.text).not.toMatch(/^[ \t]+\S/m); // no indentation left from the markup
+      expect(out.text).not.toMatch(/\n{3,}/);
     });
 
     it('answers the subject it was given', async () => {
@@ -172,6 +200,28 @@ describe('EmailTemplateService', () => {
       expect(tpl({ d: null })).toBe('[]');
       expect(tpl({ d: '' })).toBe('[]');
       expect(tpl({ d: 'not-a-date' })).toBe('[]');
+    });
+  });
+  describe('the plain-text part', () => {
+    it('drops scripts, styles and comments with their content, however their ends are written', () => {
+      expect(plainText('a<script>x()</script >b<SCRIPT type="t">y()</SCRIPT foo>c')).toBe('abc');
+      expect(plainText('a<style>p{}</style\n>b<!-- hidden --!>c<!--[if mso]><b>96</b><![endif]-->d')).toBe('abcd');
+      expect(plainText('a<scr<script>x</script>ipt>alert(1)</script>b')).not.toMatch(/<|>/);
+    });
+
+    it('removes tags until none is left, and decodes each reference once', () => {
+      expect(plainText('a<scr<script></script>ipt>alert(1)</script>b')).toBe('ab');
+      expect(plainText('<<b>i>x</<b>i>')).not.toContain('<');
+      expect(plainText('&amp;lt;b&amp;gt; &#x27;&#39;&#8217; &copy; &unknown; &#0; &#xD800;')).toBe(
+        "&lt;b&gt; ''\u2019 \u00a9 &unknown; &#0; &#xD800;"
+      );
+      expect(plainText('&constructor; &__proto__;')).toBe('&constructor; &__proto__;');
+    });
+
+    it('turns breaks and paragraphs into lines, and a link into its text and address', () => {
+      expect(plainText('<p>one<br/>two</p><div>three</div>')).toBe('one\ntwo\n\nthree');
+      expect(plainText('<a class="x"\n href="https://e.example/?a=1&amp;b=2">\n  Go\n</a>')).toBe('Go (https://e.example/?a=1&b=2)');
+      expect(plainText('<a href="https://e.example/"><img src="logo.png"></a>')).toBe('https://e.example/');
     });
   });
 });
