@@ -241,7 +241,7 @@ export function createOneDriveRoutes({
       res.json({
         success: true,
         configured: false,
-        message: 'OneDrive integration not configured. Set ONEDRIVE_CLIENT_ID and ONEDRIVE_CLIENT_SECRET in environment.'
+        message: "OneDrive isn't set up: enter the app's client ID, secret and redirect URI on the Backup page."
       });
       return;
     }

@@ -319,9 +319,8 @@ services:
       # ---- Integrations ----
       SIMPLEFIN_ALLOWED_HOSTS: ${SIMPLEFIN_ALLOWED_HOSTS:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}  # default: the origin of an https CLIENT_URL
-      ONEDRIVE_CLIENT_ID: ${ONEDRIVE_CLIENT_ID:-}
-      ONEDRIVE_CLIENT_SECRET: ${ONEDRIVE_CLIENT_SECRET:-}
-      ONEDRIVE_REDIRECT_URI: ${ONEDRIVE_REDIRECT_URI:-}
+      # OneDrive (the Backup page), SMTP and SimpleFin are set up in the app, which also makes its
+      # own Web Push keys, and all are stored encrypted. Never put a secret in this environment.
       # ---- Data retention (days) ----
       RETENTION_SESSION_DAYS: ${RETENTION_SESSION_DAYS:-30}
       RETENTION_NOTIFICATION_DAYS: ${RETENTION_NOTIFICATION_DAYS:-90}
