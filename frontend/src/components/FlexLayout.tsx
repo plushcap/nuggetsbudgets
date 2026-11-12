@@ -48,24 +48,26 @@ const MainMenu: React.FC<{
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const current = navCurrent(pathname, item.href, item.also);
+          const unread = item.href === '/activity' && activityBadge > 0 ? activityBadge : 0;
           return (
             <li key={item.href}>
               <Flex asChild align="center" gap="3" px="3">
               <Link
                 to={item.href}
                 aria-current={current}
+                // With a count, the link is named with it ("Activity, 2 new"). A visually
+                // hidden ", 2 new" beside the name read "Activity , 2 new": it is positioned
+                // absolutely, so a browser takes it for a block and puts a space before it.
+                aria-label={unread > 0 ? `${item.name}, ${unread} new` : undefined}
                 onClick={() => onNavigate(item.href)}
                 className={menuLinkClass(current !== undefined)}
               >
                 <Icon size={20} aria-hidden="true" />
                 <span>{item.name}</span>
-                {item.href === '/activity' && activityBadge > 0 && (
-                  <>
-                    <Badge color="amber" variant="solid" radius="full" ml="auto" aria-hidden="true">
-                      {activityBadge}
-                    </Badge>
-                    <VisuallyHidden>{`, ${activityBadge} new`}</VisuallyHidden>
-                  </>
+                {unread > 0 && (
+                  <Badge color="amber" variant="solid" radius="full" ml="auto" aria-hidden="true">
+                    {unread}
+                  </Badge>
                 )}
               </Link>
               </Flex>
