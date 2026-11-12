@@ -165,10 +165,10 @@ describe('Deleting and archiving a budget period', () => {
     expect(await listed()).toEqual({ list: archivedAt, managed: archivedAt });
     expect(await counts(period.id)).toEqual(before);
 
-    // Archiving it again keeps when it was first archived.
+    // Archiving it again leaves it as it is: archived when it first was, not written again.
     const again = await request(app).post(`/api/budget-periods/${period.uuid}/archive`);
     expect(again.status).toBe(200);
-    expect(again.body.period.archived_at).toBe(archivedAt);
+    expect(again.body.period).toEqual(archived.body.period);
 
     // An archived period still holds its month, and still can't be deleted with transactions.
     const create = await request(app).post('/api/budgets/periods').send({ year: YEAR, month: 4 });
@@ -183,6 +183,42 @@ describe('Deleting and archiving a budget period', () => {
     expect(restored.body).toMatchObject({ success: true, message: `Budget period "April ${YEAR}" restored`, period: { archived_at: null } });
     expect(await listed()).toEqual({ list: null, managed: null });
     expect(await counts(period.id)).toEqual(before);
+
+    // Restoring one that isn't archived leaves it as it is.
+    const restoredAgain = await request(app).post(`/api/budget-periods/${period.uuid}/restore`);
+    expect(restoredAgain.status).toBe(200);
+    expect(restoredAgain.body.period).toEqual(restored.body.period);
+  });
+
+  // An archive waiting for a period's row while a delete removes it: the period is gone, a 404.
+  it('answers 404 to an archive of a period deleted while it waited', async () => {
+    const period = await periodWithBudget(5);
+    const deleter: PoolClient = await tenant.pool.connect();
+    try {
+      await deleter.query('BEGIN');
+      const deleterPid = (await deleter.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0]!.pid;
+      await deleter.query('SELECT id FROM budget_period WHERE id = $1 FOR UPDATE', [period.id]);
+      const archiving = request(app).post(`/api/budget-periods/${period.uuid}/archive`).then((r) => r);
+      const deadline = Date.now() + 10_000;
+      for (;;) {
+        const waiting = await tenant.pool.query('SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))', [deleterPid]);
+        if ((waiting.rowCount ?? 0) > 0) break;
+        if (Date.now() > deadline) throw new Error('the archive never waited for the delete');
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      await deleter.query(
+        `DELETE FROM budget_period_transactions WHERE budget_period_item_id IN (SELECT id FROM budget_period_items WHERE budget_period_id = $1)`,
+        [period.id]
+      );
+      await deleter.query('DELETE FROM budget_period WHERE id = $1', [period.id]);
+      await deleter.query('COMMIT');
+      const res = await archiving;
+      expect(res.status, JSON.stringify(res.body)).toBe(404);
+      expect(res.body).toMatchObject({ code: 'NOT_FOUND' });
+    } finally {
+      await deleter.query('ROLLBACK').catch(() => undefined);
+      deleter.release();
+    }
   });
 
   it('answers 404 for archiving or restoring a period that is not there', async () => {

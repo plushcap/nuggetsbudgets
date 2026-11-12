@@ -109,6 +109,8 @@ const BudgetPeriodsPage: React.FC = () => {
     }
   };
 
+  // Periods there are, all of them archived and hidden: not "no periods yet".
+  const allArchived = !showArchived && budgetPeriods.length > 0 && archivedCount === budgetPeriods.length;
   const filteredPeriods = budgetPeriods.filter(period =>
     (showArchived || !period.archived_at) &&
     (period.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -204,12 +206,14 @@ const BudgetPeriodsPage: React.FC = () => {
             <Calendar size={48} className="text-[var(--gray-6)]" />
             <Flex direction="column" align="center" gap="2">
               <Text size="4" weight="bold" color="gray" highContrast>
-                {searchTerm ? 'No matching periods found' : 'No budget periods yet'}
+                {searchTerm ? 'No matching periods found' : allArchived ? 'Every budget period is archived' : 'No budget periods yet'}
               </Text>
               <Text size="2" color="gray" align="center">
                 {searchTerm
                   ? 'Try adjusting your search terms to find what you\'re looking for.'
-                  : 'Get started by creating your first budget period.'
+                  : allArchived
+                    ? 'Show archived to see them and restore one, or create a new budget period.'
+                    : 'Get started by creating your first budget period.'
                 }
               </Text>
             </Flex>

@@ -8,7 +8,7 @@ import { centsToAmount, centsToNumber, numericToCents, toCents } from '../utils/
 import { ControlPlaneError } from './controlPlaneErrors.js';
 import { DomainError, type RefusalStatus } from './domainErrors.js';
 import { isLockConflict, lockRowsForDelete, lockTransactions } from './transactions/locks.js';
-import { budgetPeriodHasTransactions, transferItemsNotInPeriod } from './budgetPeriods/BudgetPeriodError.js';
+import { budgetPeriodHasTransactions, budgetPeriodNotFound, transferItemsNotInPeriod } from './budgetPeriods/BudgetPeriodError.js';
 import { budgetPeriodItemIdOf, budgetPeriodOf } from './budgetPeriods/periodLookups.js';
 import { notTakenOut } from './budgetPeriods/takenOut.js';
 import { budgetEventType, budgetItemStatus } from '@nuggets/shared';
@@ -570,36 +570,42 @@ export class BudgetService {
     /**
      * Archive the period `uuid` names (POST /api/budget-periods/:uuid/archive): it leaves the
      * period pickers, and its transactions, budget events and items stay as they are, so its
-     * figures and every later envelope balance are unchanged. Archiving an archived period keeps
-     * the time it was first archived. The period's row; a period that isn't the ledger's is a 404.
+     * figures and every later envelope balance are unchanged. An archived period is left as it
+     * is (it keeps the time it was first archived). The period's row; a period that isn't the
+     * ledger's, or was deleted meanwhile, is a 404.
      */
     async archivePeriod(uuid: string): Promise<Selectable<DB['budget_period']>> {
-        const period = await budgetPeriodOf(uuid);
-        const archived = await getDb()
-            .updateTable('budget_period')
-            .set({ archived_at: sql<Date>`COALESCE(archived_at, CURRENT_TIMESTAMP)`, updated_at: sql<Date>`CURRENT_TIMESTAMP` })
-            .where('id', '=', period.id)
-            .returningAll()
-            .executeTakeFirstOrThrow();
-        logger.info({ periodId: period.id }, 'Budget period archived');
-        return archived;
+        return this.setPeriodArchived(uuid, true);
     }
 
     /**
      * Restore an archived period (POST /api/budget-periods/:uuid/restore): it shows in the
      * period pickers again. One that isn't archived is left as it is. The period's row; a
-     * period that isn't the ledger's is a 404.
+     * period that isn't the ledger's, or was deleted meanwhile, is a 404.
      */
     async restorePeriod(uuid: string): Promise<Selectable<DB['budget_period']>> {
-        const period = await budgetPeriodOf(uuid);
-        const restored = await getDb()
+        return this.setPeriodArchived(uuid, false);
+    }
+
+    /**
+     * Archive or restore the period `uuid` names, in one statement by its uuid, so a delete
+     * between a lookup and the write can't turn the 404 into a 500. Only a change writes the row
+     * (the update_budget_period_updated_at trigger stamps updated_at on every UPDATE); a period
+     * already so is read as it is.
+     */
+    private async setPeriodArchived(uuid: string, archived: boolean): Promise<Selectable<DB['budget_period']>> {
+        const db = getDb();
+        const changed = await db
             .updateTable('budget_period')
-            .set({ archived_at: null, updated_at: sql<Date>`CURRENT_TIMESTAMP` })
-            .where('id', '=', period.id)
+            .set({ archived_at: archived ? sql<Date>`CURRENT_TIMESTAMP` : null })
+            .where('uuid', '=', uuid)
+            .where('archived_at', archived ? 'is' : 'is not', null)
             .returningAll()
-            .executeTakeFirstOrThrow();
-        logger.info({ periodId: period.id }, 'Budget period restored');
-        return restored;
+            .executeTakeFirst();
+        const period = changed ?? (await db.selectFrom('budget_period').selectAll().where('uuid', '=', uuid).executeTakeFirst());
+        if (!period) throw budgetPeriodNotFound();
+        if (changed) logger.info({ periodId: period.id }, archived ? 'Budget period archived' : 'Budget period restored');
+        return period;
     }
 
     /**

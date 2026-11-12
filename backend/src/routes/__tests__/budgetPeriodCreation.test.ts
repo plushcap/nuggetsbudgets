@@ -208,6 +208,34 @@ describe('Creating a budget period', () => {
     expect(await periodOf(decemberTakenOut)).toBeNull();
   });
 
+  // A delete of a period with transactions took them out of it before such a delete was refused,
+  // and ledgers still have rows it left that way: the period it took them out of is gone, and
+  // its month's period made again takes them back, as the bank sync does.
+  it("takes back into its month's period made again a row that left the period deleted before", async () => {
+    const year = YEAR + 2;
+    const account = (await tenant.pool.query(
+      `INSERT INTO accounts (name, account_type, account_group, type) VALUES ('Remade checking', 'checking', 'cash', 'Asset') RETURNING id`
+    )).rows[0].id as number;
+    const first = await request(app).post('/api/budgets/periods').send({ year, month: 9 });
+    expect(first.status).toBe(201);
+    const row = (await tenant.pool.query(
+      `INSERT INTO transactions (account_id, amount, transaction_date, type, description, budget_period_id)
+       VALUES ($1, -12.34, make_date($2, 9, 14), 'expense', 'Left by a delete', $3) RETURNING id`,
+      [account, year, first.body.id]
+    )).rows[0].id as number;
+    const periodOf = async () =>
+      (await tenant.pool.query(`SELECT budget_period_id FROM transactions WHERE id = $1`, [row])).rows[0].budget_period_id as number | null;
+
+    // What such a delete did: the period's transactions out of it, then the period.
+    await tenant.pool.query(`UPDATE transactions SET budget_period_id = NULL WHERE budget_period_id = $1`, [first.body.id]);
+    expect((await request(app).delete(`/api/budget-periods/${first.body.uuid}`)).status).toBe(200);
+    expect(await periodOf()).toBeNull();
+
+    const again = await request(app).post('/api/budgets/periods').send({ year, month: 9 });
+    expect(again.status).toBe(201);
+    expect(await periodOf()).toBe(again.body.id);
+  });
+
   it('gives one 201 and one 409 to two requests for the same month at once', async () => {
     const send = () => request(app).post('/api/budget-periods').send({ year: YEAR, month: 8 });
     const statuses = (await Promise.all([send(), send()])).map((r) => r.status).sort();

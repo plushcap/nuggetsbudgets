@@ -16,14 +16,17 @@ const periods = [
 ];
 
 const mutations = vi.hoisted(() => ({ delete: vi.fn(), archive: vi.fn(), restore: vi.fn() }));
+// The periods the page is given; a test may replace them.
+const listed = vi.hoisted(() => ({ periods: [] as unknown[] }));
 vi.mock('../../hooks/queries', () => ({
-  useBudgetPeriodsManagementQuery: () => ({ data: { periods, stats: null }, isLoading: false }),
+  useBudgetPeriodsManagementQuery: () => ({ data: { periods: listed.periods, stats: null }, isLoading: false }),
   useDeleteBudgetPeriodMutation: () => ({ mutateAsync: mutations.delete, isPending: false }),
   useArchiveBudgetPeriodMutation: () => ({ mutateAsync: mutations.archive, isPending: false }),
   useRestoreBudgetPeriodMutation: () => ({ mutateAsync: mutations.restore, isPending: false }),
 }));
 
 beforeEach(() => {
+  listed.periods = periods;
   mutations.delete.mockReset().mockResolvedValue({});
   mutations.archive.mockReset().mockResolvedValue({});
   mutations.restore.mockReset().mockResolvedValue({});
@@ -102,5 +105,15 @@ describe('Archiving a budget period', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Hide archived' }));
     expect(screen.queryByText('August 2026')).not.toBeInTheDocument();
+  });
+
+  it('says every period is archived, not that there are none, when all of them are', async () => {
+    listed.periods = periods.map((p) => ({ ...p, archived_at: '2026-11-01T12:00:00.000Z' }));
+    renderPage();
+    expect(screen.getByText('Every budget period is archived')).toBeInTheDocument();
+    expect(screen.queryByText('No budget periods yet')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: `Show archived (${periods.length})` }));
+    expect(screen.queryByText('Every budget period is archived')).not.toBeInTheDocument();
+    expect(screen.getAllByText('October 2026').length).toBeGreaterThan(0);
   });
 });

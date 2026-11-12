@@ -141,6 +141,30 @@ describe('BudgetPage period selection', () => {
     expect(await options()).toEqual(['March 2026', 'February 2026', 'January 2026']);
   });
 
+  // An archived period still holds its month: creating the month shows it, and says where it is
+  // restored, rather than refusing with nothing shown.
+  it("shows a month's archived period rather than create it", async () => {
+    query.periods = periods.map((p) => (p.month_number === 2 ? { ...p, archived_at: '2026-11-01T12:00:00.000Z' } : p));
+    renderAt('/budgets?period=2026-01');
+    await waitFor(() => expect(shownPeriod()).toHaveTextContent('January 2026'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create Period' }));
+    const dialog = await screen.findByRole('dialog');
+    const [monthPicker, yearPicker] = within(dialog).getAllByRole('combobox');
+    await userEvent.click(monthPicker!);
+    await userEvent.click(await screen.findByRole('option', { name: 'February' }));
+    await userEvent.click(yearPicker!);
+    await userEvent.click(await screen.findByRole('option', { name: '2026' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create Period' }));
+
+    await waitFor(() => expect(shownPeriod()).toHaveTextContent('February 2026'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(createPeriod).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(
+      "February 2026 has an archived budget period, so it's shown. Restore it in Settings → Budget Periods to list it again",
+    );
+  });
+
   it('a chosen period goes into the URL and the session', async () => {
     renderAt('/budgets?period=2026-01');
     await waitFor(() => expect(shownPeriod()).toHaveTextContent('January 2026'));

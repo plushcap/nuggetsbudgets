@@ -30,7 +30,16 @@ const CreatePeriodDialog: React.FC<{
 
   const create = async () => {
     const monthLabel = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    if (budgetPeriods.some((p) => p.year === year && p.month_number === month)) {
+    const existing = budgetPeriods.find((p) => p.year === year && p.month_number === month);
+    // An archived period still holds its month, and the picker leaves it out: show it, and say
+    // where it is restored.
+    if (existing?.archived_at) {
+      await showPeriod((p) => p.id === existing.id);
+      toast(`${monthLabel} has an archived budget period, so it's shown. Restore it in Settings → Budget Periods to list it again`);
+      setOpen(false);
+      return;
+    }
+    if (existing) {
       toast.error('This budget period already exists');
       return;
     }
