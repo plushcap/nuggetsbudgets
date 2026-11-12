@@ -108,6 +108,54 @@ describe('Creating a budget period', () => {
     expect(july.body).toMatchObject({ year: YEAR, month_number: 7, budgetItemsCreated: 2 });
   });
 
+  it("takes in the month's transactions that have no period from the Budget page's route, as from the settings page's", async () => {
+    const account = (await tenant.pool.query(
+      `INSERT INTO accounts (name, account_type, account_group, type) VALUES ('Period checking', 'checking', 'cash', 'Asset') RETURNING id`
+    )).rows[0].id as number;
+    const transaction = async (date: string, description: string, type = 'expense', periodId: number | null = null) =>
+      (await tenant.pool.query(
+        `INSERT INTO transactions (account_id, amount, transaction_date, type, description, budget_period_id)
+         VALUES ($1, -12.34, $2, $3, $4, $5) RETURNING id`,
+        [account, date, type, description, periodId]
+      )).rows[0].id as number;
+    const periodOf = async (id: number) =>
+      (await tenant.pool.query(`SELECT budget_period_id FROM transactions WHERE id = $1`, [id])).rows[0].budget_period_id as number | null;
+
+    // November's period, made from the settings page without taking anything in.
+    const novemberCreated = await request(app).post('/api/budget-periods').send({ year: YEAR, month: 11, associate_transactions: false });
+    expect(novemberCreated.status).toBe(201);
+    const november = novemberCreated.body.period_id as number;
+
+    const firstDay = await transaction(`${YEAR}-09-01`, 'First day');
+    const lastDay = await transaction(`${YEAR}-09-30`, 'Last day');
+    const opening = await transaction(`${YEAR}-09-15`, 'Opening balance', 'starting balance');
+    const alreadyPlaced = await transaction(`${YEAR}-09-20`, 'Counted in November', 'expense', november);
+    const nextMonth = await transaction(`${YEAR}-10-01`, 'Next month');
+    const earlier = await transaction(`${YEAR}-04-30`, 'Earlier month');
+
+    const res = await request(app).post('/api/budgets/periods').send({ year: YEAR, month: 9 });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ year: YEAR, month_number: 9, budgetItemsCreated: 2 });
+    const september = res.body.id as number;
+    expect(await periodsOf(9)).toEqual([september]);
+
+    // September's own days, with no period: taken in.
+    expect(await periodOf(firstDay)).toBe(september);
+    expect(await periodOf(lastDay)).toBe(september);
+    // An opening balance, one already in a period, and other months': left alone.
+    expect(await periodOf(opening)).toBeNull();
+    expect(await periodOf(alreadyPlaced)).toBe(november);
+    expect(await periodOf(nextMonth)).toBeNull();
+    expect(await periodOf(earlier)).toBeNull();
+
+    // The settings page's route takes in its month's the same way.
+    const october = await request(app).post('/api/budget-periods').send({ year: YEAR, month: 10 });
+    expect(october.status).toBe(201);
+    expect(october.body.transactions_associated).toBe(1);
+    expect(await periodOf(nextMonth)).toBe(october.body.period_id);
+    expect(await periodOf(earlier)).toBeNull();
+  });
+
   it('gives one 201 and one 409 to two requests for the same month at once', async () => {
     const send = () => request(app).post('/api/budget-periods').send({ year: YEAR, month: 8 });
     const statuses = (await Promise.all([send(), send()])).map((r) => r.status).sort();

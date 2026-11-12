@@ -101,7 +101,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "code": "NOT_FOUND",
@@ -124,7 +124,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "code": "VALIDATION_ERROR",
@@ -153,7 +153,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "eventUuid": "<uuid:15>",
@@ -174,7 +174,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "eventUuid": "<uuid:16>",
@@ -195,7 +195,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "code": "INVALID_AMOUNT",
@@ -419,7 +419,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "goal": {
@@ -452,7 +452,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "NOT_FOUND",
@@ -537,7 +537,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "goal": {
@@ -569,7 +569,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "VALIDATION_ERROR",
@@ -598,7 +598,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "NOT_FOUND",
@@ -621,7 +621,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "message": "Account associated successfully",
@@ -641,7 +641,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "message": "Account associated successfully",
@@ -661,7 +661,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "INVALID_REFERENCE",
@@ -685,7 +685,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "message": "Budget item associated successfully",
@@ -705,7 +705,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "BUDGET_ITEM_NOT_ROLLOVER",
@@ -728,7 +728,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "NOT_FOUND",
@@ -751,7 +751,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "VALIDATION_ERROR",
@@ -988,7 +988,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "message": "Account association removed successfully",
@@ -1008,7 +1008,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "NOT_FOUND",
@@ -1030,7 +1030,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "message": "Budget item association removed successfully",
@@ -1050,7 +1050,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "NOT_FOUND",
@@ -1072,7 +1072,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "goal": {
@@ -1104,7 +1104,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 12,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "NOT_FOUND",
@@ -1664,7 +1664,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 3,
     "periods": 1,
     "rules": 0,
-    "transactions_in_periods": 0,
+    "transactions_in_periods": 2,
   },
   "body": {
     "budgetItemsCreated": 3,
@@ -1696,7 +1696,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 3,
     "periods": 1,
     "rules": 0,
-    "transactions_in_periods": 0,
+    "transactions_in_periods": 2,
   },
   "body": {
     "code": "BUDGET_PERIOD_EXISTS",
@@ -1719,7 +1719,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 3,
     "periods": 1,
     "rules": 0,
-    "transactions_in_periods": 0,
+    "transactions_in_periods": 2,
   },
   "body": {
     "code": "VALIDATION_ERROR",
@@ -1748,7 +1748,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 4,
     "periods": 1,
     "rules": 1,
-    "transactions_in_periods": 0,
+    "transactions_in_periods": 2,
   },
   "body": {
     "budget_items_deleted": 4,
@@ -1772,7 +1772,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 8,
     "periods": 2,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "budget_items_deleted": 4,
@@ -1796,7 +1796,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 8,
     "periods": 2,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "NOT_FOUND",
@@ -1870,7 +1870,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 6,
     "periods": 2,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "budget_items_created": 3,
@@ -1894,7 +1894,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 6,
     "periods": 2,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "code": "BUDGET_PERIOD_EXISTS",
@@ -1917,7 +1917,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "budget_items_created": 3,
@@ -1941,7 +1941,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 6,
     "periods": 2,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "code": "VALIDATION_ERROR",
@@ -1970,7 +1970,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 6,
     "periods": 2,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "code": "VALIDATION_ERROR",
@@ -2001,7 +2001,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
         "month_number": 3,
         "name": "March 2024",
         "start_date": "2024-03-01",
-        "transaction_count": "0",
+        "transaction_count": "2",
         "uuid": "<uuid:9>",
         "year": 2024,
       },
@@ -2064,7 +2064,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 2,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "VALIDATION_ERROR",
@@ -2093,7 +2093,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 2,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "VALIDATION_ERROR",
@@ -2122,7 +2122,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "amount_max": "500.00",
@@ -2154,7 +2154,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 2,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "amount_max": null,
@@ -2186,7 +2186,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 2,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "VALIDATION_ERROR",
@@ -2215,7 +2215,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 2,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "VALIDATION_ERROR",
@@ -2244,7 +2244,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {},
   "status": 204,
@@ -2262,7 +2262,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 1,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "NOT_FOUND",
@@ -2392,7 +2392,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 2,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "amount_max": null,
@@ -2424,7 +2424,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 2,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "NOT_FOUND",
@@ -2447,7 +2447,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 2,
-    "transactions_in_periods": 7,
+    "transactions_in_periods": 9,
   },
   "body": {
     "code": "VALIDATION_ERROR",
@@ -2476,7 +2476,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "code": "NOT_FOUND",
@@ -2499,7 +2499,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "code": "NOT_FOUND",
@@ -2521,7 +2521,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "amount": 1.1,
@@ -2546,7 +2546,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "code": "NOT_FOUND",
@@ -2569,7 +2569,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "code": "INSUFFICIENT_FUNDS",
@@ -2592,7 +2592,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "amount": 20.25,
@@ -2617,7 +2617,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "code": "VALIDATION_ERROR",
@@ -2646,7 +2646,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "code": "VALIDATION_ERROR",
@@ -2675,7 +2675,7 @@ exports[`Budget, budget-period and goal routes: whole answers > answers every bu
     "period_items": 9,
     "periods": 3,
     "rules": 0,
-    "transactions_in_periods": 3,
+    "transactions_in_periods": 5,
   },
   "body": {
     "code": "VALIDATION_ERROR",

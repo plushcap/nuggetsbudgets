@@ -113,11 +113,12 @@ export function useMergeBudgetItemMutation() {
     onSuccess: invalidate,
   });
 }
+// Creating a period (either way) assigns it the transactions in its dates that have no
+// period; deleting one unassigns them.
 export function useCreateBudgetPeriodMutation() {
-  const invalidate = useInvalidateBudgets();
+  const invalidate = useInvalidateBudgetsAndTransactions();
   return useMutation({ mutationFn: (args: Parameters<typeof createBudgetPeriod>) => createBudgetPeriod(...args), onSuccess: invalidate });
 }
-// Creating a period assigns it the transactions in its dates; deleting one unassigns them.
 export function useCreateManagedBudgetPeriodMutation() {
   const invalidate = useInvalidateBudgetsAndTransactions();
   return useMutation({ mutationFn: (args: Parameters<typeof createManagedBudgetPeriod>) => createManagedBudgetPeriod(...args), onSuccess: invalidate });

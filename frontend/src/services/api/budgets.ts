@@ -106,8 +106,10 @@ export const getBudgetPeriods = async (): Promise<BudgetPeriod[]> =>
   parseAnswer(budgetPeriodListResponseSchema, await apiGet<unknown>('/budgets/periods'), 'budget periods');
 
 /**
- * Create a budget period. Answers with the new period's row and how many of its items were
- * created; 409 BUDGET_PERIOD_EXISTS when the ledger already has the month.
+ * Create a budget period (the Budget page's Create Period). It takes in the month's
+ * transactions that have no period yet, as {@link createManagedBudgetPeriod} does. Answers
+ * with the new period's row and how many of its items were created; 409
+ * BUDGET_PERIOD_EXISTS when the ledger already has the month.
  */
 export const createBudgetPeriod = async (year: number, month: number): Promise<BudgetPeriod & { budgetItemsCreated: number }> =>
   parseAnswer(budgetPeriodCreatedResponseSchema, await apiPost<unknown>('/budgets/periods', { year, month }), 'budget period');
@@ -129,9 +131,9 @@ export const getBudgetPeriodsManagement = async (): Promise<BudgetPeriodsManagem
 /**
  * Create a budget period with automatic rollover and transaction association.
  *
- * Distinct from {@link createBudgetPeriod}: this hits the `/budget-periods`
- * management endpoint (always enabling rollover + associating existing
- * transactions) and reports how many items/transactions were affected.
+ * The settings page's create. It does what {@link createBudgetPeriod} does (the same
+ * backend method), but hits the `/budget-periods` management endpoint, which reports how
+ * many items and transactions were affected.
  */
 export const createManagedBudgetPeriod = async (year: number, month: number): Promise<CreateManagedBudgetPeriodResult> =>
   parseAnswer(
