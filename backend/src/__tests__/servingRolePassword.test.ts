@@ -20,13 +20,10 @@ describe('servingRolePassword', () => {
     expect(servingRolePassword(noAppPassword, { DB_USER: 'owner' })).toBe('owner-password');
     // Even when app_db_password is mounted, as both shipped stacks do.
     expect(servingRolePassword(secrets, { DB_USER: 'owner', MIGRATION_DB_USER: 'owner' })).toBe('owner-password');
+    // The retired MIGRATION_DB_PASSWORD changes nothing: the owner's password is db_password.
     expect(
       servingRolePassword(secrets, { DB_USER: 'owner', MIGRATION_DB_USER: 'owner', MIGRATION_DB_PASSWORD: 'migration-password' })
-    ).toBe('migration-password');
-    // migrationPool connects as DB_USER with MIGRATION_DB_PASSWORD when MIGRATION_DB_USER is unset.
-    expect(servingRolePassword(noAppPassword, { DB_USER: 'owner', MIGRATION_DB_PASSWORD: 'migration-password' })).toBe(
-      'migration-password'
-    );
+    ).toBe('owner-password');
   });
 
   it("refuses to fall back to the owner's password for a separate serving role", () => {

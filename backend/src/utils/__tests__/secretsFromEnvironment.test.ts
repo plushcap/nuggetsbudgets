@@ -1,12 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import {
   SECRET_VARIABLES,
   copySecretsIntoEnvironment,
   loadSecrets,
-  optionalSecret,
   readDockerSecret,
   secretsInEnvironment,
 } from '../docker-secrets.js';
@@ -29,8 +28,6 @@ describe('secrets and the environment', () => {
     SESSION_SECRET: process.env.SESSION_SECRET,
     CSRF_SECRET: process.env.CSRF_SECRET,
     APP_DB_PASSWORD: process.env.APP_DB_PASSWORD,
-    MIGRATION_DB_PASSWORD: process.env.MIGRATION_DB_PASSWORD,
-    BACKUP_DB_PASSWORD: process.env.BACKUP_DB_PASSWORD,
   };
 
   beforeEach(() => {
@@ -46,48 +43,47 @@ describe('secrets and the environment', () => {
   });
 
   it('knows every secret config.ts lists', () => {
-    expect([...SECRET_VARIABLES].sort()).toEqual([
-      'APP_DB_PASSWORD',
-      'BACKUP_DB_PASSWORD',
-      'CSRF_SECRET',
-      'DB_PASSWORD',
-      'JWT_SECRET',
-      'MIGRATION_DB_PASSWORD',
-      'SESSION_SECRET',
-    ]);
+    expect([...SECRET_VARIABLES].sort()).toEqual(['APP_DB_PASSWORD', 'CSRF_SECRET', 'DB_PASSWORD', 'JWT_SECRET', 'SESSION_SECRET']);
   });
 
   it('refuses a secret in the environment in production, naming its file', () => {
-    const env = { NODE_ENV: 'production', JWT_SECRET: 'made-up', MIGRATION_DB_PASSWORD: 'made-up', SESSION_SECRET: '' };
+    const env = { NODE_ENV: 'production', JWT_SECRET: 'made-up', CSRF_SECRET: 'made-up', SESSION_SECRET: '' };
     const problems = secretsInEnvironment(env);
     expect(problems).toHaveLength(2); // an empty variable isn't a secret
     expect(problems[0]).toMatch(/^JWT_SECRET is set in the environment.*the jwt_secret Docker secret file/);
-    expect(problems[1]).toMatch(/^MIGRATION_DB_PASSWORD is set.*the migration_db_password Docker secret file/);
+    expect(problems[1]).toMatch(/^CSRF_SECRET is set in the environment.*the csrf_secret Docker secret file/);
   });
 
-  it('takes the variables outside production', () => {
+  it('refuses a retired setting still set in production, saying what replaced it', () => {
+    const env = { NODE_ENV: 'production', MIGRATION_DB_PASSWORD: 'made-up', BACKUP_DB_PASSWORD: 'made-up', BACKUP_DB_USER: 'backups' };
+    expect(secretsInEnvironment(env)).toEqual([
+      "MIGRATION_DB_PASSWORD is no longer used (the database owner's password is the db_password Docker secret file): remove the variable",
+      'BACKUP_DB_PASSWORD is no longer used (backups sign in as the database owner, with the db_password Docker secret file): remove the variable',
+      'BACKUP_DB_USER is no longer used (backups run as the database owner, MIGRATION_DB_USER): remove the variable',
+    ]);
+    // An empty one, as 3.0.0's compose files pass BACKUP_DB_USER, is no setting at all.
+    expect(secretsInEnvironment({ NODE_ENV: 'production', BACKUP_DB_USER: '' })).toEqual([]);
+  });
+
+  it('takes the variables outside production, and ignores the retired ones', () => {
     expect(secretsInEnvironment({ NODE_ENV: 'development', JWT_SECRET: 'made-up' })).toEqual([]);
-    expect(secretsInEnvironment({ NODE_ENV: 'test', DB_PASSWORD: 'made-up' })).toEqual([]);
+    expect(secretsInEnvironment({ NODE_ENV: 'test', DB_PASSWORD: 'made-up', MIGRATION_DB_PASSWORD: 'made-up' })).toEqual([]);
   });
 
-  it('reads an optional secret from its file first, and its variable only outside production', () => {
-    const variable = { SECRETS_PATH: dir, MIGRATION_DB_PASSWORD: 'from-the-variable' };
-    expect(optionalSecret('MIGRATION_DB_PASSWORD', { ...variable, NODE_ENV: 'development' })).toBe('from-the-variable');
-    expect(optionalSecret('MIGRATION_DB_PASSWORD', { ...variable, NODE_ENV: 'production' })).toBeUndefined();
-
-    writeFileSync(path.join(dir, 'migration_db_password'), 'from-the-file\n');
-    expect(optionalSecret('MIGRATION_DB_PASSWORD', { ...variable, NODE_ENV: 'development' })).toBe('from-the-file');
-    expect(optionalSecret('MIGRATION_DB_PASSWORD', { ...variable, NODE_ENV: 'production' })).toBe('from-the-file');
-    expect(optionalSecret('BACKUP_DB_PASSWORD', { ...variable, NODE_ENV: 'production' })).toBeUndefined();
-  });
-
-  it('gives the owner, and the serving role in a single-role setup, the migration_db_password file', () => {
-    writeFileSync(path.join(dir, 'migration_db_password'), 'owner-from-file');
-    writeFileSync(path.join(dir, 'backup_db_password'), 'backups-from-file');
-    const env = { NODE_ENV: 'production', SECRETS_PATH: dir, MIGRATION_DB_USER: 'owner', DB_USER: 'owner' };
-    expect(getOwnerCredentials(env).password).toBe('owner-from-file');
-    expect(getOwnerCredentials(env, true).password).toBe('backups-from-file');
-    expect(servingRolePassword({ dbPassword: 'db', appDbPassword: '' }, env)).toBe('owner-from-file');
+  it("signs the owner in, for migrations and backups alike, with db_password, whatever the retired variables say", () => {
+    writeFileSync(path.join(dir, 'migration_db_password'), 'a-file-nothing-reads');
+    const env = {
+      NODE_ENV: 'development',
+      SECRETS_PATH: dir,
+      MIGRATION_DB_USER: 'owner',
+      DB_USER: 'owner',
+      MIGRATION_DB_PASSWORD: 'made-up',
+      BACKUP_DB_PASSWORD: 'made-up',
+      BACKUP_DB_USER: 'backups',
+    };
+    process.env.DB_PASSWORD = 'the-db-password';
+    expect(getOwnerCredentials(env)).toEqual({ user: 'owner', password: 'the-db-password' });
+    expect(servingRolePassword({ dbPassword: 'the-db-password', appDbPassword: '' }, env)).toBe('the-db-password');
   });
 
   it('names the variable left where a missing file should be, in production', () => {
@@ -104,7 +100,7 @@ describe('secrets and the environment', () => {
 
   it("doesn't take the secrets startup copied from their files for ones a stack set", () => {
     process.env.NODE_ENV = 'production';
-    for (const name of ['APP_DB_PASSWORD', 'MIGRATION_DB_PASSWORD', 'BACKUP_DB_PASSWORD']) delete process.env[name];
+    delete process.env.APP_DB_PASSWORD;
     copySecretsIntoEnvironment({ dbPassword: 'a', appDbPassword: 'b', jwtSecret: 'c', sessionSecret: 'd', csrfSecret: 'e' });
     expect(process.env.JWT_SECRET).toBe('c');
     expect(secretsInEnvironment()).toEqual([]);
@@ -112,13 +108,6 @@ describe('secrets and the environment', () => {
     expect(secretsInEnvironment({ ...process.env, APP_DB_PASSWORD: 'made-up' })).toEqual([
       expect.stringMatching(/^APP_DB_PASSWORD is set in the environment/),
     ]);
-  });
-
-  it('refuses an optional secret file that is there but can\'t be read, rather than sign in another way', () => {
-    mkdirSync(path.join(dir, 'migration_db_password')); // a directory reads as EISDIR, even for root
-    expect(() => optionalSecret('MIGRATION_DB_PASSWORD', { NODE_ENV: 'production', SECRETS_PATH: dir })).toThrow(
-      /^The migration_db_password secret file \(.*\) can't be read: EISDIR$/
-    );
   });
 
   it('says why a separate serving role has no password when APP_DB_PASSWORD is set in production', () => {

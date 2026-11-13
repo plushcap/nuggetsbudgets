@@ -109,32 +109,6 @@ export function refusedVariable(variable: string, env: NodeJS.ProcessEnv = proce
   return `${variable} is set in the environment, which production never reads a secret from`;
 }
 
-/**
- * An optional secret read for one task, by the environment it is given: its file in
- * SECRETS_PATH (the variable's name in lower case: `migration_db_password` for
- * MIGRATION_DB_PASSWORD), else, outside production, the variable. Undefined when neither.
- * A file that is there but can't be read is an error, not a reason to sign in another way.
- */
-export function optionalSecret(
-  variable: 'MIGRATION_DB_PASSWORD' | 'BACKUP_DB_PASSWORD',
-  env: NodeJS.ProcessEnv = process.env
-): string | undefined {
-  const settings = configFor(env);
-  const file = path.join(settings.SECRETS_PATH, secretFileName(variable));
-  try {
-    const value = fs.readFileSync(file, 'utf8').trim();
-    if (value) return value;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      throw new Error(
-        `The ${secretFileName(variable)} secret file (${file}) can't be read: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`,
-        { cause: error }
-      );
-    }
-  }
-  return settings.NODE_ENV === 'production' ? undefined : envSecret(variable, env);
-}
-
 /** The variables config.ts lists as secrets (DB_PASSWORD, JWT_SECRET, …). */
 export const SECRET_VARIABLES: readonly string[] = Object.entries(SETTINGS)
   .filter(([, spec]) => (spec as { secret?: boolean }).secret === true)
@@ -144,16 +118,37 @@ export const SECRET_VARIABLES: readonly string[] = Object.entries(SETTINGS)
 export const secretFileName = (variable: string): string => variable.toLowerCase();
 
 /**
+ * Settings that are gone, with why: the database owner (MIGRATION_DB_USER) signs in with the
+ * db_password secret, the password Postgres gave it, for migrations, backups and restores
+ * alike, so a second password, or a second role for backups (which had to be a superuser
+ * too), added a way to get it wrong and nothing else.
+ */
+export const RETIRED_VARIABLES: Readonly<Record<string, string>> = {
+  MIGRATION_DB_PASSWORD: "the database owner's password is the db_password Docker secret file",
+  BACKUP_DB_PASSWORD: "backups sign in as the database owner, with the db_password Docker secret file",
+  BACKUP_DB_USER: 'backups run as the database owner, MIGRATION_DB_USER',
+};
+
+/**
  * In production, a problem for each secret set in the environment `env` (as it was before
  * index.ts copied the Docker secrets into it): production reads secrets only from their
- * files, so one in a stack's settings is a mistake to fix, not a value to use. None outside
- * production, where the variables are how development and the tests set them.
+ * files, so one in a stack's settings is a mistake to fix, not a value to use. And one for
+ * each retired setting still set (RETIRED_VARIABLES), so a stack doesn't keep a password
+ * nothing reads. None outside production, where the variables are how development and the
+ * tests set the secrets, and a retired one is simply not read.
  */
 export function secretsInEnvironment(env: NodeJS.ProcessEnv = process.env): string[] {
-  return SECRET_VARIABLES.flatMap((name) => {
+  const inEnvironment = SECRET_VARIABLES.flatMap((name) => {
     const refused = refusedVariable(name, env);
     return refused ? [`${refused}: put it in the ${secretFileName(name)} Docker secret file (in SECRETS_PATH) and remove the variable`] : [];
   });
+  const retired =
+    configFor(env).NODE_ENV === 'production'
+      ? Object.entries(RETIRED_VARIABLES)
+          .filter(([name]) => envSecret(name, env))
+          .map(([name, why]) => `${name} is no longer used (${why}): remove the variable`)
+      : [];
+  return [...inEnvironment, ...retired];
 }
 
 /**

@@ -103,7 +103,7 @@ secret_file session_secret "$(openssl rand -base64 32)"
 secret_file csrf_secret "$(openssl rand -base64 32)"
 # Any secret variable from the caller's shell (APP_DB_PASSWORD is this script's own input)
 # would make migrate and the backend refuse to start, as production does.
-unset DB_PASSWORD APP_DB_PASSWORD JWT_SECRET SESSION_SECRET CSRF_SECRET MIGRATION_DB_PASSWORD BACKUP_DB_PASSWORD
+unset DB_PASSWORD APP_DB_PASSWORD JWT_SECRET SESSION_SECRET CSRF_SECRET MIGRATION_DB_PASSWORD BACKUP_DB_PASSWORD BACKUP_DB_USER
 export DATA_ENCRYPTION_KEY_FILE="$RUN_DIR/data_encryption_key"
 openssl rand -base64 32 | tr -d '\n' > "$DATA_ENCRYPTION_KEY_FILE"
 chmod 600 "$DATA_ENCRYPTION_KEY_FILE"

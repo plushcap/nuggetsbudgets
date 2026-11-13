@@ -35,7 +35,6 @@ function variablesRead(source: string): string[] {
     /\bstrictSetting\(\s*['"]([A-Z][A-Z0-9_]+)['"]/g,
     /\breadDockerSecret\(\s*['"][a-z_]+['"]\s*,\s*['"]([A-Z][A-Z0-9_]+)['"]/g,
     /\benvSecret\(\s*['"]([A-Z][A-Z0-9_]+)['"]/g,
-    /\boptionalSecret\(\s*['"]([A-Z][A-Z0-9_]+)['"]/g,
   ];
   return patterns.flatMap((re) => [...source.matchAll(re)].map((m) => m[1]));
 }
@@ -58,7 +57,7 @@ describe('the settings registry', () => {
     expect(missing.map(([name, file]) => `${name} (${file})`)).toEqual([]);
     // The scan finds what it should (a regression in it would pass the check above).
     expect(read.has('DB_POOL_MAX') && read.has('RETENTION_SESSION_DAYS') && read.has('APP_DB_PASSWORD')).toBe(true);
-    expect(read.has('BACKUP_DB_PASSWORD') && read.has('SHUTDOWN_DRAIN_MS')).toBe(true);
+    expect(read.has('CSRF_SECRET') && read.has('SHUTDOWN_DRAIN_MS')).toBe(true);
   });
 
   it('lists nothing nobody reads', () => {

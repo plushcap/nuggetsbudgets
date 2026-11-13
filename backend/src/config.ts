@@ -364,12 +364,6 @@ export const SETTINGS = {
     defaultText: '`DB_USER`',
     parse: optionalText(),
   }),
-  BACKUP_DB_USER: setting({
-    group: 'Database',
-    description: 'Overrides `MIGRATION_DB_USER` for backups, restores and the schema download (Settings → Utilities) only',
-    defaultText: '`MIGRATION_DB_USER`',
-    parse: optionalText(),
-  }),
   DB_MAINTENANCE_NAME: setting({
     group: 'Database',
     description: 'Database a restore connects to while it swaps the app\'s database',
@@ -567,8 +561,6 @@ export const SETTINGS = {
   JWT_SECRET: secret('Signs tokens (secret `jwt_secret`)'),
   SESSION_SECRET: secret('Session signing (secret `session_secret`)'),
   CSRF_SECRET: secret('Keys the CSRF token (secret `csrf_secret`)'),
-  MIGRATION_DB_PASSWORD: secret('The owner\'s password, over the `db_password` secret, for migrations, backups and restores (optional secret `migration_db_password`)'),
-  BACKUP_DB_PASSWORD: secret('Overrides the owner\'s password for backups, restores and the schema download only (optional secret `backup_db_password`)'),
 } as const satisfies Record<string, SettingSpec<unknown>>;
 
 export type SettingName = keyof typeof SETTINGS;

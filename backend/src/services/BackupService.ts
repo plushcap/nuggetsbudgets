@@ -477,7 +477,7 @@ export class BackupService {
 
   /** Read when needed, not at construction: the secrets may not be there in a unit test. */
   private owner(): DbCredentials {
-    return (this.ownerOverride ??= getOwnerCredentials(process.env, true));
+    return (this.ownerOverride ??= getOwnerCredentials());
   }
 
   private serving(): DbCredentials {

@@ -1,4 +1,4 @@
-import { initializeSecrets, optionalSecret } from '../utils/docker-secrets.js';
+import { initializeSecrets } from '../utils/docker-secrets.js';
 import { configFor } from '../config.js';
 
 /**
@@ -29,19 +29,12 @@ export interface DbCredentials {
 }
 
 /**
- * The schema owner: the role migrations run as, and backups and restores connect as
- * (MIGRATION_DB_USER with the migration_db_password secret, else db_password). Not DB_USER's
+ * The schema owner: the role migrations run as, and backups, restores and the schema
+ * download (Settings → Utilities) connect as. MIGRATION_DB_USER (else DB_USER, a single-role
+ * setup) with the db_password secret, the password Postgres gave the owner. Not DB_USER's
  * password: with the role split that is the serving role's.
- * BACKUP_DB_USER and the backup_db_password secret override it for backups, restores and the
- * schema download (Settings → Utilities) only. Outside production, MIGRATION_DB_PASSWORD and
- * BACKUP_DB_PASSWORD stand in for those files (optionalSecret).
  */
-export function getOwnerCredentials(env: NodeJS.ProcessEnv = process.env, forBackups = false): DbCredentials {
+export function getOwnerCredentials(env: NodeJS.ProcessEnv = process.env): DbCredentials {
   const settings = configFor(env);
-  const user = (forBackups ? settings.BACKUP_DB_USER : undefined) || settings.MIGRATION_DB_USER || settings.DB_USER;
-  const password =
-    (forBackups ? optionalSecret('BACKUP_DB_PASSWORD', env) : undefined) ||
-    optionalSecret('MIGRATION_DB_PASSWORD', env) ||
-    initializeSecrets().dbPassword;
-  return { user, password };
+  return { user: settings.MIGRATION_DB_USER || settings.DB_USER, password: initializeSecrets().dbPassword };
 }

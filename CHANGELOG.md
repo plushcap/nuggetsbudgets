@@ -30,18 +30,22 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
 
 - Production reads secrets only from their Docker secret files, and refuses to start with
   one set in the environment: `DB_PASSWORD`, `APP_DB_PASSWORD`, `JWT_SECRET`,
-  `SESSION_SECRET`, `CSRF_SECRET`, `MIGRATION_DB_PASSWORD` or `BACKUP_DB_PASSWORD`. The
-  error names the variable and the file it belongs in. The two owner-password overrides
-  have files of their own now, `migration_db_password` and `backup_db_password` (optional).
+  `SESSION_SECRET` or `CSRF_SECRET`. The error names the variable and the file it belongs in.
   Production always reads the files now, whatever `USE_DOCKER_SECRETS` says, and the
-  `restore`, `rewrap-secrets` and `setup-token` commands refuse a variable too. Development
-  and the tests still take the variables (a file, when there is one, wins).
+  `restore`, `rewrap-secrets`, `setup-token` and `migrate-images-to-db` commands refuse a
+  variable too. Development and the tests still take the variables (a file, when there is
+  one, wins).
+- `MIGRATION_DB_PASSWORD`, `BACKUP_DB_PASSWORD` and `BACKUP_DB_USER` are gone. The database
+  owner signs in with `db_password`, the password Postgres gave it, for migrations, backups
+  and restores alike, so a second password or a second backup role (a superuser too) only
+  added a way to get it wrong. Production refuses to start while one is still set.
 
   **Upgrading:** nothing to do with the provided compose files, which pass no secret in the
-  environment. If your stack or `.env` sets one of those variables, put its value in the
-  secret file named after it (`jwt_secret` for `JWT_SECRET`) and remove the variable; the
-  server won't start until you do. The compose files mount neither optional file: to use one,
-  add it to the backend's `secrets:` as the others are.
+  environment. If your stack or `.env` sets one of the five secret variables, put its value
+  in the secret file named after it (`jwt_secret` for `JWT_SECRET`) and remove the variable.
+  If it sets `MIGRATION_DB_PASSWORD`, `BACKUP_DB_PASSWORD` or `BACKUP_DB_USER`, remove it
+  (`db_password` must hold the owner's password, as it does with the provided compose files).
+  The server won't start until you do.
 
 ### Fixed
 
