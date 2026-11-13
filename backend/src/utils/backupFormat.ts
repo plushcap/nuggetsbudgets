@@ -752,7 +752,8 @@ export function checkSignedTail(
  * BackupBundleError, and leaves what it wrote for the caller to delete.
  */
 export async function extractBundle(tarPath: string, payloadSize: number, destDir: string): Promise<BundleManifest> {
-  await mkdir(destDir, { recursive: true, mode: 0o700 });
+  const destRoot = path.resolve(destDir);
+  await mkdir(destRoot, { recursive: true, mode: 0o700 });
   const seen = new Map<string, number>();
   let manifestText: string | null = null;
   const refuse = (why: string) => new BackupBundleError(`This backup's contents aren't what a Nuggets backup holds: ${why}`);
@@ -788,7 +789,10 @@ export async function extractBundle(tarPath: string, payloadSize: number, destDi
       return;
     }
 
-    const target = path.join(destDir, ...name.split('/'));
+    // memberPathProblem has refused every name that leaves the bundle; checked again where the
+    // file is written, the way a zip-slip check reads, so no later change to it can open a way out.
+    const target = path.resolve(destRoot, ...name.split('/'));
+    if (!target.startsWith(destRoot + path.sep)) return fail(refuse('an entry outside the bundle'));
     mkdir(path.dirname(target), { recursive: true, mode: 0o700 })
       .then(() => pipeline(stream, createWriteStream(target, { mode: 0o600, flags: 'wx' })))
       .then(() => next())
