@@ -344,6 +344,34 @@ jobs:
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
+        # The tags, to find the release before this one for its list of pull requests.
+        fetch-depth: 0
+        fetch-tags: true
+
+    # The description's "What changed": this release's section of CHANGELOG.md, then the pull
+    # requests merged since the release before it, as GitHub lists them
+    # (scripts/release-notes.mjs; release-notes.yml rewrites it for a release made before).
+    - name: Write the release notes
+      id: notes
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ github.ref_name }}
+        VERSION: ${{ needs.build-backend.outputs.version }}
+      run: |
+        release_tag='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+        # The newest release tag before this one; none for the first, or for a pre-release
+        # (GitHub then picks the starting point itself).
+        previous=$( (git tag --list 'v*' | grep -E "$release_tag" || true) | sort -V \
+          | awk -v tag="$TAG" '$0 == tag { print before; exit } { before = $0 }')
+        args=(-f tag_name="$TAG")
+        if [ -n "$previous" ]; then args+=(-f previous_tag_name="$previous"); fi
+        if ! gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" "${args[@]}" --jq .body > prs.md; then
+          echo "::warning::GitHub didn't list the pull requests in $TAG: the notes have the changelog's entries only."
+          : > prs.md
+        fi
+        node scripts/release-notes.mjs block "$VERSION" CHANGELOG.md prs.md > notes.md
+        delimiter="NOTES_$(openssl rand -hex 16)"
+        { echo "block<<$delimiter"; cat notes.md; echo "$delimiter"; } >> "$GITHUB_OUTPUT"
 
     - name: Create deployment manifest
       id: manifest
@@ -388,7 +416,9 @@ jobs:
         body: |
           ## Nuggets ${{ needs.build-backend.outputs.version }}
 
-          What changed: [CHANGELOG.md](${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/CHANGELOG.md).
+          ${{ steps.notes.outputs.block }}
+
+          Every release: [CHANGELOG.md](${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/CHANGELOG.md).
 
           ### Container images (linux/amd64, linux/arm64)
           - `${{ steps.manifest.outputs.prefix }}/nuggets-backend:${{ needs.build-backend.outputs.version }}` (`${{ needs.build-backend.outputs.digest }}`)

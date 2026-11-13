@@ -1,0 +1,74 @@
+name: Rewrite release notes
+
+# Run by hand from the Actions tab ("Run workflow" on main), once per release: it puts the
+# release's "What changed" into its GitHub Release description, as docker-build-deploy.yml
+# writes it into a new one. That is its section of main's CHANGELOG.md, then the pull requests
+# merged since the release before it (scripts/release-notes.mjs). The rest of the description
+# (the images, the deploy notes) and the attached manifest stay as they are. For the releases
+# made before releases had notes, and for one whose changelog section was corrected since. Run
+# again, it replaces the part it wrote.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'The release, such as v3.1.0'
+        required: true
+        type: string
+
+# Every job states the access it needs; a job that states none gets none.
+permissions: {}
+
+jobs:
+  notes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write   # edit the release, and list its pull requests
+
+    steps:
+    - name: Only from main
+      if: github.ref != 'refs/heads/main'
+      run: |
+        echo "::error::Run this from main: the notes come from main's CHANGELOG.md (this run is on $GITHUB_REF)."
+        exit 1
+
+    - name: Checkout main with its tags
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+        persist-credentials: false
+
+    - name: Rewrite the release's notes
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ inputs.tag }}
+      run: |
+        if ! [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$ ]]; then
+          echo "::error::'$TAG' is not a release tag (vX.Y.Z)"
+          exit 1
+        fi
+        if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > description.md; then
+          echo "::error::$TAG has no GitHub Release to rewrite"
+          exit 1
+        fi
+        release_tag='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+        # The newest release tag before this one; none for the first, or for a pre-release
+        # (GitHub then picks the starting point itself).
+        previous=$( (git tag --list 'v*' | grep -E "$release_tag" || true) | sort -V \
+          | awk -v tag="$TAG" '$0 == tag { print before; exit } { before = $0 }')
+        args=(-f tag_name="$TAG")
+        if [ -n "$previous" ]; then args+=(-f previous_tag_name="$previous"); fi
+        if ! gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" "${args[@]}" --jq .body > prs.md; then
+          echo "::warning::GitHub didn't list the pull requests in $TAG: the notes have the changelog's entries only."
+          : > prs.md
+        fi
+        node scripts/release-notes.mjs block "${TAG#v}" CHANGELOG.md prs.md > block.md
+        node scripts/release-notes.mjs merge description.md block.md > new-description.md
+        gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file new-description.md > /dev/null
+        {
+          echo "### Release notes for $TAG"
+          echo
+          echo "- From main's CHANGELOG.md, and the pull requests since ${previous:-the start}."
+          echo "- The release: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG"
+        } >> "$GITHUB_STEP_SUMMARY"

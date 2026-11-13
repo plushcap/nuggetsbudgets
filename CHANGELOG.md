@@ -4,10 +4,36 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
 
 ## Unreleased
 
+### Changed
+
+- Each GitHub Release's description lists what changed in it: its section of this changelog,
+  then the pull requests merged since the release before it. A release made before this has
+  only a link to the changelog: run **Rewrite release notes** from the Actions tab on `main`,
+  with its tag, to add the list (the release's images and attached file stay as they are).
+- A bank transaction is linked to one entered by hand of the same amount dated up to 7 days
+  before it; it was 4. A transfer entered the day it is sent can post five business days later,
+  over a weekend, and was added beside the manual entry instead of being linked to it. An entry
+  dated after the bank's transaction is still linked only up to 4 days after it, so next week's
+  payment of the same amount, entered early, isn't taken for this week's; and a balance
+  adjustment the sync booked, only up to 4 days either side, so an unrelated bank transaction
+  of its amount a week later doesn't take it over.
+- A bank transaction is no longer linked to a part of a split transaction, or to a side of a
+  move between budget periods. Neither is ever at the bank, and either link left the bank's
+  transaction out of the balance.
+
+### Fixed
+
+- Close-Out's envelope reconciliation compares a month's envelopes with the envelope account's
+  balance at the end of that month (the date is shown under it). It used today's balance for
+  every month, so a past month showed a variance of everything that had moved since. Its
+  **Submit Transfer** dates a transfer for a month that has ended on that month's last day, so
+  the transfer counts in the month it balances. `GET /api/accounts` takes `as_of`
+  (YYYY-MM-DD) for the balances at the end of that day.
+
+## 3.1.0 (2026-11-13)
+
 ### Security
 
-- Passkey sign-in refuses a credential id longer than any can be before it reads it. A long
-  run of `=` in one held the server for seconds per request.
 - OneDrive's app registration (client ID, secret and redirect URI) is no longer read from
   the stack's environment: it comes only from Settings → Database Backup, where it is stored
   encrypted. The compose files and env templates no longer offer `ONEDRIVE_CLIENT_ID`,
@@ -27,7 +53,6 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
   every package but one at minimatch 9; overrides now raise only the affected versions,
   minimatch to 11 and glob to 14. The server never matches a glob: only ESLint and mjml's
   command-line tool do.
-
 - Production reads secrets only from their Docker secret files, and refuses to start with
   one set in the environment: `DB_PASSWORD`, `APP_DB_PASSWORD`, `JWT_SECRET`,
   `SESSION_SECRET` or `CSRF_SECRET`. The error names the variable and the file it belongs in.
@@ -53,16 +78,6 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
 
 ### Changed
 
-- A bank transaction is linked to one entered by hand of the same amount dated up to 7 days
-  before it; it was 4. A transfer entered the day it is sent can post five business days later,
-  over a weekend, and was added beside the manual entry instead of being linked to it. An entry
-  dated after the bank's transaction is still linked only up to 4 days after it, so next week's
-  payment of the same amount, entered early, isn't taken for this week's; and a balance
-  adjustment the sync booked, only up to 4 days either side, so an unrelated bank transaction
-  of its amount a week later doesn't take it over.
-- A bank transaction is no longer linked to a part of a split transaction, or to a side of a
-  move between budget periods. Neither is ever at the bank, and either link left the bank's
-  transaction out of the balance.
 - The main menu is reordered: Home, Budgets, Tasks, Close-Out, Goals, Bills, Accounts,
   Transactions, Agent Activity, Tags, Investments, then Reports, set apart. Dashboard is now
   **Home** and Activity **Agent Activity** in the menu, and Investments carries a small
@@ -83,17 +98,6 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
 
 ### Fixed
 
-- Close-Out's envelope reconciliation compares a month's envelopes with the envelope account's
-  balance at the end of that month (the date is shown under it). It used today's balance for
-  every month, so a past month showed a variance of everything that had moved since. Its
-  **Submit Transfer** dates a transfer for a month that has ended on that month's last day, so
-  the transfer counts in the month it balances. `GET /api/accounts` takes `as_of`
-  (YYYY-MM-DD) for the balances at the end of that day.
-- The plain-text part of notification emails reads as the email does: apostrophes, `=` and
-  © come out as characters, not codes, Outlook-only markup no longer leaves a stray "96",
-  and the button's and the unsubscribe link's addresses are in it.
-- A screen reader reads the menu's Activity link with its count as "Activity, 2 new"; it
-  read "Activity , 2 new", with a pause before the comma.
 - Creating a budget period from the Budget page's **Create Period** now takes in that month's
   transactions that have no period yet, as **Settings → Budget Periods → Add** always has.
   Before, the month's existing transactions stayed outside the new period. When one of them is
@@ -109,3 +113,16 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
 ## 3.0.0 (2026-11-12)
 
 The first public release.
+
+### Security
+
+- Passkey sign-in refuses a credential id longer than any can be before it reads it. A long
+  run of `=` in one held the server for seconds per request.
+
+### Fixed
+
+- The plain-text part of notification emails reads as the email does: apostrophes, `=` and
+  © come out as characters, not codes, Outlook-only markup no longer leaves a stray "96",
+  and the button's and the unsubscribe link's addresses are in it.
+- A screen reader reads the menu's Activity link with its count as "Activity, 2 new"; it
+  read "Activity , 2 new", with a pause before the comma.

@@ -136,13 +136,14 @@ jobs:
           echo "::error::a release build is still running: $running. Run this again when it has finished."
           exit 1
         fi
-        # The release's notes link to CHANGELOG.md at the tag, so its heading should be there.
+        # The release's notes are its section of CHANGELOG.md at the tag (scripts/release-notes.mjs),
+        # so its heading should be there; without it they list the Unreleased entries instead.
         version="${tag#v}"
         if grep -qE "^## ${version//./\\.} \(" CHANGELOG.md; then
           changelog=yes
         else
           changelog=no
-          echo "::warning::CHANGELOG.md has no '## $version (YYYY-MM-DD)' heading, so the release notes' changelog link shows only 'Unreleased'. Add it in a PR (the Unreleased entries under it) before cutting $tag."
+          echo "::warning::CHANGELOG.md has no '## $version (YYYY-MM-DD)' heading, so the release notes list its Unreleased entries instead. Add it in a PR (the Unreleased entries under it) before cutting $tag."
         fi
 
         from="${newest:-$BEFORE_THIS_REPOSITORY (before this repository)}"
@@ -221,7 +222,7 @@ jobs:
           echo "- Bump: $BUMP, from $NEWEST"
           echo "- Commit: \`${COMMIT:0:7}\` on main"
           if [ "$CHANGELOG" != "yes" ]; then
-            echo "- CHANGELOG.md has no \`## $version (YYYY-MM-DD)\` heading: the release notes' changelog link shows only Unreleased."
+            echo "- CHANGELOG.md has no \`## $version (YYYY-MM-DD)\` heading: the release notes list its Unreleased entries instead."
           fi
           if [ "$DRY_RUN" = "true" ]; then
             echo "- Dry run: no tag was created and nothing was built."
