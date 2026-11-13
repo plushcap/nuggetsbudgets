@@ -79,7 +79,11 @@ export const BudgetActualCard: React.FC<{ items: BudgetPeriodItem[] }> = ({ item
  * included) against the envelope accounts', in whole cents. An account whose balance is
  * unavailable (null) makes the comparison unavailable. Nothing when there are neither.
  */
-export const EnvelopeComparisonCard: React.FC<{ items: BudgetPeriodItem[]; accounts: Account[] }> = ({ items, accounts }) => {
+/**
+ * The period's envelopes against the envelope accounts. `accounts` carry each envelope account's money
+ * through the period (`withEnvelopeBalances`), named by `through` (the period's name), not its balance today.
+ */
+export const EnvelopeComparisonCard: React.FC<{ items: BudgetPeriodItem[]; accounts: Account[]; through: string }> = ({ items, accounts, through }) => {
   const envelopeItems = items.filter((item) => item.type === 'Envelope');
   const envelopeAccounts = accounts.filter((account) => account.is_envelope_account === true);
   if (envelopeItems.length === 0 && envelopeAccounts.length === 0) return null;
@@ -102,7 +106,7 @@ export const EnvelopeComparisonCard: React.FC<{ items: BudgetPeriodItem[]; accou
 
       <SummaryMath total={<SummaryLine label="Difference:" strong>{shown(difference)}</SummaryLine>}>
         <SummaryLine label="Budgeted Envelope Savings:">{formatMoney(centsToAmount(budgetCents))}</SummaryLine>
-        <SummaryLine label="Actual Envelope Account Total:">{shown(centsToAmount(-accountCents))}</SummaryLine>
+        <SummaryLine label={`Actual Envelope Account Total, through ${through}:`}>{shown(centsToAmount(-accountCents))}</SummaryLine>
       </SummaryMath>
 
       <Box mt="3" pt="3" className="border-t border-[var(--gray-6)]">
@@ -117,7 +121,7 @@ export const EnvelopeComparisonCard: React.FC<{ items: BudgetPeriodItem[]; accou
           </Flex>
           {envelopeAccounts.length > 0 && (
             <Box>
-              <Box mb="1" className="font-medium text-[var(--gray-12)]">Envelope Accounts:</Box>
+              <Box mb="1" className="font-medium text-[var(--gray-12)]">Envelope Accounts, through {through}:</Box>
               {envelopeAccounts.map((account) => (
                 <Flex key={account.id} justify="between" className="text-xs">
                   <Box mr="2" className="truncate">{account.name}</Box>

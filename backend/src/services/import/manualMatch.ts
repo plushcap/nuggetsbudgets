@@ -16,19 +16,49 @@ export interface ManualMatch {
   status: string;
 }
 
-/** How many days before or after an import's date a manual entry it's linked to may be dated. */
-const MATCH_WINDOW_DAYS = 4;
+/**
+ * How many days before an import's date a manual entry it's linked to may be dated: a week, as
+ * a transfer entered the day it is sent can post five business days later, over a weekend.
+ */
+const DAYS_BEFORE = 7;
+/**
+ * How many days after it: fewer, as the bank posts after a member enters, not before. A week
+ * would take next week's payment of the same amount, entered early, for this week's bank row.
+ */
+const DAYS_AFTER = 4;
 
 /**
  * A manually entered transaction, which an import may be linked to: not an import, with no
- * SimpleFin id, and never the account's opening balance (a bank transaction isn't one).
+ * SimpleFin id, and never the account's opening balance (a bank transaction isn't one). Nor
+ * a split's part (its parent carries the money: a bank row linked to a part drops out of the
+ * balance), nor a side of a move between budget periods (two rows of the same account, linked
+ * to each other: bookkeeping, never at the bank).
  */
 function isManualEntry(table: string): RawBuilder<SqlBool> {
   const column = (name: string) => sql.ref(`${table}.${name}`);
   return sql<SqlBool>`
     (${column('is_import')} = false OR ${column('is_import')} IS NULL)
     AND ${column('import_transaction_id')} IS NULL
-    AND ${column('type')} IS DISTINCT FROM ${sql.lit(transactionType.enum['starting balance'])}`;
+    AND ${column('type')} IS DISTINCT FROM ${sql.lit(transactionType.enum['starting balance'])}
+    AND ${column('parent_transaction_id')} IS NULL
+    -- A scalar subquery, not NOT EXISTS: as an anti-join, the planner put the feed inside a
+    -- nested loop when the table's statistics lagged a bulk load (29 s on 100,000 rows).
+    AND (SELECT pair.account_id FROM transactions pair WHERE pair.id = ${column('transfer_transaction_id')})
+        IS DISTINCT FROM ${column('account_id')}`;
+}
+
+/**
+ * The days a manual entry may be dated in, for an import dated from `first` to `last`: from
+ * DAYS_BEFORE before to DAYS_AFTER after. A balance adjustment only DAYS_AFTER before: the
+ * sync dates one the day it runs, so an unrelated bank row a week later of the same amount
+ * would take it over, and the next rebalance book it again.
+ */
+function withinWindow(table: string, first: RawBuilder<unknown>, last: RawBuilder<unknown>): RawBuilder<SqlBool> {
+  const column = (name: string) => sql.ref(`${table}.${name}`);
+  return sql<SqlBool>`
+    ${column('transaction_date')} BETWEEN ${first} - ${DAYS_BEFORE}::int AND ${last} + ${DAYS_AFTER}::int
+    AND (${column('type')} IS DISTINCT FROM ${sql.lit(transactionType.enum['balance adjustment'])}
+         OR ${column('transaction_date')} >= ${first} - ${DAYS_AFTER}::int)`;
 }
 
 /**
@@ -50,7 +80,7 @@ export function manualMatchCandidates(accountId: number, imports: Array<{ amount
         FROM unnest(${imports.map((i) => i.amount)}::numeric[], ${imports.map((i) => i.day)}::date[]) AS feed(amount, day)
         JOIN transactions t
           ON t.account_id = ${accountId}
-         AND t.transaction_date BETWEEN feed.day - ${MATCH_WINDOW_DAYS}::int AND feed.day + ${MATCH_WINDOW_DAYS}::int
+         AND ${withinWindow('t', sql`feed.day`, sql`feed.day`)}
          AND t.amount = feed.amount
        WHERE ${isManualEntry('t')}))`;
 }
@@ -73,7 +103,7 @@ export async function manualEntriesNear(
              WITH ORDINALITY AS feed(amount, day, i)
       JOIN transactions t
         ON t.account_id = ${accountId}
-       AND t.transaction_date BETWEEN feed.day - ${MATCH_WINDOW_DAYS}::int AND feed.day + ${MATCH_WINDOW_DAYS}::int
+       AND ${withinWindow('t', sql`feed.day`, sql`feed.day`)}
        AND t.amount = feed.amount
      WHERE ${isManualEntry('t')}
      ORDER BY feed.i, ABS(t.transaction_date - feed.day), t.id
@@ -96,8 +126,7 @@ export async function hasManualEntryOfAmount(
 ): Promise<boolean> {
   if (amounts.length === 0) return false;
   const within = span
-    ? sql`AND t.transaction_date BETWEEN ${span.first}::date - ${MATCH_WINDOW_DAYS}::int
-                                     AND GREATEST(${span.last}::date, app_today()) + ${MATCH_WINDOW_DAYS}::int`
+    ? sql`AND ${withinWindow('t', sql`${span.first}::date`, sql`GREATEST(${span.last}::date, app_today())`)}`
     : sql``;
   const result = await sql<{ found: boolean }>`
     SELECT EXISTS (
@@ -112,10 +141,9 @@ export async function hasManualEntryOfAmount(
 }
 
 /**
- * Find potential manually entered transactions that match an imported transaction
- * Matches transactions within ±4 days of `day` (the imported transaction's
- * calendar date, 'YYYY-MM-DD') with the exact same amount
- * Only matches transactions that are NOT imports (is_import = false or null)
+ * The manually entered transaction an imported one should be linked to: of the exact same
+ * amount, a manual entry (isManualEntry), dated from 7 days before `day` (the import's
+ * calendar date, 'YYYY-MM-DD') to 4 after (DAYS_BEFORE, DAYS_AFTER), the nearest first.
  */
 export async function findManualTransactionMatch(
   accountId: number,
@@ -135,9 +163,9 @@ export async function findManualTransactionMatch(
         WHERE account_id = ${accountId}
           AND amount = ${amount}
           -- The window in SQL, as manualMatchCandidates and manualEntriesNear have it: worked
-          -- out in JavaScript, 4 days past a day near 9999-12-31 was "+010000-…", which Postgres
+          -- out in JavaScript, the window past a day near 9999-12-31 was "+010000-…", which Postgres
           -- refused, and the catch answered "no match" for an entry the sync had locked for it.
-          AND transaction_date BETWEEN ${day}::date - ${MATCH_WINDOW_DAYS}::int AND ${day}::date + ${MATCH_WINDOW_DAYS}::int
+          AND ${withinWindow('transactions', sql`${day}::date`, sql`${day}::date`)}
           AND ${isManualEntry('transactions')}
         -- id last, so of two as near the same one is linked every time, the one
         -- manualEntriesNear names.

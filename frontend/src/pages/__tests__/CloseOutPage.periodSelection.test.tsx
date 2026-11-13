@@ -43,6 +43,7 @@ vi.mock('../../hooks/queries', async (importOriginal) => ({
   useBudgetPeriodItemsQuery: () => ({ data: { success: true, data: empty }, isLoading: false }),
   useZeroBalanceAccountsQuery: () => ({ data: undefined, isLoading: false }),
   useAccountsQuery: () => ({ data: empty }),
+  useEnvelopeBalanceQuery: () => ({ data: { success: true, data: { accounts: empty } }, isLoading: false, isSuccess: true }),
 }));
 
 let location = '';

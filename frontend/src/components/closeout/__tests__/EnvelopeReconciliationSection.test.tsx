@@ -48,7 +48,7 @@ describe('EnvelopeReconciliationSection', () => {
       </Theme>,
     );
     await userEvent.click(screen.getByRole('button', { name: 'About envelope account reconciliation' }));
-    expect(await screen.findByText(/Verify that your envelope account balance matches/)).toBeInTheDocument();
+    expect(await screen.findByText(/Verify that your envelope account's money through this month matches/)).toBeInTheDocument();
   });
 
   // With the accounts not loaded there is no envelope account to find, and that isn't

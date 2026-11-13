@@ -47,7 +47,7 @@ const Section: React.FC<{ children: React.ReactNode }> = ({ children }) => (
         Envelope Account Reconciliation
       </Text>
       <InfoPopover label="About envelope account reconciliation">
-        Verify that your envelope account balance matches the sum of all envelope budget items.
+        Verify that your envelope account's money through this month matches the sum of all envelope budget items.
       </InfoPopover>
     </Flex>
     {children}
@@ -134,6 +134,8 @@ const EnvelopeReconciliationSection: React.FC<EnvelopeReconciliationSectionProps
   }
 
   const { envelope_account, budget_summary, variance } = reconciliation;
+  // The month reconciled: the account's money is what is filed under it and the months before (CloseOutPage).
+  const period = budgetPeriods.find((p) => p.uuid === periodId);
 
   // Reconciliation guidance. Underfunded is unambiguous (top the account up).
   // Overfunded is often legitimate (unbudgeted income such as interest), so we
@@ -174,7 +176,7 @@ const EnvelopeReconciliationSection: React.FC<EnvelopeReconciliationSectionProps
     if (!fullEnvelope || !variance) return {};
     const amount = centsToAmount(Math.abs(toCents(variance.amount)));
     const transaction_date = todayLocal();
-    const budget_period_id = budgetPeriods.find((p) => p.uuid === periodId)?.id ?? null;
+    const budget_period_id = period?.id ?? null;
     const counterparty = fullEnvelope.default_pay_from_account_id ?? null;
     if (variance.status === 'underfunded') {
       return {
@@ -210,7 +212,7 @@ const EnvelopeReconciliationSection: React.FC<EnvelopeReconciliationSectionProps
         </Callout.Root>
 
         <Grid columns={{ initial: '1', sm: '3' }} gap="5">
-          <Figure label="Actual Envelope Balance" note={envelope_account.name}>
+          <Figure label="Actual Envelope Balance" note={period ? `${envelope_account.name}, through ${period.name}` : envelope_account.name}>
             <Text size="8" weight="bold" className="text-[var(--gray-12)]">
               {formatMoney(envelope_account.actual_balance)}
             </Text>

@@ -157,6 +157,42 @@ export async function envelopeTransfers(periodUuid: string) {
   };
 }
 
+/**
+ * Each envelope account's money through a period, counted as its envelopes are: what is filed
+ * under that period or an earlier one (by start date), and what is filed under none and dated by
+ * the period's last day (the opening balance among them: it is dated the day the account was
+ * set up, as an envelope's starting balance is filed under that day's period). The envelope
+ * accounts are the Accounts list's (not hidden, not closed).
+ *
+ * The envelopes' remaining (calculate_remaining_for_period_item) counts what is filed under
+ * each period, so a balance by date disagreed with them over whatever was filed across a
+ * month's end: a close-out transfer filed under October and dated November 2 counted in
+ * November's balance and October's envelopes. Not an account balance, which is
+ * calculate_account_balance: this is the account's side of the envelope reconciliation.
+ */
+export async function envelopeBalanceThroughPeriod(periodUuid: string) {
+  const periodId = await budgetPeriodIdOf(periodUuid);
+  // Raw sql: a filtered aggregate over a join, with the period's span from a CTE.
+  const { rows } = await sql<{ uuid: string; balance: string }>`
+    WITH period AS (SELECT start_date, end_date FROM budget_period WHERE id = ${periodId}),
+         through AS (SELECT bp.id FROM budget_period bp, period WHERE bp.start_date <= period.start_date)
+    SELECT a.uuid,
+           COALESCE(SUM(t.amount) FILTER (
+             WHERE t.parent_transaction_id IS NULL
+               AND (t.budget_period_id IN (SELECT id FROM through)
+                    OR (t.budget_period_id IS NULL AND t.transaction_date <= (SELECT end_date FROM period)))
+           ), 0)::text AS balance
+      FROM accounts a
+      LEFT JOIN transactions t ON t.account_id = a.id
+     WHERE a.is_envelope_account = true
+       AND a.hide_account = false
+       AND a.close_account = false
+     GROUP BY a.id, a.uuid
+     ORDER BY a.id
+  `.execute(getDb());
+  return { accounts: rows.map((row) => ({ uuid: row.uuid, balance: centsToNumber(numericToCents(row.balance)) })) };
+}
+
 /** Every period with its counts of transactions, items and budget events, and the periods' span, for the settings page. */
 export async function budgetPeriodsForManagement() {
   // Raw sql: an aggregate of several grouped subqueries.

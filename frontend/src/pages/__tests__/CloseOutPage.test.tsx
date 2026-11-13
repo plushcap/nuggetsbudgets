@@ -5,7 +5,8 @@ import { Theme } from '@radix-ui/themes';
 import { transferCreateSchema } from '@nuggets/shared';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import { apiError, labelledLine, mockApi } from '../../test/apiServer';
-import { account, accountsResponse, budgetPeriod, budgetPeriodItem, uuidFor } from '../../test/fixtures';
+import { account, accountsResponse, budgetPeriod, budgetPeriodItem, envelopeBalanceFrom, uuidFor } from '../../test/fixtures';
+import { todayLocal } from '../../utils/dateUtils';
 import type { ZeroBalanceAccount, ZeroBalanceSummary } from '../../services/api/types';
 import CloseOutPage from '../CloseOutPage';
 
@@ -60,16 +61,21 @@ const zeroBalance: { accounts: ZeroBalanceAccount[]; summary: ZeroBalanceSummary
   summary: { total_accounts: 0, balanced_count: 0, needs_adjustment_count: 0, total_adjustment_amount: 0 },
 };
 
-const routes = (overrides: Parameters<typeof mockApi>[0] = {}) => ({
-  'GET /budgets/periods': [october],
-  'GET /budgets/periods/:uuid/items': { success: true, data: items },
-  'GET /accounts': accountsResponse([envelopeAccount]),
-  'GET /accounts/zero-balance/:uuid': zeroBalance,
-  'GET /budgets/periods/:uuid/envelope-transfers': [],
-  // The household's time zone, for which month is today's (useBudgetPeriodSelection).
-  'GET /settings/general': [],
-  ...overrides,
-});
+const routes = (overrides: Parameters<typeof mockApi>[0] = {}) => {
+  const answers = {
+    'GET /budgets/periods': [october],
+    'GET /budgets/periods/:uuid/items': { success: true, data: items },
+    'GET /accounts': accountsResponse([envelopeAccount]),
+    'GET /accounts/zero-balance/:uuid': zeroBalance,
+    'GET /budgets/periods/:uuid/envelope-transfers': [],
+    // The household's time zone, for which month is today's (useBudgetPeriodSelection).
+    'GET /settings/general': [],
+    ...overrides,
+  };
+  // The envelope account's money through the period: its balance in the accounts answer,
+  // unless a test answers this itself.
+  return { 'GET /budgets/periods/:uuid/envelope-balance': envelopeBalanceFrom(answers['GET /accounts']), ...answers };
+};
 
 const renderPage = () => renderWithProviders(<Theme><CloseOutPage /></Theme>, { route: '/close-out?period=2026-10' });
 
@@ -176,7 +182,7 @@ describe('CloseOutPage', () => {
       renderPage();
 
       expect(await screen.findByText('Record unbudgeted income (e.g. interest), or withdraw the excess from Reserve savings')).toBeInTheDocument();
-      expect(line('Actual Envelope Balance')).toBe('Actual Envelope Balance$1,880.91Reserve savings');
+      expect(line('Actual Envelope Balance')).toBe(`Actual Envelope Balance$1,880.91Reserve savings, through ${october.name}`);
       expect(line('Expected Budget Balance')).toBe('Expected Budget Balance$850.603 envelope items');
       expect(line('Variance')).toBe('Variance$1,030.31');
       // What the page worked out, exactly: in floats it was 850.5999999999999 and
@@ -204,6 +210,8 @@ describe('CloseOutPage', () => {
       expect(body.amount).toBe(1030.31);
       expect(String(body.amount)).toMatch(/^\d+(\.\d{1,2})?$/);
       expect(body).toMatchObject({ source_account_id: longTerm.id, destination_account_id: checking.id, type: 'transfer' });
+      // Dated today and filed under October: the money through October counts it, whatever its date.
+      expect(body).toMatchObject({ transaction_date: todayLocal(), budget_period_id: october.id });
       expect(transferCreateSchema.safeParse(body).success).toBe(true);
     });
 
@@ -339,6 +347,28 @@ describe('CloseOutPage', () => {
     });
   });
 
+  // The envelopes count what is filed under the period and those before it; the account's balance
+  // today made a past month disagree by everything since.
+  it("reconciles against the envelope account's money through the period, not its balance today", async () => {
+    // Today the account has $200.00; through October, $250.00, which is what the envelopes hold.
+    api = mockApi(routes({
+      'GET /budgets/periods/:uuid/envelope-balance': { success: true, data: { accounts: [{ uuid: envelopeAccount.uuid, balance: 250 }] } },
+    }));
+    renderPage();
+
+    expect(await screen.findByText('Perfectly balanced!')).toBeInTheDocument();
+    expect(line('Actual Envelope Balance')).toBe(`Actual Envelope Balance$250.00Envelope savings, through ${october.name}`);
+    expect(api.calls('GET /budgets/periods/:uuid/envelope-balance').map((call) => call.params.uuid)).toContain(october.uuid);
+  });
+
+  it("says the balance is unavailable when the period's answer lacks the envelope account", async () => {
+    api = mockApi(routes({ 'GET /budgets/periods/:uuid/envelope-balance': { success: true, data: { accounts: [] } } }));
+    renderPage();
+
+    expect(await screen.findByText('Envelope account balance unavailable')).toBeInTheDocument();
+    expect(screen.queryByText(/^Deposit .* into Envelope savings$/)).toBeNull();
+  });
+
   it('skips the reconciliation, and says why, when the envelope balance is unavailable', async () => {
     api = mockApi(routes({
       'GET /accounts': accountsResponse([{ ...envelopeAccount, calculated_balance: null, balance_unavailable: true }]),
@@ -403,6 +433,7 @@ describe('CloseOutPage', () => {
         await accountsLoaded;
         return accountsResponse([envelopeAccount]);
       },
+      'GET /budgets/periods/:uuid/envelope-balance': envelopeBalanceFrom(accountsResponse([envelopeAccount])),
     }));
     renderPage();
 

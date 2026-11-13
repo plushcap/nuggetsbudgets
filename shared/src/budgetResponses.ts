@@ -423,6 +423,20 @@ export const envelopeTransfersResponseSchema = z.object({
 });
 export type EnvelopeTransferData = z.infer<typeof envelopeTransfersResponseSchema>['data'];
 
+/**
+ * GET /api/budgets/periods/:uuid/envelope-balance (`data`): each envelope account's money
+ * through the period, counted as its envelopes are (by the period a transaction is filed
+ * under), which Close-Out and the Budget page reconcile them against. Not the account's
+ * balance today.
+ */
+export const envelopeBalanceResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.object({
+    accounts: z.array(z.object({ uuid: z.uuid(), balance: responseAmount })),
+  }),
+});
+export type EnvelopeBalanceData = z.infer<typeof envelopeBalanceResponseSchema>['data'];
+
 /** PUT /api/budgets/period-items/:uuid/budget: the budget event recorded (the difference from the budget before). */
 export const budgetAmountUpdatedResponseSchema = z.object({
   success: z.literal(true),

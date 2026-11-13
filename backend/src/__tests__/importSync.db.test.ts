@@ -766,9 +766,9 @@ describe('SimpleFin sync', () => {
       it('adjusts only by the drift the feed leaves unexplained, sync after sync, and counts the row once it is saved', async () => {
         const account = await linkedAccount('rebalance-failed-row', { rebalance: true });
         const opening = { id: `RF1-${stamp}`, amount: '1000.00', description: 'DEPOSIT', posted: daysAgo(9) };
-        // Older than the 4 days an import is linked to a manual entry of its amount across, or
-        // the row coming in later would take over an adjustment of its amount.
-        const fee = { id: `RF2-${stamp}`, amount: '-40.00', description: 'FEE', posted: daysAgo(7) };
+        // Dated before the 7 days a manual entry of its amount may precede it by: nothing in the
+        // ledger is taken for it.
+        const fee = { id: `RF2-${stamp}`, amount: '-40.00', description: 'FEE', posted: daysAgo(8) };
         // The bank's balance has the fee in it, and a 5.00 charge the feed never lists. Compared
         // whole, the rebalance booked -45.00, then +40.00 once the fee came in; skipped while a
         // row failed, the account never rebalanced at all, and the 5.00 stayed uncorrected.
@@ -916,7 +916,7 @@ describe('SimpleFin sync', () => {
           expect((await lastSyncLog()).error_message).not.toContain(notAdjusted);
         }
 
-        // An entry of its amount within 4 days of the feed's days could be it: not compared.
+        // An entry of its amount near the feed's days could be it: not compared.
         const near = await linkedAccount('rebalance-failed-near-manual', { rebalance: true });
         feed = accountSet([{ id: near.importId, balance: '1000.00', transactions: [{ ...opening, id: `RN3-${stamp}` }] }]);
         await fullSync();
@@ -931,7 +931,7 @@ describe('SimpleFin sync', () => {
         expect((await lastSyncLog()).error_message).toContain(notAdjusted);
       });
 
-      // The window started 4 days before the feed's earliest dated row, so a
+      // The window started a match window before the feed's earliest dated row, so a
       // dateless row older than it (a fee 20 days back, the deposit 3) missed its own copy
       // entered by hand: +40.00 on the failing sync, -40.00 once it was saved and linked.
       it('starts the window at the start-date SimpleFin was asked for, when the ledger sets one', async () => {

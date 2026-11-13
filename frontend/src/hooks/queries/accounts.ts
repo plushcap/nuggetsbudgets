@@ -9,7 +9,7 @@ import {
   updateAccountImportSettings,
   adjustAccountBalance,
 } from '../../services/api';
-import { accountKeys, netWorthKeys } from './keys';
+import { accountKeys, budgetKeys, netWorthKeys } from './keys';
 import { invalidateTransactionData, useKeepPreviousLedgerData } from './invalidation';
 
 type QueryOverrides = {
@@ -99,6 +99,9 @@ export function useUpdateAccountWithImageMutation() {
       void queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
       void queryClient.invalidateQueries({ queryKey: accountKeys.detail(uuid) });
       void queryClient.invalidateQueries({ queryKey: netWorthKeys.all });
+      // Which account is the envelope account, and whether it is hidden or closed, decide the
+      // envelope accounts' money through a period (Close-Out, the Budget page).
+      void queryClient.invalidateQueries({ queryKey: [...budgetKeys.all, 'envelopeBalance'] });
     },
   });
 }

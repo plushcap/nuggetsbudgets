@@ -130,6 +130,7 @@ member          GET    /api/budgets/items/:uuid/usage
 member          PUT    /api/budgets/period-items/:uuid/budget
 member          GET    /api/budgets/periods
 member          POST   /api/budgets/periods
+member          GET    /api/budgets/periods/:uuid/envelope-balance
 member          GET    /api/budgets/periods/:uuid/envelope-transfers
 member          GET    /api/budgets/periods/:uuid/items
 member          GET    /api/budgets/periods/:uuid/summary

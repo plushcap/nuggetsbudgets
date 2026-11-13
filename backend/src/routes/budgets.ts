@@ -21,6 +21,7 @@ import {
   budgetPeriodItems,
   budgetPeriodSummary,
   envelopeTransfers,
+  envelopeBalanceThroughPeriod,
   listBudgetPeriods,
 } from '../services/budgetPeriods/BudgetPeriodReads.js';
 import { createLogger } from '../utils/logger.js';
@@ -146,6 +147,11 @@ export function createBudgetRoutes(): Router {
   // Get envelope account transfers for a budget period
   router.get('/periods/:uuid/envelope-transfers', tenantHandler(async (req: AuthenticatedRequest, res) => {
     res.json({ success: true, data: await envelopeTransfers(String(req.params.uuid)) });
+  }));
+
+  // Each envelope account's money through a budget period, as its envelopes count it
+  router.get('/periods/:uuid/envelope-balance', tenantHandler(async (req: AuthenticatedRequest, res) => {
+    res.json({ success: true, data: await envelopeBalanceThroughPeriod(String(req.params.uuid)) });
   }));
 
   // ====================================================================

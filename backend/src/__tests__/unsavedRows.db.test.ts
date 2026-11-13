@@ -63,7 +63,7 @@ describe('unsavedRows', () => {
       // The nearest is reconciled: the import adds it beside that one, so the ledger hasn't
       // got it, though a farther entry of its amount isn't reconciled.
       tx('C', '-30.00', second(1)),
-      // No entry of its amount within 4 days.
+      // No entry of its amount within 7 days.
       tx('D', '-25.00', second(2)),
       // Saved by an earlier sync (the import would update it).
       tx('OWN-1', '-12.50', 0),
@@ -96,7 +96,7 @@ describe('unsavedRows', () => {
   });
 
   it("can't tell, for a row with no date, whether it is an unreconciled manual entry of its amount near the feed's days", async () => {
-    // The feed's dated rows span 2026-10-10 to 2026-10-20 (dayOf): an entry from 4 days before
+    // The feed's dated rows span 2026-10-10 to 2026-10-20 (dayOf): an entry from 7 days before
     // its first to 4 days after its last (or today) could be the row.
     await insert({ amount: '-61.00', date: '2026-10-06' });
     await insert({ amount: '-62.00', date: '2026-10-15', status: 'reconciled' });
@@ -109,7 +109,8 @@ describe('unsavedRows', () => {
   // An entry of the amount anywhere in the account's history kept the rebalance
   // off for as long as the row failed.
   it('leaves a dateless row out of the bank side alone when the entries of its amount are far from the feed', async () => {
-    await insert({ amount: '-63.00', date: '2026-10-05' });
+    // 8 days before the feed's first dated row (2026-10-10): just outside the 7-day window.
+    await insert({ amount: '-63.00', date: '2026-10-02' });
     await insert({ amount: '-63.00', date: '2025-01-15' });
     expect(await run([tx('J', '-63.00', second(1) * 1000)])).toEqual({ count: 1, bankCents: -6300, standInIds: [], undecidable: false });
     // A feed with no dated row bounds nothing: any entry of the amount could be it.
@@ -137,17 +138,17 @@ describe('unsavedRows', () => {
     expect(past).toEqual({ count: 1, bankCents: -6400, standInIds: [earlier], undecidable: false });
   });
 
-  // With no start-date the window began 4 days before the feed's first dated
+  // With no start-date the window began a match window before the feed's first dated
   // row; asked from one, SimpleFin's rows posted from then on, so the window begins there.
   it('starts a dateless row\'s window at the start-date asked for, a pending lag before it', async () => {
     await insert({ amount: '-65.00', date: '2026-09-25' });
     await insert({ amount: '-67.00', date: '2026-09-01' });
     const withStart = (amount: string) =>
       withTenant(tenant.tenantId, () => unsavedRows(accountId, [tx('N', amount, second(1) * 1000)], dayOf, new Map(), '2026-10-01'));
-    // 2026-10-01 less 5 days' pending lag, less the 4-day window: from 2026-09-22.
+    // 2026-10-01 less 5 days' pending lag, less the 7-day window: from 2026-09-19.
     expect(await withStart('-65.00')).toMatchObject({ undecidable: true });
     expect(await withStart('-67.00')).toEqual({ count: 1, bankCents: -6700, standInIds: [], undecidable: false });
-    // Without the start, the window starts at the feed's first dated row (2026-10-10) less 4.
+    // Without the start, the window starts at the feed's first dated row (2026-10-10) less 7: from 2026-10-03.
     expect(await run([tx('O', '-65.00', second(1) * 1000)])).toEqual({ count: 1, bankCents: -6500, standInIds: [], undecidable: false });
     // A start and no dated row: from the start to today.
     const startOnly = await withTenant(tenant.tenantId, () =>
@@ -174,6 +175,102 @@ describe('unsavedRows', () => {
     expect(picked?.id).toBe(lower);
     const near = await withTenant(tenant.tenantId, () => manualEntriesNear(accountId, [{ amount: '-66.00', day }]));
     expect(near.map((entry) => entry.id)).toEqual([lower, higher]);
+  });
+
+  // A transfer entered the day it is sent can post five business days later, over a weekend:
+  // an entry up to 7 days before an import's day is linked, one 8 days before isn't. After
+  // it, 4 days: a week would take next week's payment of the amount, entered early.
+  it('links an entry from 7 days before the import to 4 after, and none farther', async () => {
+    const day = '2026-08-20';
+    const weekBefore = await insert({ amount: '-71.00', date: '2026-08-13' });
+    const fourAfter = await insert({ amount: '-73.00', date: '2026-08-24' });
+    await insert({ amount: '-72.00', date: '2026-08-12' });
+    await insert({ amount: '-72.00', date: '2026-08-25' });
+    const linked = (amount: string) =>
+      withTenant(tenant.tenantId, () => findManualTransactionMatch(accountId, amount, day, (fn) => fn()));
+    const near = (amount: string) =>
+      withTenant(tenant.tenantId, () => manualEntriesNear(accountId, [{ amount, day }]));
+    expect((await linked('-71.00'))?.id).toBe(weekBefore);
+    expect((await linked('-73.00'))?.id).toBe(fourAfter);
+    expect(await linked('-72.00')).toBeNull();
+    expect((await near('-71.00')).map((entry) => entry.id)).toEqual([weekBefore]);
+    expect((await near('-73.00')).map((entry) => entry.id)).toEqual([fourAfter]);
+    expect(await near('-72.00')).toEqual([]);
+  });
+
+  // The sync dates a balance adjustment the day it runs: an unrelated bank row of its amount a
+  // week later took it over, and the next rebalance booked it again. An adjustment keeps the
+  // 4 days either side it had.
+  it('links a balance adjustment only within 4 days either side of the import', async () => {
+    const adjustment = async (amount: string, date: string) =>
+      (await tenant.pool.query<{ id: number }>(
+        `INSERT INTO transactions (account_id, amount, description, transaction_date, type, status)
+         VALUES ($1, $2, 'Adjusted to match', $3::date, 'balance adjustment', 'cleared') RETURNING id`,
+        [accountId, amount, date])).rows[0].id;
+    const day = '2026-06-20';
+    const fourBefore = await adjustment('-81.00', '2026-06-16');
+    const threeAfter = await adjustment('-82.00', '2026-06-23');
+    await adjustment('-83.00', '2026-06-14');
+    // An entry by hand of the same amount and day is linked: only the adjustment keeps 4.
+    const entry = await insert({ amount: '-84.00', date: '2026-06-14' });
+    const linked = (amount: string) =>
+      withTenant(tenant.tenantId, () => findManualTransactionMatch(accountId, amount, day, (fn) => fn()));
+    const near = (amount: string) =>
+      withTenant(tenant.tenantId, () => manualEntriesNear(accountId, [{ amount, day }]));
+    expect((await linked('-81.00'))?.id).toBe(fourBefore);
+    expect((await linked('-82.00'))?.id).toBe(threeAfter);
+    expect(await linked('-83.00')).toBeNull();
+    expect(await near('-83.00')).toEqual([]);
+    expect((await linked('-84.00'))?.id).toBe(entry);
+  });
+
+  // A bank row linked to a split's part dropped out of the balance (the parent carries the
+  // money), and one linked to a side of a move between budget periods left the bank's money
+  // out the same way. Neither is ever at the bank.
+  it("links no bank row to a split's part or to a side of a move between periods", async () => {
+    // A split, its parent and parts in one statement (the database checks they add up).
+    const { rows: [parent] } = await tenant.pool.query<{ id: number }>(
+      `WITH parent AS (
+         INSERT INTO transactions (account_id, amount, transaction_date, type, is_split_parent, description)
+         VALUES ($1, -101, '2026-07-10', 'expense', true, 'Split') RETURNING id
+       ), parts AS (
+         INSERT INTO transactions (account_id, amount, transaction_date, type, parent_transaction_id, description)
+         SELECT $1, v.amount, '2026-07-10', 'expense', parent.id, 'Part'
+           FROM parent, (VALUES (-60::numeric), (-41::numeric)) AS v(amount)
+       )
+       SELECT id FROM parent`,
+      [accountId]
+    );
+    // A move between periods: two sides of the same account, pointing at each other.
+    const client = await tenant.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const out = (await client.query<{ id: number }>(
+        `INSERT INTO transactions (account_id, amount, transaction_date, type, description)
+         VALUES ($1, -52, '2026-07-31', 'transfer', 'Moved') RETURNING id`, [accountId])).rows[0].id;
+      const into = (await client.query<{ id: number }>(
+        `INSERT INTO transactions (account_id, amount, transaction_date, type, description, transfer_transaction_id, transfer_source_account_id)
+         VALUES ($1, 52, '2026-08-01', 'transfer', 'Moved', $2, $1) RETURNING id`, [accountId, out])).rows[0].id;
+      await client.query('UPDATE transactions SET transfer_transaction_id = $1 WHERE id = $2', [into, out]);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+    const linked = (amount: string, day: string) =>
+      withTenant(tenant.tenantId, () => findManualTransactionMatch(accountId, amount, day, (fn) => fn()));
+    const near = (amount: string, day: string) =>
+      withTenant(tenant.tenantId, () => manualEntriesNear(accountId, [{ amount, day }]));
+    expect(await linked('-41.00', '2026-07-12')).toBeNull();
+    expect(await near('-41.00', '2026-07-12')).toEqual([]);
+    // The split's parent, which carries the money, still is.
+    expect((await linked('-101.00', '2026-07-12'))?.id).toBe(parent.id);
+    for (const [amount, day] of [['52.00', '2026-08-03'], ['-52.00', '2026-08-02']]) {
+      expect(await linked(amount, day), amount).toBeNull();
+      expect(await near(amount, day), amount).toEqual([]);
+    }
   });
 
   // The window's end was worked out in JavaScript, and 4 days past a day near

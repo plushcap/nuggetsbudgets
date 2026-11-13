@@ -134,6 +134,24 @@ export function account(overrides: Partial<AccountWire> & { id: number; name: st
 /** GET /accounts answers `{ accounts: [...] }`. */
 export const accountsResponse = (accounts: AccountWire[]) => ({ accounts });
 
+/**
+ * GET /budgets/periods/:uuid/envelope-balance, made from an accounts answer: each envelope
+ * account's money through the period, here its balance in that answer (a test that tells the two
+ * apart answers this route itself). An envelope account without a balance is left out, which the
+ * page shows as unavailable.
+ */
+export const envelopeBalanceFrom = (answer: unknown) => {
+  const accounts = (answer as { accounts?: AccountWire[] } | null)?.accounts ?? [];
+  return {
+    success: true,
+    data: {
+      accounts: accounts
+        .filter((row) => row.is_envelope_account && row.calculated_balance != null)
+        .map((row) => ({ uuid: row.uuid, balance: row.calculated_balance })),
+    },
+  };
+};
+
 // --- budgets ----------------------------------------------------------------
 
 export type BudgetPeriodWire = z.input<typeof budgetPeriodResponseSchema>;

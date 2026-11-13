@@ -253,8 +253,9 @@ export interface ReconciledAccount {
 /**
  * The envelope accounts' money against what the envelopes should hold: the expected balance
  * is the envelope items' remaining (rollover and all), the actual one the envelope accounts'
- * balances, as the Budget page's Envelope Comparison adds them (future-period activity
- * is not backed out). Balanced is exactly 0 cents of variance (float sums made $1,030.31
+ * `calculated_balance` as the caller gives it: Close-Out and the Budget page give each one's
+ * money through the period (GET /budgets/periods/:uuid/envelope-balance), counted as the
+ * envelopes are, by the period a transaction is filed under. Balanced is exactly 0 cents of variance (float sums made $1,030.31
  * 1030.3100000000002). null without an envelope account or items, or when an envelope account's
  * balance is unavailable (never compared against $0).
  */
