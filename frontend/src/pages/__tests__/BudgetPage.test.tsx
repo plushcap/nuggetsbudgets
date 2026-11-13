@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import { apiError, labelledLine, mockApi } from '../../test/apiServer';
-import { account, accountsResponse, budgetPeriod, budgetPeriodItem, uuidFor, type BudgetPeriodItemWire } from '../../test/fixtures';
+import { account, accountsResponse, budgetPeriod, budgetPeriodItem, envelopeBalanceFrom, uuidFor, type BudgetPeriodItemWire } from '../../test/fixtures';
 import BudgetPage from '../BudgetPage';
 
 /**
@@ -48,20 +48,25 @@ const seed = (): BudgetPeriodItemWire[] => [
 let items: BudgetPeriodItemWire[];
 let api: ReturnType<typeof mockApi>;
 
-const routes = (overrides: Parameters<typeof mockApi>[0] = {}) => ({
-  'GET /budgets/periods': [october],
-  'GET /budgets/items': [],
-  // The household's time zone, for which month is today's (useBudgetPeriodSelection).
-  'GET /settings/general': [],
-  'GET /accounts': accountsResponse([]),
-  'GET /budgets/periods/:uuid/items': () => ({ success: true, data: items }),
-  'PUT /budgets/period-items/:uuid/budget': ({ params, body }: { params: Record<string, string>; body: unknown }) => {
-    const amount = (body as { amount: number }).amount;
-    items = items.map((item) => (item.uuid === params.uuid ? { ...item, calculated_budget: amount.toFixed(2) } : item));
-    return { success: true, eventUuid: uuidFor(15, 1) };
-  },
-  ...overrides,
-});
+const routes = (overrides: Parameters<typeof mockApi>[0] = {}) => {
+  const answers = {
+    'GET /budgets/periods': [october],
+    'GET /budgets/items': [],
+    // The household's time zone, for which month is today's (useBudgetPeriodSelection).
+    'GET /settings/general': [],
+    'GET /accounts': accountsResponse([]),
+    'GET /budgets/periods/:uuid/items': () => ({ success: true, data: items }),
+    'PUT /budgets/period-items/:uuid/budget': ({ params, body }: { params: Record<string, string>; body: unknown }) => {
+      const amount = (body as { amount: number }).amount;
+      items = items.map((item) => (item.uuid === params.uuid ? { ...item, calculated_budget: amount.toFixed(2) } : item));
+      return { success: true, eventUuid: uuidFor(15, 1) };
+    },
+    ...overrides,
+  };
+  // The envelope accounts' money through the period: their balances in the accounts answer,
+  // unless a test answers this itself.
+  return { 'GET /budgets/periods/:uuid/envelope-balance': envelopeBalanceFrom(answers['GET /accounts']), ...answers };
+};
 
 const renderPage = () =>
   renderWithProviders(<Theme><BudgetPage /></Theme>, { route: '/budgets?period=2026-10' });

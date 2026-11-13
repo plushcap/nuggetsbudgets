@@ -7,7 +7,7 @@ import {
   getBudgetItemMatchingRules, getBudgetItemMatchingRulesByBudgetItem,
   createBudgetItemMatchingRule, updateBudgetItemMatchingRule, deleteBudgetItemMatchingRule,
   getBudgetItemActivity, getBudgetItemTransactions,
-  getBudgetPeriodsManagement, createManagedBudgetPeriod, getEnvelopeTransfers, archiveBudgetPeriod, restoreBudgetPeriod,
+  getBudgetPeriodsManagement, createManagedBudgetPeriod, getEnvelopeTransfers, getEnvelopeBalance, archiveBudgetPeriod, restoreBudgetPeriod,
 } from '../../services/api';
 import { budgetKeys } from './keys';
 import { invalidateTransactionData } from './invalidation';
@@ -29,6 +29,15 @@ export function useEnvelopeTransfersQuery(periodUuid: string | undefined, option
   return useQuery({
     queryKey: [...budgetKeys.all, 'envelopeTransfers', periodUuid ?? ''],
     queryFn: () => getEnvelopeTransfers(periodUuid as string),
+    enabled: !!periodUuid,
+    ...options,
+  });
+}
+/** Each envelope account's money through a period, as its envelopes count it. Under budgetKeys: a transaction write refreshes it. */
+export function useEnvelopeBalanceQuery(periodUuid: string | undefined, options?: QueryOverrides) {
+  return useQuery({
+    queryKey: [...budgetKeys.all, 'envelopeBalance', periodUuid ?? ''],
+    queryFn: () => getEnvelopeBalance(periodUuid as string),
     enabled: !!periodUuid,
     ...options,
   });

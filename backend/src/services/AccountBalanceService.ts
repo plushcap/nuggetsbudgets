@@ -44,20 +44,16 @@ class AccountBalanceService {
     }
 
     /**
-     * Current balances for many accounts in one query, or with `asOf` (YYYY-MM-DD) the
-     * balances at the end of that day. Every requested id is in the map (an account the
-     * tenant can't see, or with no transactions, is 0). Throws if the query fails; callers
-     * show the balances as unavailable.
+     * Current balances for many accounts in one query. Every requested id is in
+     * the map (an account the tenant can't see, or with no transactions, is 0).
+     * Throws if the query fails; callers show the balances as unavailable.
      */
-    async getBalances(accountIds: number[], asOf?: string): Promise<Map<number, number>> {
+    async getBalances(accountIds: number[]): Promise<Map<number, number>> {
         const balances = new Map<number, number>();
         if (accountIds.length === 0) return balances;
         const ids = [...new Set(accountIds)];
-        const balance = asOf === undefined
-            ? sql`calculate_account_balance(u.account_id)`
-            : sql`calculate_account_balance_as_of(u.account_id, ${asOf}::date)`;
         const result = await sql<{ account_id: number; balance: string }>`
-            SELECT u.account_id, ${balance} AS balance
+            SELECT u.account_id, calculate_account_balance(u.account_id) AS balance
               FROM UNNEST(${ids}::int[]) AS u(account_id)
         `.execute(getDb());
         for (const row of result.rows) {
@@ -71,9 +67,9 @@ class AccountBalanceService {
      * caller renders "unavailable", never $0). Runs in a savepoint so a database
      * error doesn't abort the request's transaction.
      */
-    async tryGetBalances(accountIds: number[], asOf?: string): Promise<Map<number, number> | null> {
+    async tryGetBalances(accountIds: number[]): Promise<Map<number, number> | null> {
         try {
-            return await withSavepoint(() => this.getBalances(accountIds, asOf));
+            return await withSavepoint(() => this.getBalances(accountIds));
         } catch (err) {
             logger.error({ err, accountCount: accountIds.length }, 'Failed to compute account balances');
             return null;

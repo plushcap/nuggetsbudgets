@@ -67,12 +67,11 @@ export function createAccountsRoutes(): Router {
 
   // Get all accounts
   router.get('/', validateQuery(accountListQuery), tenantHandler(async (req, res) => {
-    const { include_hidden, exclude_closed, exclude_balance, as_of } = parsedQuery(req, accountListQuery);
+    const { include_hidden, exclude_closed, exclude_balance } = parsedQuery(req, accountListQuery);
     const accounts = await listAccounts({
       includeHidden: include_hidden,
       excludeClosed: exclude_closed,
       excludeBalance: exclude_balance,
-      asOf: as_of,
     });
     res.status(200).json({ accounts });
   }));

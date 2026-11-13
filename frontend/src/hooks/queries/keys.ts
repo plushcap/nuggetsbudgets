@@ -23,8 +23,6 @@ export const accountKeys = {
   all: ['accounts'] as const,
   lists: () => [...accountKeys.all, 'list'] as const,
   list: (showHidden: boolean) => [...accountKeys.lists(), { showHidden }] as const,
-  /** The accounts with their balances at the end of a day (Close-Out's month). */
-  listAsOf: (asOf: string) => [...accountKeys.lists(), { showHidden: false, asOf }] as const,
   details: () => [...accountKeys.all, 'detail'] as const,
   detail: (uuid: string) => [...accountKeys.details(), uuid] as const,
   balance: (uuid: string) => [...accountKeys.detail(uuid), 'balance'] as const,

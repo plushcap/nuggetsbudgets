@@ -24,12 +24,12 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
 
 ### Fixed
 
-- Close-Out's envelope reconciliation compares a month's envelopes with the envelope account's
-  balance at the end of that month (the date is shown under it). It used today's balance for
-  every month, so a past month showed a variance of everything that had moved since. Its
-  **Submit Transfer** dates a transfer for a month that has ended on that month's last day, so
-  the transfer counts in the month it balances. `GET /api/accounts` takes `as_of`
-  (YYYY-MM-DD) for the balances at the end of that day.
+- Close-Out's envelope reconciliation, and the Budget page's Envelope Comparison, compare a
+  month's envelopes with the envelope account's money through that month, counted as the
+  envelopes are: what is filed under that month or an earlier one, what is filed under none and
+  dated by its last day, and the opening balance. Both used the account's balance today for every
+  month, so a past month showed a variance of everything that had moved since. Close-Out says
+  which month the figure is through. `GET /api/budgets/periods/:uuid/envelope-balance` answers it.
 
 ## 3.1.0 (2026-11-13)
 

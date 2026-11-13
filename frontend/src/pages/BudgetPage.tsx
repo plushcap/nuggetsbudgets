@@ -4,7 +4,8 @@ import { Plus } from 'lucide-react';
 import { Box, Button, Card, Flex, Heading, Text } from '@radix-ui/themes';
 import { deriveBudgetSections, computeAllSubtotals } from './budgetPageCalcs';
 import type { BudgetPeriod, BudgetPeriodItem } from '../services/api';
-import { useAccountsQuery, useBudgetPeriodsQuery, useBudgetPeriodItemsQuery, useBudgetItemsQuery } from '../hooks/queries';
+import { useAccountsQuery, useBudgetPeriodsQuery, useBudgetPeriodItemsQuery, useBudgetItemsQuery, useEnvelopeBalanceQuery } from '../hooks/queries';
+import { withEnvelopeBalances } from '../utils/envelopeBalance';
 import { useBudgetPeriodSelection } from '../hooks/useBudgetPeriodSelection';
 import RetireBudgetItemDialog, { type RetiringItem } from '../components/budget/RetireBudgetItemDialog';
 import BudgetTransferModal from '../components/BudgetTransferModal';
@@ -52,6 +53,13 @@ const BudgetPage: React.FC = () => {
 
   // The period's items (refetched on a period change, and after a mutation's invalidation).
   const budgetPeriodItemsQuery = useBudgetPeriodItemsQuery(currentPeriod?.uuid);
+  // The envelope accounts' money through the period, as Close-Out reconciles it: their balance
+  // today made a past period's comparison disagree by everything since.
+  const envelopeBalanceQuery = useEnvelopeBalanceQuery(currentPeriod?.uuid);
+  const periodAccounts = useMemo(
+    () => withEnvelopeBalances(accounts, envelopeBalanceQuery.data?.data),
+    [accounts, envelopeBalanceQuery.data],
+  );
   const budgetPeriodItems = useMemo<BudgetPeriodItem[]>(
     () => (budgetPeriodItemsQuery.data?.success && Array.isArray(budgetPeriodItemsQuery.data.data) ? budgetPeriodItemsQuery.data.data : []),
     [budgetPeriodItemsQuery.data],
@@ -219,7 +227,9 @@ const BudgetPage: React.FC = () => {
               <>
                 <BudgetPlanCard income={subtotals.income.budget} expenses={subtotals.expense.budget} savings={subtotals.savings.budget} />
                 <BudgetActualCard items={budgetPeriodItems} />
-                {accounts.length > 0 && <EnvelopeComparisonCard items={budgetPeriodItems} accounts={accounts} />}
+                {accounts.length > 0 && !envelopeBalanceQuery.isLoading && (
+                  <EnvelopeComparisonCard items={budgetPeriodItems} accounts={periodAccounts} />
+                )}
               </>
             )}
           </Flex>

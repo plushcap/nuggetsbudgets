@@ -2,12 +2,13 @@ import React, { useState, useMemo } from 'react';
 import { budgetExpenseType, envelopeReconciliation, formatMoney } from '@nuggets/shared';
 import { type BudgetPeriodItem } from '../services/api';
 import {
-  useAccountsAsOfQuery,
   useAccountsQuery,
   useBudgetPeriodsQuery,
   useBudgetPeriodItemsQuery,
+  useEnvelopeBalanceQuery,
   useZeroBalanceAccountsQuery,
 } from '../hooks/queries';
+import { withEnvelopeBalances } from '../utils/envelopeBalance';
 import ZeroBalanceAccountsSection from '../components/closeout/ZeroBalanceAccountsSection';
 import EnvelopeReconciliationSection, { type EnvelopeUnavailable } from '../components/closeout/EnvelopeReconciliationSection';
 import EnvelopeSavingsTransferSection from '../components/closeout/EnvelopeSavingsTransferSection';
@@ -50,15 +51,18 @@ const CloseOutPage: React.FC = () => {
   const budgetItemsQuery = useBudgetPeriodItemsQuery(currentPeriod?.uuid);
   const accountsQuery = useAccountsQuery(false);
   const accounts = accountsQuery.data ?? EMPTY_LIST;
-  // The envelope account is reconciled at the end of the chosen month, as its envelopes are
-  // (their remaining counts that month and the ones before it): today's balance made a past
-  // month's figures disagree by everything since.
-  const periodEndQuery = useAccountsAsOfQuery(currentPeriod?.end_date);
-  const periodEndAccounts = periodEndQuery.data ?? EMPTY_LIST;
+  // The envelope account's side of the reconciliation: its money through the chosen period,
+  // counted as its envelopes are, by the period a transaction is filed under. Its balance today
+  // made a past month disagree by everything since.
+  const envelopeBalanceQuery = useEnvelopeBalanceQuery(currentPeriod?.uuid);
+  const periodAccounts = useMemo(
+    () => withEnvelopeBalances(accounts, envelopeBalanceQuery.data?.data),
+    [accounts, envelopeBalanceQuery.data],
+  );
   // The accounts count too: until they load, the envelope section would say that no
   // envelope account is configured.
   const loading = accountsQuery.isLoading
-    || (!!currentPeriod && (budgetItemsQuery.isLoading || zeroBalanceQuery.isLoading || periodEndQuery.isLoading));
+    || (!!currentPeriod && (budgetItemsQuery.isLoading || zeroBalanceQuery.isLoading || envelopeBalanceQuery.isLoading));
 
   const budgetPeriodItems: BudgetPeriodItem[] = useMemo(
     () => (budgetItemsQuery.data?.success && budgetItemsQuery.data.data ? budgetItemsQuery.data.data : []),
@@ -78,25 +82,26 @@ const CloseOutPage: React.FC = () => {
   // The envelope accounts' money against what the envelopes should hold: the same figures, in
   // whole cents, as the Budget page's Envelope Comparison (envelopeReconciliation, @nuggets/shared).
   // An unavailable envelope balance (null) skips it; the banner below says why.
-  const envelopeBalanceUnavailable = periodEndAccounts.some(a => a.is_envelope_account && a.calculated_balance == null);
+  const envelopeBalanceUnavailable = envelopeBalanceQuery.isSuccess
+    && periodAccounts.some(a => a.is_envelope_account && a.calculated_balance == null);
   const closeOutData = useMemo(
-    () => (currentPeriod && zeroBalanceData
-      ? { zero_balance: zeroBalanceData, envelope: envelopeReconciliation(budgetPeriodItems, periodEndAccounts) }
+    () => (currentPeriod && zeroBalanceData && envelopeBalanceQuery.isSuccess
+      ? { zero_balance: zeroBalanceData, envelope: envelopeReconciliation(budgetPeriodItems, periodAccounts) }
       : null),
-    [currentPeriod, zeroBalanceData, periodEndAccounts, budgetPeriodItems],
+    [currentPeriod, zeroBalanceData, envelopeBalanceQuery.isSuccess, periodAccounts, budgetPeriodItems],
   );
 
   // Surface query failures in the inline error banner, and the same reason in the envelope
   // section, which otherwise said no envelope account was configured. The accounts are
   // among them: without them there is no envelope account to find. A household with
   // none, whose other data failed, is still told it has none.
-  const loadFailed = zeroBalanceQuery.isError || budgetItemsQuery.isError || accountsQuery.isError || periodEndQuery.isError;
+  const loadFailed = zeroBalanceQuery.isError || budgetItemsQuery.isError || accountsQuery.isError || envelopeBalanceQuery.isError;
   const error = loadFailed
     ? 'Failed to load close-out data'
     : envelopeBalanceUnavailable
       ? 'Envelope account balance unavailable; envelope reconciliation skipped'
       : null;
-  const envelopeAccountMayExist = accountsQuery.isError || periodEndQuery.isError || accounts.some((a) => a.is_envelope_account);
+  const envelopeAccountMayExist = accountsQuery.isError || envelopeBalanceQuery.isError || accounts.some((a) => a.is_envelope_account);
   const envelopeUnavailable: EnvelopeUnavailable | null =
     loadFailed && envelopeAccountMayExist ? 'failed' : envelopeBalanceUnavailable ? 'balance' : null;
 

@@ -75,8 +75,6 @@ export interface AccountListFilters {
   excludeClosed: boolean;
   /** Leave out the accounts marked "exclude from balance". */
   excludeBalance: boolean;
-  /** The balances at the end of this day (YYYY-MM-DD), not today's. */
-  asOf?: string | undefined;
 }
 
 /** The ledger's accounts with their institution and balance, ordered by group and name. */
@@ -138,7 +136,7 @@ export async function listAccounts(filters: AccountListFilters) {
 
   // Every balance in one query. If it fails, the balances are
   // unavailable (null + balance_unavailable), never a silent $0.
-  const balances = await accountBalanceService.tryGetBalances(result.rows.map((a) => a.id), filters.asOf);
+  const balances = await accountBalanceService.tryGetBalances(result.rows.map((a) => a.id));
   return result.rows.map((account) => ({
     ...account,
     institution_balance: parseFloat(account.institution_current_balance ?? '') || 0,

@@ -34,6 +34,7 @@ import {
   budgetPeriodListResponseSchema,
   budgetPeriodManagedCreatedResponseSchema,
   budgetPeriodManagementResponseSchema,
+  envelopeBalanceResponseSchema,
   envelopeTransfersResponseSchema,
   messageResponseSchema,
   queryString,
@@ -43,6 +44,7 @@ import {
   type BudgetItemUsage,
   type BudgetPeriodsManagementResponse,
   type CreateManagedBudgetPeriodResult,
+  type EnvelopeBalanceData,
   type EnvelopeTransferData,
   type MergeBudgetItemInput,
 } from '@nuggets/shared';
@@ -60,6 +62,7 @@ export type {
   BudgetPeriodManagement,
   BudgetPeriodsManagementResponse,
   CreateManagedBudgetPeriodResult,
+  EnvelopeBalanceData,
   EnvelopeTransferData,
 } from '@nuggets/shared';
 
@@ -175,6 +178,18 @@ export const getEnvelopeTransfers = async (periodUuid: string): Promise<{ succes
     envelopeTransfersResponseSchema,
     await apiGet<unknown>(`/budgets/periods/${periodUuid}/envelope-transfers`),
     'envelope transfers',
+  );
+
+/**
+ * Each envelope account's money through a budget period, counted as its envelopes are (by the
+ * period a transaction is filed under), for the envelope reconciliation on Close-Out and the
+ * Budget page.
+ */
+export const getEnvelopeBalance = async (periodUuid: string): Promise<{ success: true; data: EnvelopeBalanceData }> =>
+  parseAnswer(
+    envelopeBalanceResponseSchema,
+    await apiGet<unknown>(`/budgets/periods/${periodUuid}/envelope-balance`),
+    'envelope balance',
   );
 
 // ====================================================================
