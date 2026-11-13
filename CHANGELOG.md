@@ -53,6 +53,13 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
 
 ### Changed
 
+- A bank transaction is linked to one entered by hand of the same amount when their dates are up
+  to 7 days apart; it was 4. A transfer entered the day it is sent can post five business days
+  later, over a weekend, and was added beside the manual entry instead of being linked to it. So
+  a transfer can be entered on the day it is sent (and left Pending): it counts in the balances,
+  and in Close-Out's envelope reconciliation, from that day. An entry made by hand of the same
+  amount within a week either side can now be taken for the bank's row; of two, the nearer one
+  is.
 - The main menu is reordered: Home, Budgets, Tasks, Close-Out, Goals, Bills, Accounts,
   Transactions, Agent Activity, Tags, Investments, then Reports, set apart. Dashboard is now
   **Home** and Activity **Agent Activity** in the menu, and Investments carries a small

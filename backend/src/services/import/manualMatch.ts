@@ -16,8 +16,11 @@ export interface ManualMatch {
   status: string;
 }
 
-/** How many days before or after an import's date a manual entry it's linked to may be dated. */
-const MATCH_WINDOW_DAYS = 4;
+/**
+ * How many days before or after an import's date a manual entry it's linked to may be dated. A
+ * week: a transfer entered the day it is sent can post five business days later, over a weekend.
+ */
+const MATCH_WINDOW_DAYS = 7;
 
 /**
  * A manually entered transaction, which an import may be linked to: not an import, with no
@@ -113,7 +116,7 @@ export async function hasManualEntryOfAmount(
 
 /**
  * Find potential manually entered transactions that match an imported transaction
- * Matches transactions within ±4 days of `day` (the imported transaction's
+ * Matches transactions within ±7 days (MATCH_WINDOW_DAYS) of `day` (the imported transaction's
  * calendar date, 'YYYY-MM-DD') with the exact same amount
  * Only matches transactions that are NOT imports (is_import = false or null)
  */
@@ -135,7 +138,7 @@ export async function findManualTransactionMatch(
         WHERE account_id = ${accountId}
           AND amount = ${amount}
           -- The window in SQL, as manualMatchCandidates and manualEntriesNear have it: worked
-          -- out in JavaScript, 4 days past a day near 9999-12-31 was "+010000-…", which Postgres
+          -- out in JavaScript, the window past a day near 9999-12-31 was "+010000-…", which Postgres
           -- refused, and the catch answered "no match" for an entry the sync had locked for it.
           AND transaction_date BETWEEN ${day}::date - ${MATCH_WINDOW_DAYS}::int AND ${day}::date + ${MATCH_WINDOW_DAYS}::int
           AND ${isManualEntry('transactions')}

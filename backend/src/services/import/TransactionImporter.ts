@@ -133,7 +133,7 @@ export class TransactionImporter {
    *  2. a pending row the bank replaced with this posted transaction under a new id
    *     (planPendingReplacements): updated in place, so its uuid, budget, tags and
    *     splits stay;
-   *  3. a manually entered transaction of the same amount within 4 days: linked;
+   *  3. a manually entered transaction of the same amount within 7 days: linked;
    *  4. nothing: inserted. (account_id, import_transaction_id) is unique for top-level
    *     rows, so the insert can't add a second copy of a row saved meanwhile.
    */
