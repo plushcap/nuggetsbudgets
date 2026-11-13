@@ -34,9 +34,10 @@ const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 function fencedLines(lines) {
   let open = null;
   return lines.map((line) => {
-    const fence = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    const fence = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
     if (open === null) {
-      if (fence) open = fence[1];
+      // A backtick fence's info string has no backtick (CommonMark): "``` a`b" is text.
+      if (fence && !(fence[1][0] === '`' && fence[2].includes('`'))) open = fence[1];
       return open !== null;
     }
     if (fence && fence[1][0] === open[0] && fence[1].length >= open.length && /^ {0,3}[`~]+\s*$/.test(line)) open = null;
@@ -79,32 +80,52 @@ export function demoteHeadings(markdown, levels) {
 /**
  * Paragraphs on one line each: the changelog wraps its lines at about 95 characters, which a
  * release description can show as a break in mid-sentence. Cautious: a line joins the one before
- * only when both are plain text. Never code (fenced, or indented four spaces), a list item, a
- * heading, a quote, a table, HTML, a rule or a hard break: those keep their line, which at worst
+ * only when both are text of a paragraph or list item. Never code (fenced, or indented code: four
+ * spaces after a blank line or more code, since it can't interrupt a paragraph), a new list item,
+ * a heading, a quote, a table, HTML, a rule or a hard break: those keep their line, which at worst
  * leaves a break where one was.
  */
+/**
+ * The HTML that can interrupt a paragraph (CommonMark's HTML blocks 1 to 6): a comment, a
+ * processing instruction, a declaration, CDATA, or a block-level tag. Any other tag at the start of
+ * a line (`<package>` in a wrapped command) carries the paragraph on.
+ */
+const htmlInterrupts =
+  /^\s{0,3}<(?:!--|\?|![A-Za-z]|!\[CDATA\[|\/?(?:script|pre|style|textarea|address|article|aside|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:\s|\/?>|$))/i;
+
 export function unwrap(markdown) {
   const lines = markdown.split('\n');
   const fenced = fencedLines(lines);
-  const special = (line) =>
-    /^\s*$/.test(line) ||
-    /^(?: {4,}|\t)/.test(line) ||
-    /^\s*(?:[-*+] |\d+[.)] |#{1,6} |>|<|\|)/.test(line) ||
+  const blank = (line) => /^\s*$/.test(line);
+  const indented = (line) => /^(?: {4,}|\t)/.test(line);
+  // Indented code: an indented line after a blank line or another such line, outside a fence.
+  const code = [];
+  lines.forEach((line, i) => {
+    code[i] = !fenced[i] && !blank(line) && indented(line) && (i === 0 || blank(lines[i - 1]) || code[i - 1] === true);
+  });
+  const opensBlock = (line) =>
+    /^\s*(?:[-*+] |\d+[.)] |#{1,6} |>|\|)/.test(line) ||
+    htmlInterrupts.test(line) ||
     line.includes('|') ||
     /^\s*(?:[-=_*]\s*){3,}$/.test(line) ||
     /^\s*=+\s*$/.test(line);
-  const hardBreak = (line) => / {2,}$/.test(line) || /\\$/.test(line);
+  const ends = (line) => / {2,}$/.test(line) || /\\$/.test(line);
   const out = [];
+  const kinds = [];
   lines.forEach((line, i) => {
     const previous = out[out.length - 1];
-    const startsItem = previous !== undefined && /^\s*(?:[-*+] |\d+[.)] )/.test(previous);
+    const previousKind = kinds[kinds.length - 1];
     const carriesOn =
-      i > 0 && !fenced[i] && !fenced[i - 1] && previous !== undefined &&
-      (!special(previous) || startsItem) && !/^\s*(?:#{1,6} |>|<|\|)/.test(previous) &&
-      !previous.includes('|') && !/^(?: {4,}|\t)/.test(previous) && !hardBreak(previous) &&
-      !special(line);
-    if (carriesOn) out[out.length - 1] = `${previous.trimEnd()} ${line.trim()}`;
-    else out.push(line);
+      i > 0 && previous !== undefined && previousKind === 'text' && !ends(previous) &&
+      !fenced[i] && !code[i] && !blank(line) && !opensBlock(line);
+    if (carriesOn) {
+      out[out.length - 1] = `${previous.trimEnd()} ${line.trim()}`;
+      return;
+    }
+    out.push(line);
+    // What a following line may join: a paragraph's or a list item's text.
+    const item = /^\s*(?:[-*+] |\d+[.)] )/.test(line);
+    kinds.push(!fenced[i] && !code[i] && !blank(line) && (item || !opensBlock(line)) && !line.includes('|') ? 'text' : 'other');
   });
   return out.join('\n');
 }
@@ -121,11 +142,10 @@ export function pullRequestList(generated) {
     .replace(/^## What's Changed\s*\n/, '')
     .trim();
   if (!body) return null;
-  return /^\s*[*-] /m.test(body) ? demoteHeadings(body, 2) : `None.\n\n${demoteHeadings(body, 2)}`;
+  // The pull requests are the list before any other heading (New Contributors) or the link.
+  const listed = body.split(/^(?:#{1,6} |\*\*Full Changelog\*\*)/m)[0] ?? '';
+  return /^\s*[*-] /m.test(listed) ? demoteHeadings(body, 2) : `None.\n\n${demoteHeadings(body, 2)}`;
 }
-
-/** The marker strings, taken apart in text that goes between them. */
-const defuseMarkers = (text) => text.replaceAll('<!-- release-notes:', '<!-- release&#8209;notes:');
 
 /**
  * The part, between the markers, for `version`; null when `strict` and the changelog has no
@@ -140,20 +160,21 @@ export function releaseNotesBlock(changelog, version, pullRequests = '', { stric
     parts.push(`_The changelog has no ${version} heading yet: these are its Unreleased entries at this release._`, '');
   }
   parts.push(entries ? demoteHeadings(unwrap(entries), 1) : `_The changelog lists nothing for ${version}._`);
+  const withoutPrs = parts.slice(1).join('\n');
   const prs = pullRequestList(pullRequests);
-  if (prs) parts.push('', '### Pull requests', '', prs);
-  let block = defuseMarkers(parts.slice(1).join('\n'));
-  if (block.length > MAX_BLOCK) {
-    block = `### What changed\n\n_Too long for this description: see ${version} in CHANGELOG.md._`;
-  }
+  let block = prs ? `${withoutPrs}\n\n### Pull requests\n\n${prs}` : withoutPrs;
+  // Too long for GitHub: the pull requests go first, then the entries give way to a link.
+  if (block.length > MAX_BLOCK) block = withoutPrs;
+  if (block.length > MAX_BLOCK) block = `### What changed\n\n_Too long for this description: see ${version} in CHANGELOG.md._`;
   return `${START}\n${block}\n${END}`;
 }
 
 /** The release description with `block` put in (see the top of this file). */
 export function mergeIntoDescription(description, block) {
   const text = description.replace(/\r\n/g, '\n');
-  // The first start and the last end: the part's own text can't hold a marker (it is defused),
-  // and nothing after the part (the images, the deploy notes) has one.
+  // The first start and the last end: the part's own text may quote a marker (a changelog entry
+  // about this script), but it opens with the real start, and nothing after the part (the images,
+  // the deploy notes) has one.
   const start = text.indexOf(START);
   const end = text.lastIndexOf(END);
   if (start !== -1 && end > start) {

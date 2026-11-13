@@ -107,17 +107,27 @@ test('wrapped lines join into one per paragraph; whatever else is in the way kee
     'a hard break\\\nnext',
     'text\n<details>',
     'text\n> quoted',
-    '- item\n    nested continuation',
+    '- item\n\n      indented code',
+    'text\n<!-- a comment -->',
   ];
   for (const text of kept) assert.equal(unwrap(text), text, JSON.stringify(text));
+  // A nested item's wrapped text, and a line merely starting with "<" (not a tag), join.
+  assert.equal(unwrap('- Outer\n  - **Nested:** which\n    wraps here.'), '- Outer\n  - **Nested:** which wraps here.');
+  assert.equal(unwrap('Waits for\n<5 minutes.'), 'Waits for <5 minutes.');
+  assert.equal(unwrap('run `npm ci -w\n<package>` there'), 'run `npm ci -w <package>` there');
+  assert.equal(unwrap('text\n<details>'), 'text\n<details>');
+  // A backtick fence's info string can't hold a backtick: this is text, which joins.
+  assert.equal(unwrap('``` a`b\nthen'), '``` a`b then');
 });
 
 test("GitHub's list of pull requests loses its own heading and comment, and moves down", () => {
   const generated = "## What's Changed\n* A change by someone\n\n## New Contributors\n* Someone\n\n**Full Changelog**: compare";
   assert.equal(pullRequestList(generated), '* A change by someone\n\n#### New Contributors\n* Someone\n\n**Full Changelog**: compare');
   assert.equal(pullRequestList(`<!-- Release notes generated using configuration in .github/release.yml -->\n\n${generated}`), pullRequestList(generated));
-  // None: it says so, and keeps the comparison link.
+  // None: it says so, and keeps the comparison link; new contributors aren't pull requests.
   assert.equal(pullRequestList('**Full Changelog**: compare'), 'None.\n\n**Full Changelog**: compare');
+  assert.equal(pullRequestList("## What's Changed\n## New Contributors\n* Someone\n\n**Full Changelog**: compare"),
+    'None.\n\n#### New Contributors\n* Someone\n\n**Full Changelog**: compare');
   assert.equal(pullRequestList(''), null);
   assert.equal(pullRequestList("## What's Changed\n"), null);
 });
@@ -147,8 +157,8 @@ test('a release cut before its heading was written takes the Unreleased entries,
 test("a marker in the changelog's text can't end the part early, run after run", () => {
   const tricky = `## 5.0.0 (2026-01-01)\n\n- Writes \`${END}\` and \`${START}\` into descriptions.\n- Second entry.\n`;
   const block = releaseNotesBlock(tricky, '5.0.0');
-  assert.equal(block.split(END).length, 2);
-  assert.equal(block.split(START).length, 2);
+  // Quoted as written (no stand-in characters in code), and the part still opens and closes once.
+  assert.ok(block.includes(`\`${END}\``) && block.startsWith(START) && block.endsWith(END));
   let description = '## Nuggets 5.0.0\n\nWhat changed: [CHANGELOG.md](https://example.invalid/c).\n\n### Deploy\nstuff';
   const once = mergeIntoDescription(description, block);
   for (let run = 0; run < 3; run++) description = mergeIntoDescription(description, block);
@@ -157,11 +167,16 @@ test("a marker in the changelog's text can't end the part early, run after run",
   assert.match(description, /### Deploy\nstuff$/);
 });
 
-test('a description too long for GitHub links to the changelog instead', () => {
+test('a description too long for GitHub drops the pull requests first, then links to the changelog', () => {
   const long = `## 6.0.0 (2026-01-01)\n\n${'- An entry.\n'.repeat(12_000)}`;
   const block = releaseNotesBlock(long, '6.0.0');
   assert.ok(block.length < 1000);
   assert.match(block, /Too long for this description: see 6\.0\.0 in CHANGELOG\.md/);
+  // A section that fits keeps its entries when its pull requests would push it over.
+  const fits = `## 6.1.0 (2026-01-01)\n\n${'- An entry.\n'.repeat(7_000)}`;
+  const prs = `## What's Changed\n${'* A change by someone\n'.repeat(3_000)}`;
+  const kept = releaseNotesBlock(fits, '6.1.0', prs);
+  assert.ok(kept.length <= 100_100 && kept.includes('- An entry.') && !kept.includes('Pull requests'));
 });
 
 test('the part goes into a description: over an earlier one, else the old link line, else under the heading', () => {

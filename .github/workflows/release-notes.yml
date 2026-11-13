@@ -84,6 +84,6 @@ jobs:
         {
           echo "### Release notes for $TAG"
           echo
-          echo "- From main's CHANGELOG.md, and the pull requests since ${previous:-(none: the first release)}."
+          echo "- From main's CHANGELOG.md, and the pull requests since ${previous:-(none: the first release, or a pre-release)}."
           echo "- The release: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG"
         } >> "$GITHUB_STEP_SUMMARY"
