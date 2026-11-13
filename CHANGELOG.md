@@ -57,7 +57,9 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
   before it; it was 4. A transfer entered the day it is sent can post five business days later,
   over a weekend, and was added beside the manual entry instead of being linked to it. An entry
   dated after the bank's transaction is still linked only up to 4 days after it, so next week's
-  payment of the same amount, entered early, isn't taken for this week's.
+  payment of the same amount, entered early, isn't taken for this week's; and a balance
+  adjustment the sync booked, only up to 4 days either side, so an unrelated bank transaction
+  of its amount a week later doesn't take it over.
 - A bank transaction is no longer linked to a part of a split transaction, or to a side of a
   move between budget periods. Neither is ever at the bank, and either link left the bank's
   transaction out of the balance.

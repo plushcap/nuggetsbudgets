@@ -766,8 +766,8 @@ describe('SimpleFin sync', () => {
       it('adjusts only by the drift the feed leaves unexplained, sync after sync, and counts the row once it is saved', async () => {
         const account = await linkedAccount('rebalance-failed-row', { rebalance: true });
         const opening = { id: `RF1-${stamp}`, amount: '1000.00', description: 'DEPOSIT', posted: daysAgo(9) };
-        // Older than the 7 days before an import a manual entry of its amount is linked across, or
-        // the row coming in later would take over an adjustment of its amount.
+        // Dated before the 7 days a manual entry of its amount may precede it by: nothing in the
+        // ledger is taken for it.
         const fee = { id: `RF2-${stamp}`, amount: '-40.00', description: 'FEE', posted: daysAgo(8) };
         // The bank's balance has the fee in it, and a 5.00 charge the feed never lists. Compared
         // whole, the rebalance booked -45.00, then +40.00 once the fee came in; skipped while a

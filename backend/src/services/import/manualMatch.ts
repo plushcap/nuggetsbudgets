@@ -41,10 +41,24 @@ function isManualEntry(table: string): RawBuilder<SqlBool> {
     AND ${column('import_transaction_id')} IS NULL
     AND ${column('type')} IS DISTINCT FROM ${sql.lit(transactionType.enum['starting balance'])}
     AND ${column('parent_transaction_id')} IS NULL
-    AND NOT EXISTS (
-      SELECT 1 FROM transactions pair
-       WHERE pair.id = ${column('transfer_transaction_id')}
-         AND pair.account_id = ${column('account_id')})`;
+    -- A scalar subquery, not NOT EXISTS: as an anti-join, the planner put the feed inside a
+    -- nested loop when the table's statistics lagged a bulk load (29 s on 100,000 rows).
+    AND (SELECT pair.account_id FROM transactions pair WHERE pair.id = ${column('transfer_transaction_id')})
+        IS DISTINCT FROM ${column('account_id')}`;
+}
+
+/**
+ * The days a manual entry may be dated in, for an import dated from `first` to `last`: from
+ * DAYS_BEFORE before to DAYS_AFTER after. A balance adjustment only DAYS_AFTER before: the
+ * sync dates one the day it runs, so an unrelated bank row a week later of the same amount
+ * would take it over, and the next rebalance book it again.
+ */
+function withinWindow(table: string, first: RawBuilder<unknown>, last: RawBuilder<unknown>): RawBuilder<SqlBool> {
+  const column = (name: string) => sql.ref(`${table}.${name}`);
+  return sql<SqlBool>`
+    ${column('transaction_date')} BETWEEN ${first} - ${DAYS_BEFORE}::int AND ${last} + ${DAYS_AFTER}::int
+    AND (${column('type')} IS DISTINCT FROM ${sql.lit(transactionType.enum['balance adjustment'])}
+         OR ${column('transaction_date')} >= ${first} - ${DAYS_AFTER}::int)`;
 }
 
 /**
@@ -66,7 +80,7 @@ export function manualMatchCandidates(accountId: number, imports: Array<{ amount
         FROM unnest(${imports.map((i) => i.amount)}::numeric[], ${imports.map((i) => i.day)}::date[]) AS feed(amount, day)
         JOIN transactions t
           ON t.account_id = ${accountId}
-         AND t.transaction_date BETWEEN feed.day - ${DAYS_BEFORE}::int AND feed.day + ${DAYS_AFTER}::int
+         AND ${withinWindow('t', sql`feed.day`, sql`feed.day`)}
          AND t.amount = feed.amount
        WHERE ${isManualEntry('t')}))`;
 }
@@ -89,7 +103,7 @@ export async function manualEntriesNear(
              WITH ORDINALITY AS feed(amount, day, i)
       JOIN transactions t
         ON t.account_id = ${accountId}
-       AND t.transaction_date BETWEEN feed.day - ${DAYS_BEFORE}::int AND feed.day + ${DAYS_AFTER}::int
+       AND ${withinWindow('t', sql`feed.day`, sql`feed.day`)}
        AND t.amount = feed.amount
      WHERE ${isManualEntry('t')}
      ORDER BY feed.i, ABS(t.transaction_date - feed.day), t.id
@@ -112,8 +126,7 @@ export async function hasManualEntryOfAmount(
 ): Promise<boolean> {
   if (amounts.length === 0) return false;
   const within = span
-    ? sql`AND t.transaction_date BETWEEN ${span.first}::date - ${DAYS_BEFORE}::int
-                                     AND GREATEST(${span.last}::date, app_today()) + ${DAYS_AFTER}::int`
+    ? sql`AND ${withinWindow('t', sql`${span.first}::date`, sql`GREATEST(${span.last}::date, app_today())`)}`
     : sql``;
   const result = await sql<{ found: boolean }>`
     SELECT EXISTS (
@@ -152,7 +165,7 @@ export async function findManualTransactionMatch(
           -- The window in SQL, as manualMatchCandidates and manualEntriesNear have it: worked
           -- out in JavaScript, the window past a day near 9999-12-31 was "+010000-…", which Postgres
           -- refused, and the catch answered "no match" for an entry the sync had locked for it.
-          AND transaction_date BETWEEN ${day}::date - ${DAYS_BEFORE}::int AND ${day}::date + ${DAYS_AFTER}::int
+          AND ${withinWindow('transactions', sql`${day}::date`, sql`${day}::date`)}
           AND ${isManualEntry('transactions')}
         -- id last, so of two as near the same one is linked every time, the one
         -- manualEntriesNear names.

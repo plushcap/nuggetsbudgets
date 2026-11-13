@@ -198,6 +198,32 @@ describe('unsavedRows', () => {
     expect(await near('-72.00')).toEqual([]);
   });
 
+  // The sync dates a balance adjustment the day it runs: an unrelated bank row of its amount a
+  // week later took it over, and the next rebalance booked it again. An adjustment keeps the
+  // 4 days either side it had.
+  it('links a balance adjustment only within 4 days either side of the import', async () => {
+    const adjustment = async (amount: string, date: string) =>
+      (await tenant.pool.query<{ id: number }>(
+        `INSERT INTO transactions (account_id, amount, description, transaction_date, type, status)
+         VALUES ($1, $2, 'Adjusted to match', $3::date, 'balance adjustment', 'cleared') RETURNING id`,
+        [accountId, amount, date])).rows[0].id;
+    const day = '2026-06-20';
+    const fourBefore = await adjustment('-81.00', '2026-06-16');
+    const threeAfter = await adjustment('-82.00', '2026-06-23');
+    await adjustment('-83.00', '2026-06-14');
+    // An entry by hand of the same amount and day is linked: only the adjustment keeps 4.
+    const entry = await insert({ amount: '-84.00', date: '2026-06-14' });
+    const linked = (amount: string) =>
+      withTenant(tenant.tenantId, () => findManualTransactionMatch(accountId, amount, day, (fn) => fn()));
+    const near = (amount: string) =>
+      withTenant(tenant.tenantId, () => manualEntriesNear(accountId, [{ amount, day }]));
+    expect((await linked('-81.00'))?.id).toBe(fourBefore);
+    expect((await linked('-82.00'))?.id).toBe(threeAfter);
+    expect(await linked('-83.00')).toBeNull();
+    expect(await near('-83.00')).toEqual([]);
+    expect((await linked('-84.00'))?.id).toBe(entry);
+  });
+
   // A bank row linked to a split's part dropped out of the balance (the parent carries the
   // money), and one linked to a side of a move between budget periods left the bank's money
   // out the same way. Neither is ever at the bank.
@@ -247,7 +273,7 @@ describe('unsavedRows', () => {
     }
   });
 
-  // The window's end was worked out in JavaScript, and 7 days past a day near
+  // The window's end was worked out in JavaScript, and 4 days past a day near
   // 9999-12-31 is in year 10000, "+010000-01-0…", which Postgres refused: the catch answered "no
   // match", so the import added the row beside the entry the sync had locked for it and the
   // rebalance (manualEntriesNear, in SQL) had left out as its stand-in.
