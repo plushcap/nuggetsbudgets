@@ -9,7 +9,7 @@
  *   node dist/scripts/restore.js <backup.tar.age> --verify --identity-file <file|->
  *   node dist/scripts/restore.js <backup.tar>     --yes    --decrypted
  *   node dist/scripts/restore.js <backup.enc>     --yes    [--key-file <file>]
- *   (any of them with [--signer <ed25519:…>] or [--allow-foreign])
+ *   (any of them with [--signer <ed25519:…>] or [--allow-foreign]; --yes also with [--ignore-current-database])
  *
  *   --verify         Restore into a scratch database, migrate and check it, report what it
  *                    holds, and drop it. Changes nothing; the app may keep running.
@@ -31,6 +31,15 @@
  *   --allow-foreign  Restore a backup this server didn't sign: one from another server or
  *                    one made before backups were signed. A backup's contents run on the
  *                    database, so only use this for a backup you trust.
+ *   --ignore-current-database
+ *                    Take nothing from the database being replaced. A restore normally keeps
+ *                    its sign-in state (locks, changed passwords, removed passkeys and admin
+ *                    roles), its backup keys and OneDrive connection; use this when it can't be
+ *                    read, or can't be trusted (someone with write access could have locked
+ *                    every admin). Sessions and tokens are still ended.
+ *
+ * A restore ends every session and personal access token, and refuses data with no deployment
+ * admin who can sign in: nothing on the server could make one afterwards.
  *
  * Exit status: 0 done, 1 failed or refused (nothing changed unless it says so), 2 usage.
  */
@@ -58,7 +67,8 @@ const USAGE =
   '  --identity-file  a .tar.age backup: your private key file (- reads it from standard input)\n' +
   '  --decrypted      the file is a backup you decrypted yourself (age -d), a .tar\n' +
   '  --key-file       an older .enc backup: the old backup key it was made with\n' +
-  "  --signer         also trust this signer's backups (the public key the Backup page shows)\n";
+  "  --signer         also trust this signer's backups (the public key the Backup page shows)\n" +
+  '  --ignore-current-database  with --yes: take nothing from the database being replaced\n';
 
 function parseArgs(argv: string[]) {
   const options = {
@@ -70,6 +80,7 @@ function parseArgs(argv: string[]) {
     verify: false,
     yes: false,
     allowForeign: false,
+    ignoreCurrentDatabase: false,
     help: false,
   };
   // One iterator, so an option can take the argument after it.
@@ -84,6 +95,7 @@ function parseArgs(argv: string[]) {
     if (arg === '--verify') options.verify = true;
     else if (arg === '--yes') options.yes = true;
     else if (arg === '--allow-foreign') options.allowForeign = true;
+    else if (arg === '--ignore-current-database') options.ignoreCurrentDatabase = true;
     else if (arg === '--decrypted') options.decrypted = true;
     else if (arg === '--help' || arg === '-h') options.help = true;
     else if ((given = value(arg, '--key-file')) !== null) options.keyFile = given || ' ';
@@ -123,6 +135,10 @@ if (!options.file || options.verify === options.yes || options.keyFile === ' ' |
   process.stderr.write(USAGE);
   process.exit(2);
 }
+if (options.ignoreCurrentDatabase && !options.yes) {
+  process.stderr.write('--ignore-current-database is for a restore (--yes): a --verify takes nothing from the database.\n' + USAGE);
+  process.exit(2);
+}
 if (options.decrypted && options.identityFile) {
   process.stderr.write('--decrypted takes a backup you decrypted already: it needs no --identity-file.\n' + USAGE);
   process.exit(2);
@@ -143,7 +159,8 @@ const { getDbLocation } = await import('../db/dbConfig.js');
 const { servingRolePassword } = await import('../db/servingRole.js');
 const { sessionOptions } = await import('../db/pgSession.js');
 const { handleConnectionErrors } = await import('../db/connectionErrors.js');
-const { BackupService, RestoreFailedError, RestoreRefusedError, assertBackupFileExists } = await import('../services/BackupService.js');
+const { BackupService, BackupInProgressError, RestoreFailedError, RestoreRefusedError, ShuttingDownError, assertBackupFileExists } = await import('../services/BackupService.js');
+const { publicErrorMessage } = await import('../utils/apiError.js');
 const { parseIdentityFile, parseSignerId } = await import('../utils/backupFormat.js');
 
 // A --signer that isn't a signer's public key is a usage mistake, like a missing value.
@@ -202,6 +219,9 @@ try {
     fileName: path.basename(file),
     allowForeign: options.allowForeign,
     verifyOnly: options.verify,
+    // No one signed in: refused only when the restored data has no admin who can sign in.
+    restorerId: null,
+    ignoreCurrentDatabase: options.ignoreCurrentDatabase,
     onPhase: (phase) => write(`  ${phase}`),
     beforeSwap: async () => {
       const others = await service.otherSessions();
@@ -220,6 +240,8 @@ try {
   }
   if (options.verify) {
     write('OK: the backup restores, migrates and passes the checks. Nothing was changed.');
+    // The Backup page's history shows it verified (by the restore command: no one signed in).
+    await service.recordVerify(result.manifest?.backupId ? `${result.manifest.backupId}.tar.age` : path.basename(file), null, 'passed', null);
     // The browser can't check a hardware key: opening a backup this server made to it alone counts.
     if (options.decrypted && result.signature === 'valid' && result.manifest?.recipients) {
       const marked = await service.markOnlyHardwareRecipientChecked(result.manifest.recipients).catch(() => null);
@@ -227,10 +249,37 @@ try {
     }
   } else {
     write(`Restored, with ${result.uploadedFilesRestored} upload file(s).`);
+    const carried = result.carryOver;
+    if (carried) {
+      const { ended, taken, kept } = carried;
+      write(`Ended: ${ended.sessions} session(s), ${ended.tokens} access token(s), ${ended.invitations} invitation(s); ${ended.notifications} queued notification(s) won't be sent.`);
+      if (!carried.tookFromRunningServer) write('Took nothing from the database it replaced (--ignore-current-database).');
+      else if (!carried.sameDeployment) write("The backup is another deployment's: no sign-in state was taken from the database it replaced.");
+      else {
+        write(
+          `Taken from the database it replaced: ${taken.locks} lock(s), ${taken.passwords} changed password(s), ${taken.passkeysRemoved} removed passkey(s), ` +
+            `${taken.deploymentRoles} removed deployment role(s); ${carried.lockedDeletedSince} person(s) deleted since were locked.`
+        );
+      }
+      if (carried.tookFromRunningServer) {
+        write(
+          `Kept: ${kept.backupKeys ? "this server's backup keys" : "the backup's backup keys (this server had none)"}, ${kept.oneDriveConnections} OneDrive connection(s)` +
+            `${kept.automaticBackupsKeptOn ? ', automatic backups on' : ''}.`
+        );
+      }
+      for (const removed of carried.removedSince) {
+        const where = `${removed.kind} "${removed.name}"`;
+        write(`Still ${removed.change === 'admin' ? 'an admin of' : 'a member of'} ${where} in the restored data, though removed since: ${removed.person}`);
+      }
+    }
     write(`The data from before is kept as database ${result.previousDatabase}, and its upload files in ${result.previousUploads}, until the next restore.`);
   }
 } catch (error) {
   const changed = error instanceof RestoreFailedError && error.databaseChanged;
+  const cause = error instanceof RestoreFailedError ? error.cause : error;
+  if (options.verify && !(error instanceof BackupInProgressError) && !(cause instanceof ShuttingDownError)) {
+    await service.recordVerify(path.basename(options.file), null, 'failed', publicErrorMessage(cause, 'The backup did not verify; the restore command said why.'));
+  }
   process.stderr.write(`${(error as Error).message}\n${changed ? 'The data WAS replaced; see the message above.' : 'Nothing was changed.'}\n`);
   logger.debug({ err: error }, 'Restore failed');
   process.exitCode = 1;

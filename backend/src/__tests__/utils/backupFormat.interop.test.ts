@@ -68,6 +68,7 @@ describe.skipIf(!runnable)(`backups and the age command line (${ageVersion})`, (
         appVersion: 'test',
         schemaVersion: null,
         recipients: [],
+        rowCounts: {},
       },
       signer,
     });
@@ -119,7 +120,7 @@ describe('a bundle is a tar the tar command reads', () => {
       for await (const chunk of bundleChunks({
         dumpFile: path.join(dir, 'db.dump'),
         uploadsDir: path.join(dir, 'uploads'),
-        manifest: { backupId: 'nuggets_backup_20261120_012958_362', createdAt: '2026-11-20T01:29:58.362Z', appVersion: 'test', schemaVersion: null, recipients: [] },
+        manifest: { backupId: 'nuggets_backup_20261120_012958_362', createdAt: '2026-11-20T01:29:58.362Z', appVersion: 'test', schemaVersion: null, recipients: [], rowCounts: {} },
         signer: signerFromSeed(randomBytes(32)),
       })) {
         parts.push(chunk);

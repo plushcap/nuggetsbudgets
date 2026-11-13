@@ -29,7 +29,7 @@ function lockPool(locked = true) {
 }
 
 type Steps = Record<
-  'createDatabaseDump' | 'writeManifest' | 'createArchiveWithUploads' | 'encryptBackup' | 'getActiveBackupKey' | 'listRecipients',
+  'createDatabaseDump' | 'writeManifest' | 'createArchiveWithUploads' | 'encryptBackup' | 'getActiveBackupKey' | 'listRecipients' | 'recordRun',
   (...args: never[]) => Promise<unknown>
 >;
 
@@ -40,11 +40,13 @@ function stubSteps(service: BackupService, gate?: Promise<void>) {
   // An upgraded install with the old key and no backup key yet: it makes .enc backups.
   vi.spyOn(steps, 'listRecipients').mockResolvedValue([]);
   vi.spyOn(steps, 'getActiveBackupKey').mockResolvedValue('backup-key');
+  // The record of the run: on a pool of its own in the app; here, nothing of the lock's.
+  vi.spyOn(steps, 'recordRun').mockResolvedValue(undefined);
   vi.spyOn(steps, 'createDatabaseDump').mockImplementation((async (tempDir: string, backupId: string) => {
     await gate;
     const file = path.join(tempDir, `${backupId}.dump`);
     await writeFile(file, 'dump');
-    return file;
+    return { dumpFile: file, rowCounts: {} };
   }) as never);
   vi.spyOn(steps, 'writeManifest').mockImplementation((async (tempDir: string) => {
     const file = path.join(tempDir, 'manifest.json');

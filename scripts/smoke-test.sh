@@ -398,6 +398,11 @@ for _ in $(seq 1 150); do
 done
 [ "$outcome" = "completed" ] || fail "the restore did not finish"
 echo "restore: $(jq -c '{phase, databaseChanged, previousDatabase, rowCounts}' "$BODY")"
+echo "carried over: $(jq -c '.carryOver | {sameDeployment, ended, kept}' "$BODY")"
+# The backup is this server's own: the restore ended every sign-in (this one too, which the
+# loop above signed in again after) and took the running server's sign-in state and keys.
+jq -e '.carryOver.sameDeployment == true and .carryOver.ended.sessions >= 1 and .carryOver.kept.backupKeys == true' "$BODY" > /dev/null \
+  || fail "the restore didn't end the sign-ins, or didn't keep this server's sign-in state and backup keys"
 
 log "Sign in again, and check the restored data"
 SESSION=""

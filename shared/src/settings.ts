@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { QUERY_MAX_PAGE, queryBoolean, queryInt } from './primitives.js';
 import { instant } from './responses.js';
-import { BACKUP_KEY_KINDS } from './vocabulary.js';
+import { BACKUP_KEY_KINDS, BACKUP_RUN_OUTCOMES, BACKUP_RUN_TRIGGERS, BACKUP_VERIFY_OUTCOMES } from './vocabulary.js';
 
 /**
  * Deployment-wide settings (`system_settings`) that a settings page may change.
@@ -481,6 +481,55 @@ export const RESTORE_PHASES = ['decrypting', 'checking', 'restoring', 'migrating
 export type RestorePhase = (typeof RESTORE_PHASES)[number];
 
 /** GET /api/backup/restore-status: the restore running, or the last one, and how it ended. */
+/**
+ * What a restore did to signing in and the deployment's settings before it swapped the data
+ * in (BackupService's carry-over): ended, taken from the running server, kept, and the
+ * memberships it removed since, which the restored data still has (for an admin to remove).
+ */
+export const restoreCarryOverSchema = z.object({
+  /** False with the restore command's --ignore-current-database: only the ending ran. */
+  tookFromRunningServer: z.boolean(),
+  /** The restored data is this deployment's: sign-in state was taken from the running server. */
+  sameDeployment: z.boolean(),
+  ended: z.object({
+    sessions: z.number().int(),
+    challenges: z.number().int(),
+    tokens: z.number().int(),
+    invitations: z.number().int(),
+    notifications: z.number().int(),
+  }),
+  taken: z.object({
+    locks: z.number().int(),
+    passwords: z.number().int(),
+    passkeysRemoved: z.number().int(),
+    passkeyCounters: z.number().int(),
+    deploymentRoles: z.number().int(),
+    loginThrottles: z.number().int(),
+    deliveries: z.number().int(),
+  }),
+  /** People in the backup the running server has deleted since: locked. */
+  lockedDeletedSince: z.number().int(),
+  kept: z.object({
+    backupKeys: z.boolean(),
+    oneDriveRegistration: z.boolean(),
+    oneDriveConnections: z.number().int(),
+    backupRuns: z.boolean(),
+    automaticBackupsKeptOn: z.boolean(),
+  }),
+  removedSince: z.array(
+    z.object({
+      /** The person's email. */
+      person: z.string(),
+      kind: z.enum(['organization', 'tenant']),
+      /** The organization's or tenant's name. */
+      name: z.string(),
+      /** Removed as a member, or only as an admin. */
+      change: z.enum(['member', 'admin']),
+    })
+  ),
+});
+export type RestoreCarryOver = z.infer<typeof restoreCarryOverSchema>;
+
 export const restoreStatusResponseSchema = z.object({
   status: z.enum(['idle', 'running', 'completed', 'failed']),
   phase: z.enum(RESTORE_PHASES).optional(),
@@ -499,8 +548,45 @@ export const restoreStatusResponseSchema = z.object({
   /** The backup's own id and time, from its signed manifest (an age backup's). */
   backupId: z.string().nullable().optional(),
   backupCreatedAt: instant.nullable().optional(),
+  /** What the restore ended, took from this server and kept (a completed restore's). */
+  carryOver: restoreCarryOverSchema.nullable().optional(),
 });
 export type RestoreStatus = z.infer<typeof restoreStatusResponseSchema>;
+
+/** One backup run, as GET /api/backup/runs lists it (newest first). */
+export const backupRunSchema = z.object({
+  uuid: z.uuid(),
+  startedAt: instant,
+  finishedAt: instant,
+  trigger: z.enum(BACKUP_RUN_TRIGGERS),
+  outcome: z.enum(BACKUP_RUN_OUTCOMES),
+  /** Why it failed, written for people; null when it succeeded. */
+  message: z.string().nullable(),
+  fileName: z.string().nullable(),
+  fileSize: z.number().int().nullable(),
+  sha256: z.string().nullable(),
+  /** The fingerprints of the backup keys it was encrypted to. */
+  recipients: z.array(z.string()),
+  /** Who started it (by name), when someone did. */
+  startedBy: z.string().nullable(),
+  /** When it was last verified, by whom (null: the restore command, or no one), and how that went. */
+  verifiedAt: instant.nullable(),
+  verifiedBy: z.string().nullable(),
+  verifyOutcome: z.enum(BACKUP_VERIFY_OUTCOMES).nullable(),
+  verifyMessage: z.string().nullable(),
+});
+export type BackupRun = z.infer<typeof backupRunSchema>;
+
+/**
+ * GET /api/backup/runs: the newest backup runs, when a backup last passed a verify, and
+ * whether none has for 90 days (said only once there is a backup).
+ */
+export const backupRunsResponseSchema = z.object({
+  runs: z.array(backupRunSchema),
+  lastVerifiedAt: instant.nullable(),
+  verifyOverdue: z.boolean(),
+});
+export type BackupRuns = z.infer<typeof backupRunsResponseSchema>;
 
 /**
  * GET /api/backup/verify-status: the verify running, or the last one. A verify restores the

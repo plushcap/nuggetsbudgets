@@ -14,6 +14,7 @@ import {
   backupKeysResponseSchema,
   backupKeyStatusResponseSchema,
   backupListResponseSchema,
+  backupRunsResponseSchema,
   backupOneDriveStatusResponseSchema,
   backupRecipientSavedResponseSchema,
   backupStartedResponseSchema,
@@ -29,6 +30,8 @@ import {
   type BackupKeyStatus,
   type BackupRecipient,
   type BackupRecipientCreate,
+  type BackupRun,
+  type BackupRuns,
   type BackupStarted,
   type OneDriveConfig,
   type OneDriveStatus,
@@ -130,6 +133,12 @@ export const restoreBackupFromServer = async (fileName: string, keys: BackupKeyA
   parseAnswer(backupStartedResponseSchema, await apiPost<unknown>(`/backup/restore/${encodeURIComponent(fileName)}`, keys), 'restore started');
 
 /** How the restore that is running, or ran last, is going. */
+/** The record of backups: the newest runs, failures too, each with its last verify; and whether none has passed one for 90 days. */
+export const getBackupRuns = async (): Promise<BackupRuns> =>
+  parseAnswer(backupRunsResponseSchema, await apiGet<unknown>('/backup/runs'), 'backup runs');
+
+export type { BackupRun, BackupRuns };
+
 export const getRestoreStatus = async (): Promise<RestoreStatus> =>
   parseAnswer(restoreStatusResponseSchema, await apiGet<unknown>('/backup/restore-status'), 'restore status');
 

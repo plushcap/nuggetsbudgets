@@ -127,7 +127,7 @@ export function createBackupRoutes({
     logger.info({ userId }, 'Starting manual backup creation (async)');
 
     // Started here, not after an await, so it holds the lock before anything else can ask.
-    const creating = backupService.createBackup();
+    const creating = backupService.createBackup({ trigger: 'manual', startedBy: userId });
 
     // Run the backup in the background and report progress via /create-status,
     // so the HTTP request returns immediately instead of blocking for minutes.
@@ -191,6 +191,15 @@ export function createBackupRoutes({
       logger.error({ err: error, userId }, 'Error restarting the backup scheduler after a backup key changed');
     }
   }
+
+  /**
+   * The record of backups (admin-only via the router mount): the newest runs, failures
+   * included, each with when it was last verified; and whether no backup has passed a verify
+   * for 90 days. GET /api/backup/runs
+   */
+  router.get('/runs', authHandler(async (_req: AuthenticatedRequest, res: Response) => {
+    res.json(await backupService.listRuns());
+  }));
 
   /**
    * The backup keys (admin-only via the router mount): the owner's age public keys, which

@@ -10,6 +10,8 @@ import { backupKeys, backupRecipient } from '../../test/fixtures';
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ toast, default: toast }));
 vi.mock('../../components/OneDriveSync', () => ({ default: () => null }));
+// It reads the restore status too, which these tests feed answer by answer (LastRestoreCallout.test.tsx).
+vi.mock('../../components/backup/LastRestoreCallout', () => ({ default: () => null }));
 
 const api = vi.hoisted(() => ({
   schedulerStatus: vi.fn(),
@@ -40,6 +42,7 @@ vi.mock('../../services/api', async (importOriginal) => {
     restoreBackupFromServer: (fileName: string, keys: unknown) => api.restoreFromServer(fileName, keys),
     restoreBackup: (formData: FormData) => api.restoreUpload(formData),
     getRestoreStatus: () => api.restoreStatus(),
+    getBackupRuns: async () => ({ runs: [], lastVerifiedAt: null, verifyOverdue: false }),
     getReauthStatus: () => api.reauthStatus(),
     reauthenticateWithPassword: (password: string) => api.reauthWithPassword(password),
   };
@@ -171,7 +174,8 @@ describe('BackupPage', () => {
     it('says to sign in again when the restored data no longer has this sign-in', async () => {
       api.restoreStatus.mockRejectedValue(new SessionExpiredError());
       await restoreListed();
-      await waitFor(() => expect(toast.success).toHaveBeenCalledWith(expect.stringMatching(/sign in again/)), { timeout: 6000 });
+      // Every restore ends every sign-in: the page says the restore finished, and to sign in.
+      await waitFor(() => expect(toast.success).toHaveBeenCalledWith(expect.stringMatching(/^The restore finished: sign in again/), expect.anything()), { timeout: 6000 });
       expect(toast.error).not.toHaveBeenCalled();
     });
   });

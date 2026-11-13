@@ -13,6 +13,7 @@
  * | `import_sync_log` (per ledger) | started that long ago, except the ledger's newest | RETENTION_SYNC_LOG_DAYS (180) |
  * | `organization_price_sync_runs` (per organization) | started that long ago, except the organization's newest | RETENTION_SYNC_LOG_DAYS (180) |
  * | `stored_images` (per ledger) | nothing points at it, a day after it was stored | — |
+ * | `backup_runs` (global) | started a year ago and its file is gone from the backup directory (or it made none) | — |
  *
  * - A notification delivery is what stops the same alert going twice: its subject (a
  *   budget item in the current month, a transaction added in the last week, a bill due
@@ -81,6 +82,12 @@ export interface RetentionOptions {
   tenantIds?: number[] | undefined;
   /** The organizations the per-organization job covers (default, or undefined: every organization). */
   organizationIds?: number[] | undefined;
+  /**
+   * The backups in the backup directory, by file name (BackupService.listBackupFileNames):
+   * the backup_runs job keeps the record of each. It throws when the directory can't be
+   * read, and that job deletes nothing. Without it the job doesn't run.
+   */
+  backupFileNames?: (() => Promise<readonly string[]>) | undefined;
 }
 
 /** Rows deleted, by job. */
@@ -129,14 +136,15 @@ async function allTenantIds(): Promise<number[]> {
   return (await globalDb.selectFrom('tenants').select('id').orderBy('id').execute()).map((t) => t.id);
 }
 
-type ResolvedOptions = Required<Omit<RetentionOptions, 'tenantIds' | 'organizationIds'>> &
-  Pick<RetentionOptions, 'tenantIds' | 'organizationIds'>;
+type ResolvedOptions = Required<Omit<RetentionOptions, 'tenantIds' | 'organizationIds' | 'backupFileNames'>> &
+  Pick<RetentionOptions, 'tenantIds' | 'organizationIds' | 'backupFileNames'>;
 
 const withDefaults = (options: RetentionOptions): ResolvedOptions => ({
   limits: options.limits ?? DEFAULT_LIMITS,
   shouldStop: options.shouldStop ?? (() => false),
   tenantIds: options.tenantIds,
   organizationIds: options.organizationIds,
+  backupFileNames: options.backupFileNames,
 });
 
 // ---------------------------------------------------------------------------------------
@@ -154,6 +162,28 @@ export async function purgeEndedSessions(policy: RetentionPolicy, options: Reten
         SELECT id FROM sessions
          WHERE expires_at < ${daysAgo(policy.sessionDays)}
             OR (is_revoked AND COALESCE(revoked_at, last_activity_at, created_at) < ${daysAgo(policy.sessionDays)})
+         ORDER BY id
+         LIMIT ${limit}
+         FOR UPDATE SKIP LOCKED`).execute(globalDb)
+    )
+  );
+}
+
+/** The record of a backup is kept at least this long, and for as long as its file is there. */
+export const BACKUP_RUN_DAYS = 365;
+
+/**
+ * The record of backups (backup_runs) started more than BACKUP_RUN_DAYS ago whose file is
+ * no longer in the backup directory (`fileNames`, all of it), or that made none (a failed
+ * run). A record whose file is still there stays, however old.
+ */
+export async function purgeOldBackupRuns(fileNames: readonly string[], options: RetentionOptions = {}): Promise<number> {
+  return inBatches('backup_runs', withDefaults(options), async (limit) =>
+    affected(
+      await deleteBatch('backup_runs', sql`
+        SELECT id FROM backup_runs
+         WHERE started_at < ${daysAgo(BACKUP_RUN_DAYS)}
+           AND (file_name IS NULL OR NOT (file_name = ANY(${[...fileNames]}::text[])))
          ORDER BY id
          LIMIT ${limit}
          FOR UPDATE SKIP LOCKED`).execute(globalDb)
@@ -304,6 +334,8 @@ export async function runRetention(policy: RetentionPolicy, options: RetentionOp
   };
 
   await attempt('sessions', async () => add('sessions', await purgeEndedSessions(policy, opts)));
+  const { backupFileNames } = opts;
+  if (backupFileNames) await attempt('backup_runs', async () => add('backup_runs', await purgeOldBackupRuns(await backupFileNames(), opts)));
   counts.organization_price_sync_runs = 0;
   for (const organizationId of opts.organizationIds ?? (await getAllOrganizationIds())) {
     await attempt(`organization ${organizationId}`, async () =>

@@ -153,6 +153,8 @@ async function runRestore(
       key: input.key,
       fileKey: input.fileKey,
       fileName,
+      // Refused unless they can manage the server afterwards, in the restored data.
+      restorerId: userId,
       onPhase: (phase) => {
         status = { ...status, phase };
       },
@@ -168,6 +170,7 @@ async function runRestore(
       rowCounts: result.rowCounts,
       backupId: result.manifest?.backupId ?? null,
       backupCreatedAt: result.manifest?.createdAt ?? null,
+      carryOver: result.carryOver,
     };
     logger.info({ userId, fileName, previousDatabase: result.previousDatabase, rowCounts: result.rowCounts }, 'Backup restored');
   } catch (error) {
@@ -261,6 +264,8 @@ async function runVerify(backupService: BackupService, input: StartRestoreInput,
         verifyStatus = { ...verifyStatus, phase };
       },
     });
+    // Recorded against the backup it is (its signed id), whatever it was uploaded as.
+    await backupService.recordVerify(result.manifest?.backupId ? `${result.manifest.backupId}.tar.age` : fileName, userId, 'passed', null);
     verifyStatus = {
       status: 'completed',
       fileName,
@@ -276,6 +281,10 @@ async function runVerify(backupService: BackupService, input: StartRestoreInput,
   } catch (error) {
     verifyStatus = { status: 'failed', fileName, startedAt, finishedAt: new Date().toISOString(), error: shownVerifyError(error) };
     const cause = error instanceof RestoreFailedError ? error.cause : error;
+    // A verify that ran and failed; not one held up by another operation or the shutdown.
+    if (!(error instanceof BackupInProgressError) && !(cause instanceof ShuttingDownError)) {
+      await backupService.recordVerify(fileName, userId, 'failed', verifyStatus.error ?? null);
+    }
     if (error instanceof BackupInProgressError) logger.warn({ err: error, userId, fileName }, 'Verify refused: a backup or restore is running');
     else if (cause instanceof ShuttingDownError) logger.warn({ err: error, userId, fileName }, 'Verify stopped by the shutdown');
     else logger.error({ err: error, userId, fileName }, 'Backup verify failed');

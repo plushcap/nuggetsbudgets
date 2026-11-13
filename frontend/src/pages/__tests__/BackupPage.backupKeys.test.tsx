@@ -46,6 +46,8 @@ const routes = (keys: ReturnType<typeof backupKeys>, extra: Record<string, unkno
   'GET /backup/create-status': { status: 'completed', fileName: 'nuggets-backup.tar.age' } satisfies BackupCreateStatus,
   // A restore asks first; this session confirmed in the last few minutes.
   'GET /auth/reauthenticate': { reauthenticated: true },
+  'GET /backup/runs': { runs: [], lastVerifiedAt: null, verifyOverdue: false },
+  'GET /backup/restore-status': { status: 'idle' },
   ...extra,
 });
 

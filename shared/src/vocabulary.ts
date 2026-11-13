@@ -224,6 +224,18 @@ export const TENANT_VOCABULARIES = {
 export const BACKUP_KEY_KINDS = ['post-quantum', 'classic'] as const;
 export type BackupKeyKind = (typeof BACKUP_KEY_KINDS)[number];
 
+/** What started a backup run: the Backup page, the schedule, or Data Management's "Back up first". */
+export const BACKUP_RUN_TRIGGERS = ['manual', 'scheduled', 'before-deletion'] as const;
+export type BackupRunTrigger = (typeof BACKUP_RUN_TRIGGERS)[number];
+/** How a backup run went. */
+export const BACKUP_RUN_OUTCOMES = ['succeeded', 'failed'] as const;
+/** How the last verify of a backup went. */
+export const BACKUP_VERIFY_OUTCOMES = ['passed', 'failed'] as const;
+export type BackupVerifyOutcome = (typeof BACKUP_VERIFY_OUTCOMES)[number];
+export const backupRunTrigger = z.enum(BACKUP_RUN_TRIGGERS);
+export const backupRunOutcome = z.enum(BACKUP_RUN_OUTCOMES);
+export const backupVerifyOutcome = z.enum(BACKUP_VERIFY_OUTCOMES);
+
 /**
  * The control-plane columns with a list CHECK, as TENANT_VOCABULARIES has the tenant's.
  * (tenant_settings.setting_key's list is the backend's TENANT_SETTING_KEYS.)
@@ -232,6 +244,9 @@ export const CONTROL_PLANE_VOCABULARIES = {
   'personal_access_tokens.scope': PERSONAL_ACCESS_TOKEN_SCOPES,
   'webauthn_challenges.purpose': WEBAUTHN_CHALLENGE_PURPOSES,
   'backup_recipients.kind': BACKUP_KEY_KINDS,
+  'backup_runs.trigger': BACKUP_RUN_TRIGGERS,
+  'backup_runs.outcome': BACKUP_RUN_OUTCOMES,
+  'backup_runs.verify_outcome': BACKUP_VERIFY_OUTCOMES,
 } as const satisfies Record<string, readonly string[]>;
 
 // What people see for a value. A page builds a list's options from its constant above and

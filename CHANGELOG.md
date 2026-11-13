@@ -28,6 +28,28 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
   rotates the data encryption key). `--key-file` still opens an older `.enc` backup.
 - Downloading the old backup key now asks you to confirm your password or passkey, as adding
   or removing a backup key does. Generating a new old-style key is gone.
+- **Restoring a backup asks you to confirm your password or passkey** (unless you did in the
+  last few minutes), before anything is uploaded: a stolen session alone can't start one.
+  Verifying needs no confirmation: it changes nothing.
+- **Signing in after a restore is never wider than before it.** A restore ends every sign-in,
+  personal access token, passkey challenge and invitation not accepted yet, and the
+  notifications the backup had queued aren't sent. When the backup is this server's own, it
+  keeps what changed since: locks and disabled sign-ins, passwords changed since, passkeys and
+  deployment admin roles removed since, and the count of failed sign-ins; people deleted since
+  come back locked; and the alerts already sent aren't sent again. Memberships and admin flags
+  of organizations and ledgers removed since are listed on the Backup page after the restore,
+  to remove again. A restore keeps this server's backup keys, OneDrive connection and record
+  of backups, and never turns automatic backups off.
+- **A restore can't lock everyone out.** The web app restores a backup only when you are, in
+  its data, a deployment admin who can sign in (the same email); the restore command refuses
+  data with no such admin at all. Its new `--ignore-current-database` takes nothing from the
+  database being replaced, for when that can't be read or trusted.
+
+  **After a restore**, everyone signs in again, you too: the page says so, and then shows what
+  the restore did.
+- **Backups record the rows of every table** as they were dumped (manifest format 5; a format-4
+  backup still restores), and a verify or restore refuses data whose rows differ: a backup cut
+  short or damaged.
 
   **Upgrading:** open Settings → Database Backup and set up a backup key (make one there, or
   paste the public key from `age-keygen -pq`). Keep the private key file in a password
@@ -40,6 +62,12 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
 
 ### Changed
 
+- Settings → Database Backup keeps a **record of backups**: every run, failures included, what
+  started it, the file it made, and when it was last verified (in the web app or with the
+  restore command's `--verify`), by whom. Each listed backup shows its last verify, and the
+  page says so when no backup has been verified in 90 days. The health check's "last
+  automatic backup failed" now survives a restart. Records over a year old whose file is gone
+  are deleted by the daily retention job.
 - Each GitHub Release's description lists what changed in it: its section of this changelog,
   then the pull requests merged since the release before it. A release made before this has
   only a link to the changelog: run **Rewrite release notes** from the Actions tab on `main`,

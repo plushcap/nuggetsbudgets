@@ -3,6 +3,7 @@ import type { Kysely } from 'kysely';
 import type { DB } from '../db/schema.generated.js';
 import { BackupService, BackupInProgressError, ShuttingDownError } from './BackupService.js';
 import { OneDriveService } from './OneDriveService.js';
+import { lastScheduledRun } from './backup/backupRuns.js';
 import { createLogger } from '../utils/logger.js';
 import { globalDb, runDetached } from '../db/withTenant.js';
 import { isValidTimeZone, timeOnDayAfter } from '../utils/syncSchedule.js';
@@ -463,7 +464,7 @@ export class BackupScheduler implements Scheduler {
   private async runAutomaticBackup(settings: BackupSettings): Promise<void> {
     // Encrypted to the backup keys, like a manual backup.
     logger.info({ frequencyDays: settings.frequencyDays }, 'Creating automatic backup');
-    const result = await this.backupService.createBackup();
+    const result = await this.backupService.createBackup({ trigger: 'scheduled' });
     logger.info({ fileName: result.fileName }, 'Automatic backup created');
 
     // Auto-upload to OneDrive for all users with auto-sync enabled
@@ -566,16 +567,34 @@ export class BackupScheduler implements Scheduler {
     return this.enabled;
   }
 
+  /**
+   * The last scheduled run, kept in memory since this process started, else the newest one
+   * recorded (backup_runs): the health check's "last run failed" survives a restart.
+   */
+  private async lastRun(): Promise<{ startedAt: Date | null; finishedAt: Date | null; outcome: 'success' | 'failed' | null }> {
+    if (this.lastRunOutcome !== null) {
+      return { startedAt: this.lastRunStartedAt, finishedAt: this.lastRunFinishedAt, outcome: this.lastRunOutcome };
+    }
+    try {
+      const recorded = await lastScheduledRun(this.db);
+      if (recorded) return recorded;
+    } catch (error) {
+      logger.warn({ err: error }, 'Could not read the last scheduled backup run');
+    }
+    return { startedAt: null, finishedAt: null, outcome: null };
+  }
+
   async getSchedulerStatus(): Promise<BackupSchedulerStatus> {
+    const last = await this.lastRun();
     return {
       enabled: await this.readEnabled(),
       running: this.isTimerArmed(),
       shuttingDown: this.isShuttingDown,
       hasRunningBackup: await this.hasRunningBackupOperation(),
       nextBackupTime: this.nextRunAt,
-      lastRunStartedAt: this.lastRunStartedAt,
-      lastRunFinishedAt: this.lastRunFinishedAt,
-      lastRunOutcome: this.lastRunOutcome,
+      lastRunStartedAt: last.startedAt,
+      lastRunFinishedAt: last.finishedAt,
+      lastRunOutcome: last.outcome,
       waitingForBackupKey: this.waitingForBackupKey,
       usingOldBackupKey: this.usingOldBackupKey,
     };

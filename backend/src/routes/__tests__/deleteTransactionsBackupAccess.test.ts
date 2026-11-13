@@ -114,7 +114,7 @@ describeDb('delete-transactions: who may back up first', () => {
   it('backs up first for a deployment admin, then deletes', async () => {
     const backup = vi
       .spyOn(BackupService.prototype, 'createBackup')
-      .mockResolvedValue({ fileName: 'nuggets_backup_20251115_030000_000.enc', filePath: '/unused', fileSize: 1, sha256: null });
+      .mockResolvedValue({ fileName: 'nuggets_backup_20251115_030000_000.enc', filePath: '/unused', fileSize: 1, sha256: null, recipients: [] });
     const { id, range } = await fixture();
 
     const res = await remove(deploymentAdmin, range, true);

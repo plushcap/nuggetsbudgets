@@ -18,8 +18,10 @@ import { DOMAIN, deriveKey } from './crypto-envelope.js';
  *   └── tar (ustar, a pax record for a long name), in this order:
  *       database.dump    pg_dump --format=custom
  *       uploads/…        the uploads directory, regular files only
- *       manifest.json    format 4: the backup's id and time, the app and schema version, the
- *                        recipients' fingerprints, and each member's path and size
+ *       manifest.json    format 5: the backup's id and time, the app and schema version, the
+ *                        recipients' fingerprints, each member's path and size, and the
+ *                        number of rows in each table of the dump (format 4, without them,
+ *                        is still read)
  *       manifest.sig     the Ed25519 signature of the SHA-256 of every tar byte before it, and
  *                        the signer's public key; then tar's end marker
  *
@@ -55,14 +57,16 @@ const BLOCK = 512;
 /** manifest.sig's header, its data padded to a block, and tar's end marker (two zero blocks). */
 export const SIGNED_TAIL_BYTES = 4 * BLOCK;
 
-/** The manifest format these backups carry. */
-export const MANIFEST_VERSION = 4;
+/** The manifest format these backups carry: 5 has the row counts. Format 4 (without them) is still read. */
+export const MANIFEST_VERSION = 5;
 
 /** Limits on what a bundle may hold, checked once the signature has been. */
 const MAX_MEMBERS = 500_000;
 const MAX_PATH_BYTES = 1024;
 const MAX_SEGMENT_BYTES = 255;
 const MAX_MANIFEST_BYTES = 64 * 1024 * 1024;
+/** At most this many tables a manifest counts the rows of. */
+const MAX_COUNTED_TABLES = 5000;
 
 /** What a backup's file is, from its first bytes (never from its name alone). */
 export type BackupFileFormat =
@@ -260,18 +264,33 @@ function verifyDigest(publicKey: Buffer, digest: Buffer, signature: Buffer): boo
 /** `nuggets_backup_YYYYMMDD_HHMMSS_mmm`: a backup's id, and its file name without the extension. */
 export const BACKUP_ID = /^nuggets_backup_\d{8}_\d{6}_\d{3}$/;
 
-const manifestSchema = z.strictObject({
-  manifestVersion: z.literal(MANIFEST_VERSION),
+const manifestFields = {
   backupId: z.string().regex(BACKUP_ID),
   createdAt: z.iso.datetime({ offset: true }),
   appVersion: z.string().max(200),
   schemaVersion: z.string().regex(/^\d{14}$/).nullable(),
   recipients: z.array(z.string().max(64)).max(MAX_BACKUP_RECIPIENTS),
   members: z.array(z.strictObject({ path: z.string().max(MAX_PATH_BYTES), size: z.number().int().nonnegative() })).max(MAX_MEMBERS),
-});
+};
 
-/** What manifest.json says: format 4. */
+/**
+ * The rows in each `public` table, counted in the snapshot pg_dump dumped: a restore
+ * compares them with what pg_restore put back, before the migrations change any.
+ */
+const rowCountsSchema = z
+  .record(z.string().min(1).max(63), z.number().int().nonnegative())
+  .refine((counts) => Object.keys(counts).length <= MAX_COUNTED_TABLES, { error: 'too many tables' });
+
+const manifestV5Schema = z.strictObject({ manifestVersion: z.literal(MANIFEST_VERSION), ...manifestFields, rowCounts: rowCountsSchema });
+const manifestSchema = z.discriminatedUnion('manifestVersion', [
+  z.strictObject({ manifestVersion: z.literal(4), ...manifestFields }),
+  manifestV5Schema,
+]);
+
+/** What manifest.json says: format 5, or format 4 (a backup made before the row counts). */
 export type BundleManifest = z.infer<typeof manifestSchema>;
+/** What this version writes. */
+export type CurrentBundleManifest = z.infer<typeof manifestV5Schema>;
 
 // ── Writing ─────────────────────────────────────────────────────────────────────────
 
@@ -447,7 +466,7 @@ export interface BundleInput {
   dumpFile: string;
   /** The uploads directory (it may not exist). */
   uploadsDir: string;
-  manifest: Omit<BundleManifest, 'manifestVersion' | 'members'>;
+  manifest: Omit<CurrentBundleManifest, 'manifestVersion' | 'members'>;
   signer: BackupSigner;
   /** What the uploads directory holds: files and bytes backed up, and entries left out. */
   onUploadsListed?: (info: { files: number; bytes: number; skipped: number }) => void;
@@ -477,7 +496,7 @@ export async function* bundleChunks(input: BundleInput): AsyncGenerator<Buffer> 
     listed.push({ path: member.path, size: member.size });
   }
 
-  const manifest: BundleManifest = { manifestVersion: MANIFEST_VERSION, ...input.manifest, members: listed };
+  const manifest: CurrentBundleManifest = { manifestVersion: MANIFEST_VERSION, ...input.manifest, members: listed };
   const manifestBytes = Buffer.from(JSON.stringify(manifest, null, 2), 'utf8');
   for (const block of memberHeader('manifest.json', manifestBytes.length, createdAt)) yield emit(block);
   yield emit(manifestBytes);
@@ -809,7 +828,7 @@ export async function extractBundle(tarPath: string, payloadSize: number, destDi
   try {
     manifest = manifestSchema.parse(JSON.parse(manifestText));
   } catch {
-    throw refuse("its manifest isn't a format-4 manifest");
+    throw refuse("its manifest isn't a format-4 or format-5 manifest");
   }
   seen.delete('manifest.json');
   const listed = new Map(manifest.members.map((m) => [m.path, m.size]));

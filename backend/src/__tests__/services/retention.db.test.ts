@@ -4,6 +4,7 @@ import { Pool } from 'pg';
 import { createTestTenant, type TestTenant } from '../../test/testTenant.js';
 import {
   purgeEndedSessions,
+  purgeOldBackupRuns,
   purgeTenant,
   purgeOldPriceSyncRuns,
   retentionPolicy,
@@ -78,6 +79,40 @@ describe('Retention', () => {
     // The live session it was rotated from is gone; the foreign key let it go.
     const { rows } = await owner.query('SELECT rotated_from_session_id FROM sessions WHERE id = $1', [live]);
     expect(rows[0].rotated_from_session_id).toBeNull();
+  });
+
+  it('deletes the record of a backup over a year old whose file is gone, and keeps one whose file is there', async () => {
+    const tag = randomBytes(4).toString('hex');
+    const backupRun = async (days: number, fileName: string | null) =>
+      (
+        await owner.query<{ id: number }>(
+          `INSERT INTO backup_runs (started_at, finished_at, trigger, outcome, message, file_name)
+           VALUES (now() - make_interval(days => $1), now() - make_interval(days => $1), 'scheduled', $2, $3, $4) RETURNING id`,
+          [days, fileName ? 'succeeded' : 'failed', fileName ? null : 'no key', fileName]
+        )
+      ).rows[0].id;
+    const goneLongAgo = await backupRun(400, `nuggets_backup_gone_${tag}.tar.age`);
+    const stillThere = await backupRun(4000, `nuggets_backup_kept_${tag}.tar.age`);
+    const failedLongAgo = await backupRun(400, null);
+    const goneRecently = await backupRun(300, `nuggets_backup_recent_${tag}.tar.age`);
+    const all = [goneLongAgo, stillThere, failedLongAgo, goneRecently];
+
+    expect(await purgeOldBackupRuns([`nuggets_backup_kept_${tag}.tar.age`, 'nuggets_backup_other.tar.age'])).toBeGreaterThanOrEqual(2);
+    expect(await idsIn('backup_runs', all)).toEqual([stillThere, goneRecently]);
+
+    // A backup directory that can't be read deletes nothing: the job fails, and says so.
+    const unreadable = await backupRun(400, `nuggets_backup_unread_${tag}.tar.age`);
+    await expect(
+      runRetention(policy, {
+        tenantIds: [],
+        organizationIds: [],
+        backupFileNames: async () => {
+          throw new Error('EACCES');
+        },
+      })
+    ).rejects.toThrow(/backup_runs/);
+    expect(await idsIn('backup_runs', [unreadable])).toEqual([unreadable]);
+    await owner.query('DELETE FROM backup_runs WHERE id = ANY($1)', [[stillThere, goneRecently, unreadable]]);
   });
 
   it("deletes price-sync runs older than RETENTION_SYNC_LOG_DAYS, keeping each organization's newest", async () => {

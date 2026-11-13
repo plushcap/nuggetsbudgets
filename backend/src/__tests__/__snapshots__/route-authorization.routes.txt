@@ -97,6 +97,7 @@ deploymentAdmin POST   /api/backup/recipients/:uuid/checked
 deploymentAdmin POST   /api/backup/restore
 deploymentAdmin GET    /api/backup/restore-status
 deploymentAdmin POST   /api/backup/restore/:fileName
+deploymentAdmin GET    /api/backup/runs
 deploymentAdmin POST   /api/backup/scheduler/start
 deploymentAdmin POST   /api/backup/scheduler/stop
 deploymentAdmin GET    /api/backup/settings

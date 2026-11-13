@@ -50,10 +50,10 @@ class BackupBeforeDeletionFailed extends Error {}
  * BACKUP_IN_PROGRESS): refused as the backup routes refuse them, so a client can tell "try
  * again later" from a failure. Any other failure is a {@link BackupBeforeDeletionFailed}.
  */
-async function backupBeforeDeletion(backupService: BackupService): Promise<string> {
+async function backupBeforeDeletion(backupService: BackupService, userId: number): Promise<string> {
   try {
     logger.info('Creating backup before deletion');
-    const { fileName } = await backupService.createBackup();
+    const { fileName } = await backupService.createBackup({ trigger: 'before-deletion', startedBy: userId });
     logger.info({ backupFileName: fileName }, 'Backup created successfully');
     return fileName;
   } catch (backupError) {
@@ -105,7 +105,7 @@ export function createDataManagementRoutes({ backupService }: Pick<RouteDependen
       let backupFileName: string | undefined;
       if (createBackup) {
         try {
-          backupFileName = await backupBeforeDeletion(backupService);
+          backupFileName = await backupBeforeDeletion(backupService, req.user.userId);
         } catch (err) {
           if (!(err instanceof BackupBeforeDeletionFailed)) throw err;
           // A refusal written for people (no backup key yet) says so; anything else is in the log.
