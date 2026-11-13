@@ -186,6 +186,14 @@ describe('BackupPage', () => {
         response: { data: { error: 'Confirm your password or passkey to continue', code: 'REAUTH_REQUIRED' } },
       });
 
+    /**
+     * A restore that was sent ends here (its status says it stopped). Awaited in each test that
+     * sends one: the page reads the status 2 s later, and a toast after the test ends would
+     * land in the next one's.
+     */
+    const restoreEnded = () =>
+      waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to restore backup: stopped here'), { timeout: 6000 });
+
     beforeEach(() => {
       api.restoreStatus.mockResolvedValue({ status: 'failed', databaseChanged: false, error: 'stopped here' });
       api.restoreFromServer.mockResolvedValue({ success: true, started: true });
@@ -216,6 +224,7 @@ describe('BackupPage', () => {
       expect(api.reauthWithPassword).toHaveBeenCalledWith('S3cret!pass');
       const form = api.restoreUpload.mock.calls[0][0] as FormData;
       expect((form.get('backup') as File).name).toBe(listed.fileName);
+      await restoreEnded();
     });
 
     it('uploads without asking when the session confirmed in the last few minutes', async () => {
@@ -224,6 +233,7 @@ describe('BackupPage', () => {
       expect(api.reauthStatus).toHaveBeenCalled();
       expect(screen.queryByRole('dialog', { name: /Confirm it’s you/ })).not.toBeInTheDocument();
       expect(api.reauthWithPassword).not.toHaveBeenCalled();
+      await restoreEnded();
     });
 
     it('sends nothing when the prompt is closed, and says nothing went wrong', async () => {
@@ -249,6 +259,7 @@ describe('BackupPage', () => {
       await user.type(within(prompt).getByLabelText('Password'), 'S3cret!pass');
       await user.click(within(prompt).getByRole('button', { name: 'Confirm' }));
       await waitFor(() => expect(api.restoreFromServer).toHaveBeenCalledWith(listed.fileName, {}));
+      await restoreEnded();
     });
 
     it('asks again when the confirmation lapsed as the restore was sent, and sends it once more', async () => {
@@ -264,6 +275,7 @@ describe('BackupPage', () => {
       await user.type(within(prompt).getByLabelText('Password'), 'S3cret!pass');
       await user.click(within(prompt).getByRole('button', { name: 'Confirm' }));
       await waitFor(() => expect(api.restoreFromServer).toHaveBeenCalledTimes(2));
+      await restoreEnded();
       expect(toast.error).not.toHaveBeenCalledWith(expect.stringMatching(/Confirm your password/));
     });
 
@@ -276,6 +288,7 @@ describe('BackupPage', () => {
       await user.click(within(prompt).getByRole('button', { name: 'Confirm' }));
       await waitFor(() => expect(api.restoreUpload).toHaveBeenCalledTimes(2));
       expect((api.restoreUpload.mock.calls[1][0] as FormData).get('backup')).toBe(api.restoreUpload.mock.calls[0][0].get('backup'));
+      await restoreEnded();
     });
 
     it('sends nothing more, and says nothing went wrong, when that second prompt is closed', async () => {
