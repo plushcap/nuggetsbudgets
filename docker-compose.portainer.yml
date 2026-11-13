@@ -301,7 +301,6 @@ services:
       # whole-DB pg_dump/restore (a superuser dump captures every tenant's rows). Defaults to
       # the bootstrap owner; set explicitly if you customized POSTGRES_USER.
       MIGRATION_DB_USER: ${MIGRATION_DB_USER:-nuggetsApp_user}
-      BACKUP_DB_USER: ${BACKUP_DB_USER:-}  # default: MIGRATION_DB_USER
       DB_MAINTENANCE_NAME: ${DB_MAINTENANCE_NAME:-postgres}
       # Leave unset. "true" starts the backend even as a role that bypasses RLS, but only
       # while there is at most one ledger.

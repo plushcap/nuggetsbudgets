@@ -23,7 +23,7 @@
 #   PG_CONTAINER=<postgres container> backend/scripts/check-migrations.sh rollback|fresh-install|upgrade
 #
 # Environment: what `node dist/scripts/migrate.js` needs (DB_HOST, DB_PORT, DB_NAME, DB_USER
-# or MIGRATION_DB_USER as the owner, DB_PASSWORD or MIGRATION_DB_PASSWORD, and the secrets),
+# or MIGRATION_DB_USER as the owner, DB_PASSWORD, and the secrets),
 # and PG_CONTAINER, the Postgres container: pg_dump and psql run there, so their version
 # matches the server's.
 set -euo pipefail
@@ -32,7 +32,7 @@ BACKEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 : "${PG_CONTAINER:?set PG_CONTAINER to the Postgres container}"
 : "${DB_NAME:?set DB_NAME}"
 OWNER="${MIGRATION_DB_USER:-${DB_USER:?set DB_USER or MIGRATION_DB_USER}}"
-OWNER_PASSWORD="${MIGRATION_DB_PASSWORD:-${DB_PASSWORD:-}}"
+OWNER_PASSWORD="${DB_PASSWORD:-}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 

@@ -29,6 +29,7 @@ import * as path from 'path';
 import { createMigrationPool } from '../db/migrationPool.js';
 import { createLogger } from '../utils/logger.js';
 import { config } from '../config.js';
+import { secretsInEnvironment } from '../utils/docker-secrets.js';
 
 dotenv.config();
 
@@ -57,6 +58,12 @@ const TARGETS: Array<{ table: string; column: string; global: boolean }> = [
 ];
 
 async function main(): Promise<void> {
+  // As the server does, refuse a secret in the environment in production.
+  const refused = secretsInEnvironment();
+  if (refused.length > 0) {
+    process.stderr.write(`Fix the configuration first:\n${refused.map((p) => `  - ${p}`).join('\n')}\n`);
+    process.exit(1);
+  }
   const pool = createMigrationPool();
 
   let migrated = 0;

@@ -150,7 +150,7 @@ export function stopSchemaDownloads(): number {
 export interface SchemaDumpOptions {
   /** Undefined: the server's own (getDbLocation). */
   location?: DbLocation | undefined;
-  /** The role pg_dump connects as: the one backups use (BACKUP_DB_USER, else the schema owner). Undefined: the owner. */
+  /** The role pg_dump connects as. Undefined: the schema owner, as backups use. */
   credentials?: DbCredentials | undefined;
   timeLimitMs?: number;
   maxBytes?: number;
@@ -182,7 +182,7 @@ export function streamSchemaDump(res: Response, fileName: string, options: Schem
     return Promise.reject(new SchemaDumpError('pg_dump was not started: the client had closed the connection', 'aborted', false));
   }
   const location = options.location ?? getDbLocation();
-  const credentials = options.credentials ?? getOwnerCredentials(process.env, true);
+  const credentials = options.credentials ?? getOwnerCredentials();
   const timeLimitMs = options.timeLimitMs ?? SCHEMA_DUMP_TIME_LIMIT_MS;
   const maxBytes = options.maxBytes ?? SCHEMA_DUMP_MAX_BYTES;
   const killGraceMs = options.killGraceMs ?? KILL_GRACE_MS;
@@ -310,7 +310,7 @@ export async function writePrivateFile(filePath: string, content: string): Promi
  */
 export async function writeSchemaDump(filePath: string, options: SchemaDumpOptions = {}): Promise<{ bytes: number }> {
   const location = options.location ?? getDbLocation();
-  const credentials = options.credentials ?? getOwnerCredentials(process.env, true);
+  const credentials = options.credentials ?? getOwnerCredentials();
   const timeLimitMs = options.timeLimitMs ?? SCHEMA_DUMP_TIME_LIMIT_MS;
   const maxBytes = options.maxBytes ?? SCHEMA_DUMP_MAX_BYTES;
   const killGraceMs = options.killGraceMs ?? KILL_GRACE_MS;

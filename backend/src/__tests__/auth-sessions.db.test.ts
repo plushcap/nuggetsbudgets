@@ -6,6 +6,9 @@ vi.hoisted(() => {
 });
 
 import http from 'http';
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { createHash, generateKeyPairSync, randomBytes, sign, type KeyObject } from 'crypto';
 import bcrypt from 'bcryptjs';
 import request from 'supertest';
@@ -223,14 +226,26 @@ describeDb('Sessions, the active ledger, MCP tokens and passkey removal through 
     // with every session cookie anyway.
     const CSRF_MAX_AGE = `Max-Age=${7 * 24 * 60 * 60}`;
 
-    /** `fn`'s requests, answered as a production backend: the cookie code reads NODE_ENV on each call. */
+    /**
+     * `fn`'s requests, answered as a production backend: the cookie code reads NODE_ENV on each
+     * call. Production reads its secrets only from their files, so they are written to some.
+     */
     async function inProduction<T>(fn: () => Promise<T>): Promise<T> {
-      const previous = process.env.NODE_ENV;
+      const previous = { NODE_ENV: process.env.NODE_ENV, SECRETS_PATH: process.env.SECRETS_PATH };
+      const dir = mkdtempSync(path.join(os.tmpdir(), 'auth-sessions-secrets-'));
+      for (const name of ['SESSION_SECRET', 'CSRF_SECRET', 'JWT_SECRET']) {
+        writeFileSync(path.join(dir, name.toLowerCase()), process.env[name] || randomBytes(32).toString('base64'));
+      }
       process.env.NODE_ENV = 'production';
+      process.env.SECRETS_PATH = dir;
       try {
         return await fn();
       } finally {
-        process.env.NODE_ENV = previous;
+        for (const [name, value] of Object.entries(previous)) {
+          if (value === undefined) delete process.env[name];
+          else process.env[name] = value;
+        }
+        rmSync(dir, { recursive: true, force: true });
       }
     }
 

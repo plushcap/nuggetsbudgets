@@ -4,7 +4,7 @@ import pool, { poolSettings } from './db.js';
 import { retentionPolicy } from './services/maintenance/retention.js';
 import { checkSecretsForStartup } from './utils/security-validator.js';
 import { config } from './config.js';
-import { initializeSecrets } from './utils/docker-secrets.js';
+import { copySecretsIntoEnvironment, initializeSecrets, secretsInEnvironment } from './utils/docker-secrets.js';
 import { createApp } from './app.js';
 import { mountRoutes } from './routes.js';
 import { ImportService } from './services/ImportService.js';
@@ -18,22 +18,29 @@ import { resolveTrustProxy } from './utils/trustProxy.js';
 import { bcryptRounds, warmPasswordHashing } from './utils/passwords.js';
 import { getPasswordPolicy } from './utils/validation.js';
 import { breachCheckEnabled } from './services/breachedPasswords.js';
-import { validateStartupConfig } from './utils/productionConfig.js';
+import { ProductionConfigError, validateStartupConfig } from './utils/productionConfig.js';
 import { isApiRateLimitingEnabled } from './middleware/security.js';
 
 // Load environment variables first
 dotenv.config();
 
-// Load Docker secrets into process.env before security validation
-if (config().USE_DOCKER_SECRETS) {
-  const secrets = initializeSecrets();
-  // Set secrets as environment variables for validation, where envSecret reads them.
-  /* eslint-disable no-restricted-syntax -- the Docker secrets, copied into the environment once at startup */
-  process.env.JWT_SECRET = secrets.jwtSecret;
-  process.env.DB_PASSWORD = secrets.dbPassword;
-  process.env.SESSION_SECRET = secrets.sessionSecret;
-  process.env.CSRF_SECRET = secrets.csrfSecret;
-  /* eslint-enable no-restricted-syntax */
+// In production a secret comes only from its Docker secret file: one in the environment (the
+// stack's settings, a .env) is refused, before the secrets read from the files are copied into
+// the environment below. (A required file that is missing was reported already, by db.ts's
+// import, naming a variable set in its place.) Rethrown so the reason reaches stderr even if
+// the async log transport hasn't flushed.
+const secretsFromEnvironment = secretsInEnvironment();
+if (secretsFromEnvironment.length > 0) {
+  const err = new ProductionConfigError(secretsFromEnvironment);
+  logger.fatal({ err }, 'Refusing to start: fix the configuration');
+  throw err;
+}
+
+// Load Docker secrets into process.env before security validation, where envSecret reads
+// them: always in production, which has no other source, elsewhere with USE_DOCKER_SECRETS.
+const readsSecretFiles = config().USE_DOCKER_SECRETS || config().NODE_ENV === 'production';
+if (readsSecretFiles) {
+  copySecretsIntoEnvironment(initializeSecrets());
 }
 
 // The configuration, checked now rather than failing later:
@@ -57,7 +64,7 @@ logger.info({
   nodeEnv: config().NODE_ENV,
   port: PORT,
   trustProxy: resolveTrustProxy(),
-  useDockerSecrets: config().USE_DOCKER_SECRETS,
+  useDockerSecrets: readsSecretFiles,
   // Production always limits, whatever API_RATE_LIMITING says.
   rateLimitingEnabled: isApiRateLimitingEnabled(),
   domainUrl: config().DOMAIN_URL || 'not configured',
