@@ -93,11 +93,24 @@ describe('FlexLayout (the app shell)', () => {
       expect(screen.getByRole('main')).toHaveFocus();
     });
 
+    it('lists the sections in order, with Investments marked Beta and Reports set apart', () => {
+      renderShell('/accounts');
+      const menu = screen.getByRole('navigation', { name: 'Main' });
+      // The menu's list (the logo above it links home too); this setup has 2 new on Activity.
+      expect(within(within(menu).getByRole('list')).getAllByRole('link').map((link) => link.textContent?.trim())).toEqual([
+        'Home', 'Budgets', 'Tasks', 'Close-Out', 'Goals', 'Bills', 'Accounts', 'Transactions',
+        'Agent Activity 2', 'Tags', 'Investments Beta', 'Reports',
+      ]);
+      expect(within(menu).getByRole('link', { name: 'Investments Beta' })).toBeInTheDocument();
+      expect(within(menu).getByRole('link', { name: 'Reports' }).closest('li')).toHaveClass('border-t');
+      expect(within(menu).getByRole('link', { name: 'Tags' }).closest('li')).not.toHaveClass('border-t');
+    });
+
     it('marks the current page, and the section of a page inside one, with aria-current', () => {
       const { unmount } = renderShell('/accounts');
       const menu = screen.getByRole('navigation', { name: 'Main' });
       expect(within(menu).getByRole('link', { name: 'Accounts' })).toHaveAttribute('aria-current', 'page');
-      expect(within(menu).getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('aria-current');
+      expect(within(menu).getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current');
       unmount();
 
       renderShell('/accounts/abc');
@@ -121,7 +134,7 @@ describe('FlexLayout (the app shell)', () => {
 
     it('names the activity count it shows', () => {
       renderShell('/dashboard');
-      expect(screen.getByRole('link', { name: 'Activity, 2 new' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Agent Activity, 2 new' })).toBeInTheDocument();
     });
 
     it('after following a menu link, focuses the new page’s heading and names the page', async () => {

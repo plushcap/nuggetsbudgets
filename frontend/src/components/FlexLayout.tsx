@@ -50,7 +50,12 @@ const MainMenu: React.FC<{
           const current = navCurrent(pathname, item.href, item.also);
           const unread = item.href === '/activity' && activityBadge > 0 ? activityBadge : 0;
           return (
-            <li key={item.href}>
+            <Box
+              asChild
+              key={item.href}
+              {...(item.separated ? { mt: '3', pt: '3', className: 'border-t border-[var(--gray-6)]' } : {})}
+            >
+            <li>
               <Flex asChild align="center" gap="3" px="3">
               <Link
                 to={item.href}
@@ -64,6 +69,13 @@ const MainMenu: React.FC<{
               >
                 <Icon size={20} aria-hidden="true" />
                 <span>{item.name}</span>
+                {/* Read with the name: "Investments Beta". */}
+                {item.beta && ' '}
+                {item.beta && (
+                  <Badge size="1" color="gray" variant="soft">
+                    Beta
+                  </Badge>
+                )}
                 {/* Between the name and the count, so their text reads "Activity 2", not "Activity2"
                     (a checker comparing it with the link's name); a flex container doesn't draw it. */}
                 {unread > 0 && ' '}
@@ -75,6 +87,7 @@ const MainMenu: React.FC<{
               </Link>
               </Flex>
             </li>
+            </Box>
           );
         })}
       </ul>

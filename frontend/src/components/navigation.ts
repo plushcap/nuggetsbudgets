@@ -20,22 +20,26 @@ export interface NavItem {
   icon: LucideIcon;
   /** Other path prefixes that belong to this section (e.g. a budget item's pages to Budgets). */
   also?: string[];
+  /** A section still in beta: the menu marks it with a small Beta tag. */
+  beta?: boolean;
+  /** The menu sets it apart from the entries above it, with a gap and a line. */
+  separated?: boolean;
 }
 
 /** The main menu: the sidebar on a wide screen, the drawer on a narrow one. */
 export const NAV_ITEMS: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home },
+  { name: 'Home', href: '/dashboard', icon: Home },
   { name: 'Budgets', href: '/budgets', icon: FileSliders, also: ['/budget-items'] },
-  { name: 'Bills', href: '/bills', icon: Receipt },
-  { name: 'Accounts', href: '/accounts', icon: Wallet },
-  { name: 'Investments', href: '/investments', icon: TrendingUp },
-  { name: 'Transactions', href: '/transactions', icon: CreditCard, also: ['/transfertransaction'] },
   { name: 'Tasks', href: '/tasks', icon: CheckSquare },
-  { name: 'Activity', href: '/activity', icon: MessageSquare },
-  { name: 'Tags', href: '/tags', icon: Tag },
   { name: 'Close-Out', href: '/close-out', icon: CheckCircle },
   { name: 'Goals', href: '/goals', icon: Target },
-  { name: 'Reports', href: '/reports', icon: BarChart3 },
+  { name: 'Bills', href: '/bills', icon: Receipt },
+  { name: 'Accounts', href: '/accounts', icon: Wallet },
+  { name: 'Transactions', href: '/transactions', icon: CreditCard, also: ['/transfertransaction'] },
+  { name: 'Agent Activity', href: '/activity', icon: MessageSquare },
+  { name: 'Tags', href: '/tags', icon: Tag },
+  { name: 'Investments', href: '/investments', icon: TrendingUp, beta: true },
+  { name: 'Reports', href: '/reports', icon: BarChart3, separated: true },
 ];
 
 /** The thumb-reachable destinations in the bottom tab bar on a narrow screen. */
