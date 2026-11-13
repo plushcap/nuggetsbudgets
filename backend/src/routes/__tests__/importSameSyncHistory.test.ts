@@ -89,7 +89,7 @@ describe("A sync's rows see the history of the rows it adds before them", () => 
     const tea = await one<{ id: number }>(`INSERT INTO budget_items (name, expense_type, rollover, type) VALUES ('Leaves', 'Expense', false, 'Monthly') RETURNING id`);
     await one(`INSERT INTO budget_item_matching_rules (budget_item_id, method, matching_text, is_active) VALUES ($1, 'contains', 'tea house', true) RETURNING id`, [tea.id]);
     const acct = await account();
-    // The first row is linked to this manual entry (same amount, within 7 days): it adds nothing.
+    // The first row is linked to this manual entry (same amount, a few days apart): it adds nothing.
     await one(
       `INSERT INTO transactions (account_id, amount, transaction_date, type, description) VALUES ($1, -8.00, '2032-03-10', 'expense', 'Tea by hand') RETURNING id`,
       [acct.id]

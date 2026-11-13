@@ -766,7 +766,7 @@ describe('SimpleFin sync', () => {
       it('adjusts only by the drift the feed leaves unexplained, sync after sync, and counts the row once it is saved', async () => {
         const account = await linkedAccount('rebalance-failed-row', { rebalance: true });
         const opening = { id: `RF1-${stamp}`, amount: '1000.00', description: 'DEPOSIT', posted: daysAgo(9) };
-        // Older than the 7 days an import is linked to a manual entry of its amount across, or
+        // Older than the 7 days before an import a manual entry of its amount is linked across, or
         // the row coming in later would take over an adjustment of its amount.
         const fee = { id: `RF2-${stamp}`, amount: '-40.00', description: 'FEE', posted: daysAgo(8) };
         // The bank's balance has the fee in it, and a 5.00 charge the feed never lists. Compared
@@ -916,7 +916,7 @@ describe('SimpleFin sync', () => {
           expect((await lastSyncLog()).error_message).not.toContain(notAdjusted);
         }
 
-        // An entry of its amount within 7 days of the feed's days could be it: not compared.
+        // An entry of its amount near the feed's days could be it: not compared.
         const near = await linkedAccount('rebalance-failed-near-manual', { rebalance: true });
         feed = accountSet([{ id: near.importId, balance: '1000.00', transactions: [{ ...opening, id: `RN3-${stamp}` }] }]);
         await fullSync();
