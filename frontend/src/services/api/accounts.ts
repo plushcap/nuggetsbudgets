@@ -33,10 +33,14 @@ import { logger } from '../../utils/logger';
  * @param includeHidden - Include hidden accounts in results (default: false)
  * @returns Array of accounts
  */
-export const getAccounts = async (includeHidden: boolean = false): Promise<Account[]> => {
+/**
+ * The accounts, with today's balances, or with `asOf` (YYYY-MM-DD) the balances at the end of
+ * that day.
+ */
+export const getAccounts = async (includeHidden: boolean = false, asOf?: string): Promise<Account[]> => {
   try {
-    // include_hidden is false when it isn't sent (accountListQuery).
-    const url = `${API_BASE_URL}/accounts${queryString(accountListQuery, { include_hidden: includeHidden || undefined })}`;
+    // include_hidden is false when it isn't sent, and as_of today (accountListQuery).
+    const url = `${API_BASE_URL}/accounts${queryString(accountListQuery, { include_hidden: includeHidden || undefined, as_of: asOf })}`;
     const response = await fetch(url, {
       headers: getAuthHeaders(),
     });

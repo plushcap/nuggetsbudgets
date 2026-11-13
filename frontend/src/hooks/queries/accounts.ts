@@ -27,6 +27,19 @@ export function useAccountsQuery(showHidden = false, options?: QueryOverrides) {
   });
 }
 
+/**
+ * The accounts (not hidden) with their balances at the end of `asOf` (YYYY-MM-DD), as
+ * Close-Out reconciles a month. `undefined` disables the query.
+ */
+export function useAccountsAsOfQuery(asOf: string | undefined, options?: QueryOverrides) {
+  return useQuery({
+    queryKey: accountKeys.listAsOf(asOf ?? ''),
+    queryFn: () => getAccounts(false, asOf),
+    enabled: !!asOf,
+    ...options,
+  });
+}
+
 /** A single account by uuid. `undefined` uuid disables the query. */
 export function useAccountQuery(uuid: string | undefined, options?: QueryOverrides) {
   return useQuery({

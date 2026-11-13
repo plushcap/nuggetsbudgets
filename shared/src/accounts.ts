@@ -7,6 +7,7 @@ import {
   assetType,
   queryAmountFilter,
   queryBoolean,
+  queryCalendarDay,
   queryDayFilter,
   queryIdFilter,
   queryInt,
@@ -236,12 +237,14 @@ export type ZeroBalanceAudit = z.infer<typeof zeroBalanceAuditResponseSchema>;
 /**
  * GET /api/accounts query: include_hidden (false when not given), exclude_closed (true when
  * not given), exclude_balance (false when not given: true leaves out the balances, which
- * cost a query per account), each true or false.
+ * cost a query per account), each true or false; and as_of, a day (YYYY-MM-DD): the
+ * balances at the end of that day, as Close-Out shows a month's, instead of today's.
  */
 export const accountListQuery = z.object({
   include_hidden: queryBoolean({ default: false }),
   exclude_closed: queryBoolean({ default: true }),
   exclude_balance: queryBoolean({ default: false }),
+  as_of: queryCalendarDay(),
 });
 export type AccountListQuery = z.infer<typeof accountListQuery>;
 

@@ -115,6 +115,28 @@ describe('Account balances', () => {
     expect(await detailBalance(acct.uuid)).toBeCloseTo(290, 2);
   });
 
+  // Close-Out reconciles a month against the envelope account's balance at its end: today's,
+  // for a past month, disagreed by everything since.
+  it('answers the balances at the end of a day with as_of, today\'s without it', async () => {
+    const acct = await createAccount(0);
+    await addTxn(acct.id, 500, '2026-01-31', 'income');
+    await addTxn(acct.id, -120, '2026-02-10');
+    await addTxn(acct.id, -30, '2026-03-05');
+    const tomorrow = (await pool.query<{ d: string }>('SELECT (app_today() + 1)::text AS d')).rows[0].d;
+    await addTxn(acct.id, -5, tomorrow);
+    const asOf = async (day: string) => {
+      const res = await request(app).get('/api/accounts').query({ as_of: day }).expect(200);
+      return res.body.accounts.find((a: { uuid: string }) => a.uuid === acct.uuid).calculated_balance as number;
+    };
+    expect(await asOf('2026-01-31')).toBeCloseTo(500, 2);
+    expect(await asOf('2026-02-28')).toBeCloseTo(380, 2);
+    // Today's leaves out the transaction dated tomorrow; a day from then on counts it.
+    expect(await listBalance(acct.uuid)).toBeCloseTo(350, 2);
+    expect(await asOf(tomorrow)).toBeCloseTo(345, 2);
+    // A day that isn't one is refused.
+    await request(app).get('/api/accounts').query({ as_of: '2026-02-30' }).expect(400);
+  });
+
   it('sees a back-dated insert', async () => {
     const acct = await createAccount(100);
     await addTxn(acct.id, -10, '2026-03-01');

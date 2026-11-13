@@ -176,7 +176,9 @@ describe('CloseOutPage', () => {
       renderPage();
 
       expect(await screen.findByText('Record unbudgeted income (e.g. interest), or withdraw the excess from Reserve savings')).toBeInTheDocument();
-      expect(line('Actual Envelope Balance')).toBe('Actual Envelope Balance$1,880.91Reserve savings');
+      // The envelope account's balance at the end of the month reconciled, not today's.
+      expect(line('Actual Envelope Balance')).toBe('Actual Envelope Balance$1,880.91Reserve savings, end of Oct 31, 2026');
+      expect(api.calls('GET /accounts').map((call) => call.query.get('as_of'))).toContain(october.end_date);
       expect(line('Expected Budget Balance')).toBe('Expected Budget Balance$850.603 envelope items');
       expect(line('Variance')).toBe('Variance$1,030.31');
       // What the page worked out, exactly: in floats it was 850.5999999999999 and
@@ -204,6 +206,8 @@ describe('CloseOutPage', () => {
       expect(body.amount).toBe(1030.31);
       expect(String(body.amount)).toMatch(/^\d+(\.\d{1,2})?$/);
       expect(body).toMatchObject({ source_account_id: longTerm.id, destination_account_id: checking.id, type: 'transfer' });
+      // October has ended: the transfer is dated its last day, so it counts in October's balance.
+      expect(body.transaction_date).toBe(october.end_date);
       expect(transferCreateSchema.safeParse(body).success).toBe(true);
     });
 

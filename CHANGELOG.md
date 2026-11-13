@@ -83,6 +83,12 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
 
 ### Fixed
 
+- Close-Out's envelope reconciliation compares a month's envelopes with the envelope account's
+  balance at the end of that month (the date is shown under it). It used today's balance for
+  every month, so a past month showed a variance of everything that had moved since. Its
+  **Submit Transfer** dates a transfer for a month that has ended on that month's last day, so
+  the transfer counts in the month it balances. `GET /api/accounts` takes `as_of`
+  (YYYY-MM-DD) for the balances at the end of that day.
 - The plain-text part of notification emails reads as the email does: apostrophes, `=` and
   © come out as characters, not codes, Outlook-only markup no longer leaves a stray "96",
   and the button's and the unsubscribe link's addresses are in it.
