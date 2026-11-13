@@ -56,8 +56,9 @@ const HKDF_INFO_PREFIX = 'nuggets-encryption-v2:';
 /**
  * Per-purpose key-derivation domains. Each yields a distinct key: AES keys for
  * the envelopes, `unsubscribe` the HMAC key that signs notification unsubscribe
- * links, and `backupSignature` the HMAC key a server signs its own backups with
- * (derived from the data encryption secret, never from a backup key).
+ * links, `backupSignature` the HMAC key a server signed its own backups with before they
+ * were age (derived from the data encryption secret, never from a backup key), and
+ * `backupSigner` the seed of the Ed25519 key it signs age backups with (backupFormat.ts).
  */
 export const DOMAIN = {
   backup: 'backup',
@@ -65,6 +66,7 @@ export const DOMAIN = {
   onedrive: 'onedrive',
   unsubscribe: 'unsubscribe',
   backupSignature: 'backup-signature',
+  backupSigner: 'backup-signer-ed25519',
 } as const;
 
 export type Domain = (typeof DOMAIN)[keyof typeof DOMAIN];

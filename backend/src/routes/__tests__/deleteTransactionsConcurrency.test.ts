@@ -124,7 +124,7 @@ describe('delete-transactions with concurrent writes', () => {
     const spy = vi.spyOn(BackupService.prototype, 'createBackup').mockImplementation(async () => {
       started();
       await finished;
-      return { filePath: '/nowhere/held.backup', fileName: 'held.backup', fileSize: 0 };
+      return { filePath: '/nowhere/held.backup', fileName: 'held.backup', fileSize: 0, sha256: null };
     });
     return { running, finish, spy };
   };
@@ -202,7 +202,7 @@ describe('delete-transactions with concurrent writes', () => {
     const spy = vi.spyOn(BackupService.prototype, 'createBackup').mockImplementation(async () => {
       backedUp = (await tenant.pool.query('SELECT amount FROM transactions WHERE id = $1', [x])).rows[0].amount;
       await tenant.pool.query('UPDATE transactions SET amount = -500 WHERE id = $1', [x]);
-      return { filePath: '/nowhere/read-x.backup', fileName: 'read-x.backup', fileSize: 0 };
+      return { filePath: '/nowhere/read-x.backup', fileName: 'read-x.backup', fileSize: 0, sha256: null };
     });
     const res = await startDelete(range, previewed, true);
 
@@ -325,7 +325,7 @@ describe('delete-transactions with concurrent writes', () => {
 
     vi.spyOn(BackupService.prototype, 'createBackup').mockImplementation(async () => {
       await change(rows);
-      return { filePath: '/nowhere/changed.backup', fileName: 'changed.backup', fileSize: 0 };
+      return { filePath: '/nowhere/changed.backup', fileName: 'changed.backup', fileSize: 0, sha256: null };
     });
     const res = await startDelete(range, previewed, true);
 

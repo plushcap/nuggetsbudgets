@@ -195,6 +195,25 @@ jobs:
         SESSION_SECRET: test_session_secret
         CSRF_SECRET: test_csrf_secret
 
+    # age's release binaries, pinned by their checksum, for the interop test
+    # (backupFormat.interop.test.ts, in the unit project): a backup the code makes opens with
+    # age -d and tar, and a file age -e makes opens with the reader, with classic and
+    # post-quantum keys. It refuses to skip in CI. Ubuntu's own age (1.1) neither makes nor
+    # opens post-quantum keys, which need age 1.3.
+    - name: Install age 1.3
+      env:
+        AGE_VERSION: 1.3.2
+        AGE_SHA256: cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10
+      run: |
+        dir="$RUNNER_TEMP/age"
+        mkdir -p "$dir"
+        tarball="age-v${AGE_VERSION}-linux-amd64.tar.gz"
+        curl -fsSL -o "$dir/$tarball" "https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/${tarball}"
+        echo "${AGE_SHA256}  $dir/$tarball" | sha256sum -c -
+        tar -xzf "$dir/$tarball" -C "$dir"
+        echo "AGE_BIN=$dir/age" >> "$GITHUB_ENV"
+        "$dir/age/age" --version
+
     # The unit project needs no database. It runs here with none configured, as on
     # a contributor's machine, so a database test named into it fails (backend/vitest.config.ts).
     - name: Run backend unit tests without a database

@@ -15,7 +15,7 @@ import { OneDriveService } from './OneDriveService.js';
 import { createLogger } from '../utils/logger.js';
 import { terminatePgTools } from '../utils/pgTools.js';
 import { stopSchemaDownloads } from './databaseDiagnostics.js';
-import { getRestoreStatus, isRestoreRunning, restoreJobSettled } from './restoreJob.js';
+import { getRestoreStatus, getVerifyStatus, isRestoreRunning, isVerifyRunning, restoreJobSettled, verifyJobSettled } from './restoreJob.js';
 import type { BackupHealth } from '../middleware/health-checks.js';
 import { ProductionConfigError, refuseSetting } from '../utils/productionConfig.js';
 import { strictSetting } from '../config.js';
@@ -588,8 +588,13 @@ export class ApplicationLifecycleService {
         'A restore is replacing the data: waiting for it to finish, up to the shutdown deadline'
       );
       await BackupService.idle();
-    } else if (operation?.kind === 'restore') {
-      logger.warn({ phase: getRestoreStatus().phase }, 'Stopping the restore: it had not begun replacing the data, which stays as it was');
+    } else if (operation?.kind === 'restore' || operation?.kind === 'verify') {
+      logger.warn(
+        { operation: operation.kind, phase: operation.kind === 'verify' ? getVerifyStatus().phase : getRestoreStatus().phase },
+        operation.kind === 'verify'
+          ? 'Stopping the verify: it drops its scratch database, and the data is not touched'
+          : 'Stopping the restore: it had not begun replacing the data, which stays as it was'
+      );
       // Again until it has ended, in case it started a query or pg_restore just after a call.
       while (BackupService.runningOperation()) {
         try {
@@ -600,6 +605,9 @@ export class ApplicationLifecycleService {
         await Promise.race([BackupService.idle(), sleep(RESTORE_INTERRUPT_INTERVAL_MS)]);
       }
     }
+
+    // A verify accepted just before the shutdown ends without starting; one stopped above has ended.
+    if (isVerifyRunning()) await verifyJobSettled();
 
     if (restoreJob) {
       await restoreJobSettled();
@@ -630,6 +638,13 @@ export class ApplicationLifecycleService {
           '("not currently accepting connections"), the swap was cut short and the data is still the one from before ' +
           `the restore: ${allowConnectionsFix(operation.database)} Otherwise the data is the backup's, and its upload ` +
           "files may be only partly in place (the ones replaced are in the temp directory's before-restore/uploads)."
+      );
+      return true;
+    }
+    if (operation?.kind === 'verify') {
+      logger.error(
+        { operation: 'verify', phase: getVerifyStatus().phase },
+        'Exiting while a backup is being verified; the data is not touched. The next start removes its scratch database'
       );
       return true;
     }
@@ -767,8 +782,10 @@ export class ApplicationLifecycleService {
     lastRunStartedAt: string | null;
     lastRunFinishedAt: string | null;
     lastRunOutcome: 'success' | 'failed' | null;
-    /** Backups are on but none can run until a backup key is generated. */
+    /** Backups are on but none can run until a backup key is set up. */
     waitingForBackupKey: boolean;
+    /** Backups are made with the old backup key until a backup key is set up (an upgraded install). */
+    usingOldBackupKey: boolean;
   }> {
     const backupScheduler = this.schedulers.get('backup').current;
     if (!backupScheduler) {
@@ -780,6 +797,7 @@ export class ApplicationLifecycleService {
         lastRunFinishedAt: null,
         lastRunOutcome: null,
         waitingForBackupKey: false,
+        usingOldBackupKey: false,
       };
     }
 
@@ -793,6 +811,7 @@ export class ApplicationLifecycleService {
       lastRunFinishedAt: status.lastRunFinishedAt?.toISOString() ?? null,
       lastRunOutcome: status.lastRunOutcome,
       waitingForBackupKey: status.waitingForBackupKey,
+      usingOldBackupKey: status.usingOldBackupKey,
     };
   }
 
@@ -809,7 +828,11 @@ export class ApplicationLifecycleService {
     if (!scheduler.enabled) {
       problems.push('Automatic backups are off');
     } else if (scheduler.waitingForBackupKey) {
-      problems.push('Automatic backups are on but none can be made: generate a backup key on the Backup page, and download it');
+      problems.push('Automatic backups are on but none can be made: set up a backup key on the Backup page');
+    }
+    const encryption = await this.backupService.encryptionState().catch(() => null);
+    if (encryption?.mode === 'legacy') {
+      problems.push('Backups still use the old backup key: set up a backup key on the Backup page, so the server can no longer open its backups');
     }
     if (scheduler.lastRunOutcome === 'failed') {
       problems.push(`The last automatic backup failed (${scheduler.lastRunFinishedAt}); see the server log`);

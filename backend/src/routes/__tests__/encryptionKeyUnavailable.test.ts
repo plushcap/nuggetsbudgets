@@ -14,6 +14,11 @@ vi.mock('../../utils/data-encryption-secret.js', async (importOriginal) => ({
     throw new Error('no data encryption secret found (looked in: /run/secrets/data_encryption_key)');
   }),
 }));
+// Step-up is the auth tests' (route-authorization); here the session counts as recent.
+vi.mock('../../middleware/auth.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../middleware/auth.js')>()),
+  requireRecentReauth: (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
 vi.mock('../../services/OneDriveService.js', () => ({
   OneDriveService: class {
     isConfigured = async () => false;

@@ -17,18 +17,23 @@ vi.mock('../services/BackupService.js', async () => {
     BackupService: class {
       static isBackupInProgress = () => false;
       static isRestoreInProgress = () => false;
+      static isVerifyInProgress = () => false;
       constructor() {
         return new Proxy(this, {
           get: (_target, prop) =>
             prop === 'then'
               ? undefined
-              : prop === 'listBackups' || prop === 'readEditableSettings'
+              : prop === 'listBackups' || prop === 'readEditableSettings' || prop === 'listRecipients'
                 ? async () => []
                 : prop === 'readSettings'
                   ? async () => ({})
-                  : prop === 'getTempDir'
-                    ? () => tmpdir()
-                    : async () => undefined,
+                  : prop === 'encryptionState'
+                    ? async () => ({ recipients: 0, legacyKey: false, mode: 'none' })
+                    : prop === 'getBackupKeyStatus'
+                      ? async () => ({ exists: false, downloaded: false })
+                      : prop === 'getTempDir'
+                        ? () => tmpdir()
+                        : async () => undefined,
         });
       }
     },

@@ -159,7 +159,7 @@ describe('a failing handler answers without the error text', () => {
       .post('/api/data-management/delete-transactions')
       .send({ ...(await previewedJanuary()), createBackup: true });
     expect(noKey.status).toBe(500);
-    expect(noKey.body.message).toMatch(/No backup encryption key has been generated/);
+    expect(noKey.body.message).toMatch(/No backup key has been set up/);
   });
 
   it.each(['start', 'stop', 'restart'])('POST /api/admin/notifications/scheduler/%s', async (action) => {
@@ -214,7 +214,7 @@ describe('a failing handler answers without the error text', () => {
     expect((await request(app).post('/api/backup/create')).status).toBe(202);
     await vi.waitFor(async () => {
       const again = await request(app).get('/api/backup/create-status');
-      expect(again.body.error).toMatch(/No backup encryption key has been generated/);
+      expect(again.body.error).toMatch(/No backup key has been set up/);
     });
   });
 

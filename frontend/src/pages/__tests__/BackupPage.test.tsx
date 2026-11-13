@@ -5,6 +5,7 @@ import { Theme } from '@radix-ui/themes';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import BackupPage from '../BackupPage';
 import { SessionExpiredError } from '../../services/api/base';
+import { backupKeys, backupRecipient } from '../../test/fixtures';
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ toast, default: toast }));
@@ -30,10 +31,10 @@ vi.mock('../../services/api', async (importOriginal) => {
     getBackups: () => api.backups(),
     getOneDriveStatus: () => api.onedriveStatus(),
     checkBackupOneDriveStatus: (fileNames: string[]) => api.uploadStatus(fileNames),
-    getBackupKeyStatus: async () => ({ exists: true, downloaded: true }),
+    getBackupKeys: async () => backupKeys({ recipients: [backupRecipient()] }),
     createBackup: async () => ({ success: true, started: true }),
     getBackupCreateStatus: () => api.createStatus(),
-    restoreBackupFromServer: (fileName: string, key?: string) => api.restoreFromServer(fileName, key),
+    restoreBackupFromServer: (fileName: string, keys: unknown) => api.restoreFromServer(fileName, keys),
     getRestoreStatus: () => api.restoreStatus(),
   };
 });
@@ -80,7 +81,7 @@ describe('BackupPage', () => {
     api.schedulerStatus.mockResolvedValue(scheduler({ running: false, waitingForBackupKey: true, nextBackupTime: undefined }));
     renderPage();
     expect(await screen.findByText('Waiting for a backup key')).toBeInTheDocument();
-    expect(screen.getByText(/They start once you generate one/)).toBeInTheDocument();
+    expect(screen.getByText(/They start once you make or add one under Backup keys/)).toBeInTheDocument();
     expect(await screen.findByRole('switch', { name: 'Enable automatic backups' })).toBeChecked();
   });
 
@@ -112,29 +113,31 @@ describe('BackupPage', () => {
     const user = userEvent.setup({ applyAccept: false });
     renderPage();
     const choose = await screen.findByRole('button', { name: 'Choose backup file' });
-    expect(choose).toHaveAccessibleDescription('Backup File (.enc)');
-    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    expect(choose).toHaveAccessibleDescription(expect.stringMatching(/^Backup File \(\.tar\.age, or an older \.enc\) Restore and Verify ask for the private key/));
+    const input = choose.parentElement!.querySelector<HTMLInputElement>('input[type="file"]')!;
     expect(input).toHaveAttribute('tabindex', '-1');
-    expect(input.accept).toBe('.enc');
+    expect(input.accept).toBe('.tar.age,.age,.enc');
     await user.upload(input, new File(['x'], 'notes.txt', { type: 'text/plain' }));
-    expect(toast.error).toHaveBeenCalledWith('Please select a .enc backup file');
-    await user.upload(input, new File(['x'], 'nuggets_backup.enc', { type: 'application/octet-stream' }));
-    expect(screen.getByText('nuggets_backup.enc')).toBeInTheDocument();
+    expect(toast.error).toHaveBeenCalledWith('Please select a backup file (.tar.age, or an older .enc)');
+    await user.upload(input, new File(['x'], 'nuggets_backup.tar.age', { type: 'application/octet-stream' }));
+    expect(screen.getByText('nuggets_backup.tar.age')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Choose another backup file' })).toBeInTheDocument();
   });
 
   describe('restoring a backup on the server', () => {
-    const listed = { fileName: 'nuggets_backup_20261101_030000_000.enc', size: 1, sizeFormatted: '1 B', created: '2026-11-01T03:00:00.000Z' };
+    // An older .enc backup: the prompt asks for the old key, which may be left empty.
+    const listed = { fileName: 'nuggets_backup_20261101_030000_000.enc', size: 1, sizeFormatted: '1 B', created: '2026-11-01T03:00:00.000Z', format: 'legacy' };
 
     async function restoreListed() {
       api.backups.mockResolvedValue({ backups: [listed] });
       api.restoreFromServer.mockResolvedValue({ success: true, started: true });
       renderPage();
       await userEvent.click(await screen.findByRole('button', { name: 'Restore this backup' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Continue' }));
       await userEvent.click(await screen.findByRole('button', { name: 'Restore Database' }));
     }
 
-    it("follows the restore the server runs, with this server's key when none is typed", async () => {
+    it("follows the restore the server runs, with this server's old key when none is typed", async () => {
       api.restoreStatus
         .mockResolvedValueOnce({ status: 'running', phase: 'migrating' })
         .mockResolvedValue({ status: 'completed', databaseChanged: true });
@@ -142,7 +145,7 @@ describe('BackupPage', () => {
       vi.stubGlobal('location', { ...window.location, reload });
       try {
         await restoreListed();
-        expect(api.restoreFromServer).toHaveBeenCalledWith(listed.fileName, undefined);
+        expect(api.restoreFromServer).toHaveBeenCalledWith(listed.fileName, {});
         expect(await screen.findByText(/Bringing it up to this version/)).toBeInTheDocument();
         await waitFor(() => expect(toast.success).toHaveBeenCalledWith(expect.stringMatching(/Backup restored/)), { timeout: 6000 });
       } finally {

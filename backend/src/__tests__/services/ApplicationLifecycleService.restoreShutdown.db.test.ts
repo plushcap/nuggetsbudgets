@@ -10,6 +10,8 @@ import { MigrationService } from '../../services/MigrationService.js';
 import { pgToolPath } from '../../utils/pgTools.js';
 import type { ImportService } from '../../services/ImportService.js';
 import type { RestoreOptions } from '../../services/BackupService.js';
+import { readAgeHeader } from '../../utils/backupFormat.js';
+import { Decrypter, generateHybridIdentity, identityToRecipient } from 'age-encryption';
 
 /**
  * A shutdown while a real restore runs. It used to wait 50 s
@@ -82,6 +84,8 @@ describe.skipIf(!runnable)('a shutdown while a backup is restored', () => {
   let tmp: string;
   let dirs: { backupLocation: string; uploadsDir: string; tempDir: string };
   let backupFile: { filePath: string; fileName: string };
+  /** The backup's file key, as the browser sends it: each restore job gets a copy (it zeroes its own). */
+  let fileKey: Buffer;
   const clients: Client[] = [];
 
   const ownerQuery = async <T extends object = Record<string, unknown>>(database: string, sql: string, params: unknown[] = []) => {
@@ -269,7 +273,7 @@ describe.skipIf(!runnable)('a shutdown while a backup is restored', () => {
     const restore = () =>
       job.startRestoreJob(
         { pool, backupService, schedulers: lifecycle },
-        { ...backupFile, key: null, deleteAfter: false, userId: 1 }
+        { filePath: backupFile.filePath, fileName: backupFile.fileName, key: null, fileKey: Buffer.from(fileKey), deleteAfter: false, userId: 1 }
       );
     return { lifecycle, backupService, Backups, ShuttingDownError, job, restore, exits };
   }
@@ -295,8 +299,13 @@ describe.skipIf(!runnable)('a shutdown while a backup is restored', () => {
     const pool = new Pool({ ...location, ...serving, max: 2 });
     try {
       const backups = new BackupService(pool, { location, owner, serving, migrationsDir, ...dirs });
-      await backups.generateBackupKey();
+      // A backup key made at run time, and the file key the browser would get with it.
+      const identity = await generateHybridIdentity();
+      await backups.addRecipient({ recipient: await identityToRecipient(identity), label: 'test key', checked: true, createdBy: null });
       backupFile = await backups.createBackup();
+      const opener = new Decrypter();
+      opener.addIdentity(identity);
+      fileKey = Buffer.from(await opener.decryptHeader(await readAgeHeader(backupFile.filePath)));
     } finally {
       await pool.end();
     }

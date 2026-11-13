@@ -1,7 +1,7 @@
 import type { Pool } from 'pg';
 import appPool from '../db.js';
 import { unlink } from 'fs/promises';
-import type { RestoreStatus } from '@nuggets/shared';
+import type { RestoreStatus, VerifyStatus } from '@nuggets/shared';
 import { BackupService, BackupInProgressError, RestoreFailedError, ShuttingDownError } from './BackupService.js';
 import { ControlPlaneError } from './controlPlaneErrors.js';
 import { assertServingRoleEnforcesRls, RlsBypassRoleError } from '../db/servingRole.js';
@@ -23,7 +23,7 @@ const logger = createLogger({ service: 'RestoreJob' });
  */
 
 /** A restore's progress and outcome, as GET /api/backup/restore-status answers it (`@nuggets/shared`). */
-export type { RestoreStatus };
+export type { RestoreStatus, VerifyStatus };
 
 /** What the job stops and starts again: ApplicationLifecycleService. */
 export interface RestoreSchedulers {
@@ -41,6 +41,24 @@ export function getRestoreStatus(): RestoreStatus {
 /** True from the moment a restore is accepted until its schedulers are running again. */
 export function isRestoreRunning(): boolean {
   return running !== null || BackupService.isRestoreInProgress();
+}
+
+let verifyStatus: VerifyStatus = { status: 'idle' };
+let verifying: Promise<void> | null = null;
+
+/** How the verify running, or the last one, went (GET /api/backup/verify-status). */
+export function getVerifyStatus(): VerifyStatus {
+  return verifyStatus;
+}
+
+/** True from the moment a verify is accepted until it has ended. */
+export function isVerifyRunning(): boolean {
+  return verifying !== null || BackupService.isVerifyInProgress();
+}
+
+/** Resolves when the running verify job (if any) has finished. */
+export function verifyJobSettled(): Promise<void> {
+  return verifying ?? Promise.resolve();
 }
 
 /** Resolves when the running restore job (if any) has finished. */
@@ -72,8 +90,13 @@ function shownError(error: unknown): string {
 export interface StartRestoreInput {
   filePath: string;
   fileName: string;
-  /** The key the user typed, or null for this server's own. */
+  /** An older .enc backup: the key the user typed, or null for this server's own. */
   key: string | null;
+  /**
+   * An age backup: its file key, which the browser got from the header with the private key.
+   * Kept in memory for this job only, never stored or logged, and zeroed when it ends.
+   */
+  fileKey: Buffer | null;
   /** Delete the file afterwards (an uploaded backup). */
   deleteAfter: boolean;
   userId: number;
@@ -99,8 +122,11 @@ export function startRestoreJob(
   input: StartRestoreInput
 ): void {
   if (BackupService.isRefusingNewOperations()) throw new ShuttingDownError();
-  if (isRestoreRunning()) throw new BackupInProgressError('A restore is in progress');
+  if (isRestoreRunning()) throw new BackupInProgressError('A restore is in progress', 'restore');
   if (BackupService.isBackupInProgress()) throw new BackupInProgressError('A backup is in progress; restore when it has finished');
+  // Before the schedulers are paused: a verify holds the backup lock, so the restore would
+  // only fail once they were.
+  if (isVerifyRunning()) throw new BackupInProgressError('A backup is being verified; restore when it has finished', 'verify');
 
   const startedAt = new Date().toISOString();
   status = { status: 'running', phase: 'decrypting', fileName: input.fileName, startedAt };
@@ -122,9 +148,11 @@ async function runRestore(
   let shutDown = false;
   try {
     await schedulers.pauseSchedulersForRestore();
-    logger.info({ userId, fileName, usingCustomKey: input.key !== null }, 'Restoring a backup');
+    logger.info({ userId, fileName, usingCustomKey: input.key !== null, usingFileKey: input.fileKey !== null }, 'Restoring a backup');
     const result = await backupService.restoreFromFile(input.filePath, {
       key: input.key,
+      fileKey: input.fileKey,
+      fileName,
       onPhase: (phase) => {
         status = { ...status, phase };
       },
@@ -138,6 +166,8 @@ async function runRestore(
       databaseChanged: true,
       previousDatabase: result.previousDatabase,
       rowCounts: result.rowCounts,
+      backupId: result.manifest?.backupId ?? null,
+      backupCreatedAt: result.manifest?.createdAt ?? null,
     };
     logger.info({ userId, fileName, previousDatabase: result.previousDatabase, rowCounts: result.rowCounts }, 'Backup restored');
   } catch (error) {
@@ -192,7 +222,75 @@ async function runRestore(
       logger.error({ err: error }, 'Could not start the schedulers again after a restore');
     }
   }
+  input.fileKey?.fill(0);
   if (input.deleteAfter) {
     await unlink(input.filePath).catch((error) => logger.warn({ err: error, filePath: input.filePath }, 'Could not delete an uploaded backup'));
   }
+}
+
+/**
+ * Start a verify in the background: the backup is restored into a scratch database, checked
+ * and dropped, while the app keeps serving. No scheduler stops, and nothing goes into
+ * maintenance mode. Throws (synchronously) ShuttingDownError once a shutdown has begun, and
+ * BackupInProgressError while a backup, restore or other verify runs; otherwise the outcome
+ * is in getVerifyStatus().
+ */
+export function startVerifyJob(deps: Pick<RestoreJobDependencies, 'backupService'>, input: StartRestoreInput): void {
+  if (BackupService.isRefusingNewOperations()) throw new ShuttingDownError();
+  if (isVerifyRunning()) throw new BackupInProgressError('A backup is already being verified', 'verify');
+  if (isRestoreRunning()) throw new BackupInProgressError('A restore is in progress', 'restore');
+  if (BackupService.isBackupInProgress()) throw new BackupInProgressError('A backup is in progress; verify when it has finished');
+
+  const startedAt = new Date().toISOString();
+  verifyStatus = { status: 'running', phase: 'decrypting', fileName: input.fileName, startedAt };
+  verifying = runDetached(() => runVerify(deps.backupService, input, startedAt)).finally(() => {
+    verifying = null;
+  });
+}
+
+async function runVerify(backupService: BackupService, input: StartRestoreInput, startedAt: string): Promise<void> {
+  const { userId, fileName } = input;
+  try {
+    logger.info({ userId, fileName, usingFileKey: input.fileKey !== null }, 'Verifying a backup');
+    const result = await backupService.restoreFromFile(input.filePath, {
+      key: input.key,
+      fileKey: input.fileKey,
+      fileName,
+      verifyOnly: true,
+      onPhase: (phase) => {
+        verifyStatus = { ...verifyStatus, phase };
+      },
+    });
+    verifyStatus = {
+      status: 'completed',
+      fileName,
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      backupId: result.manifest?.backupId ?? null,
+      backupCreatedAt: result.manifest?.createdAt ?? null,
+      schemaVersion: result.manifest?.schemaVersion ?? null,
+      appVersion: result.manifest?.appVersion ?? null,
+      rowCounts: result.rowCounts,
+    };
+    logger.info({ userId, fileName, backupId: result.manifest?.backupId, rowCounts: result.rowCounts }, 'Backup verified');
+  } catch (error) {
+    verifyStatus = { status: 'failed', fileName, startedAt, finishedAt: new Date().toISOString(), error: shownVerifyError(error) };
+    const cause = error instanceof RestoreFailedError ? error.cause : error;
+    if (error instanceof BackupInProgressError) logger.warn({ err: error, userId, fileName }, 'Verify refused: a backup or restore is running');
+    else if (cause instanceof ShuttingDownError) logger.warn({ err: error, userId, fileName }, 'Verify stopped by the shutdown');
+    else logger.error({ err: error, userId, fileName }, 'Backup verify failed');
+  } finally {
+    input.fileKey?.fill(0);
+    if (input.deleteAfter) {
+      await unlink(input.filePath).catch((error) => logger.warn({ err: error, filePath: input.filePath }, 'Could not delete an uploaded backup'));
+    }
+  }
+}
+
+/** A verify's failure, for the person who asked: a reason they can act on, else generic. */
+function shownVerifyError(error: unknown): string {
+  const cause = error instanceof RestoreFailedError ? error.cause : error;
+  if (cause instanceof ShuttingDownError) return 'The server shut down during the verify, which changes nothing. Verify again once it has restarted.';
+  const shown = shownError(error);
+  return shown.startsWith('The restore failed') ? 'The backup did not verify; see the server log for why' : shown.replace(/^Restore failed: /, '');
 }

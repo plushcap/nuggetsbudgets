@@ -54,7 +54,7 @@ describe('a restore started inside a ledger transaction', () => {
     await withTenant(tenant.tenantId, async () => {
       expect(inTenantTransaction()).toBe(true);
       expect(getCurrentOrganizationId()).toBeDefined();
-      startRestoreJob({ pool, backupService, schedulers }, { filePath: '/nonexistent.enc', fileName: 'x.enc', key: null, deleteAfter: false, userId: tenant.userId });
+      startRestoreJob({ pool, backupService, schedulers }, { filePath: '/nonexistent.enc', fileName: 'x.enc', key: null, fileKey: null, deleteAfter: false, userId: tenant.userId });
     });
     await restoreJobSettled();
 

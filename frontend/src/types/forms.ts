@@ -20,6 +20,7 @@ import type {
   TagReportFlowMeasure,
   BudgetItemAmountField,
   BudgetItemRequest,
+  BackupKeyKind,
 } from '@nuggets/shared';
 import { todayLocal } from '../utils/dateUtils';
 
@@ -540,4 +541,26 @@ export const createDefaultTagForm = (parentId: number | null = null): TagFormDat
   is_active: true,
   is_report_root: false,
   report_flow_measure: 'effective',
+});
+
+/** Add a backup key by its public key (BackupKeysCard): what age-keygen -y prints. */
+export interface BackupKeyFormData {
+  label: string;
+  recipient: string;
+}
+
+export const createDefaultBackupKeyForm = (): BackupKeyFormData => ({
+  label: '',
+  recipient: '',
+});
+
+/** Make a backup key in the browser (BackupKeysCard): its name and kind. */
+export interface MakeBackupKeyFormData {
+  label: string;
+  kind: BackupKeyKind;
+}
+
+export const createDefaultMakeBackupKeyForm = (): MakeBackupKeyFormData => ({
+  label: 'Password manager',
+  kind: 'post-quantum',
 });

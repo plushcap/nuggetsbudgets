@@ -19,6 +19,8 @@ import {
   attachmentResponseSchema,
   authMeResponseSchema,
   backupFileResponseSchema,
+  backupKeysResponseSchema,
+  backupRecipientResponseSchema,
   backupListResponseSchema,
   backupStartedResponseSchema,
   backupStatusResponseSchema,
@@ -468,6 +470,7 @@ export function backupStatus(overrides: Partial<BackupStatusWire['scheduler']> &
       lastRunFinishedAt: null,
       lastRunOutcome: null,
       waitingForBackupKey: false,
+      usingOldBackupKey: false,
       ...scheduler,
     },
   });
@@ -476,6 +479,37 @@ export function backupStatus(overrides: Partial<BackupStatusWire['scheduler']> &
 /** GET /backup/list: these backup files. */
 export const backupList = (backups: z.input<typeof backupFileResponseSchema>[] = []) =>
   checked(backupListResponseSchema, 'backup list', { success: true, backups });
+
+export type BackupRecipientWire = z.input<typeof backupRecipientResponseSchema>;
+
+/** One backup key, as GET /backup/recipients lists it: a post-quantum key, checked, unless given. */
+export function backupRecipient(overrides: Partial<BackupRecipientWire> = {}): BackupRecipientWire {
+  return checked(backupRecipientResponseSchema, 'backup key', {
+    uuid: '019a6f00-0000-7000-8000-000000000001',
+    recipient: `age1pq1${'q'.repeat(1952)}`,
+    label: 'Password manager',
+    kind: 'post-quantum',
+    hardware: false,
+    fingerprint: '1a2b 3c4d 5e6f 7a8b',
+    checkedAt: '2026-11-13T12:00:00.000Z',
+    createdAt: '2026-11-13T12:00:00.000Z',
+    createdBy: 'Alex Admin',
+    ...overrides,
+  });
+}
+
+/** GET /backup/recipients: these backup keys (none, unless given), age backups, no old key. */
+export function backupKeys(overrides: Partial<z.input<typeof backupKeysResponseSchema>> = {}) {
+  const recipients = overrides.recipients ?? [];
+  return checked(backupKeysResponseSchema, 'backup keys', {
+    recipients,
+    signer: `ed25519:${'A'.repeat(43)}`,
+    mode: recipients.length > 0 ? 'age' : 'none',
+    maxRecipients: 5,
+    legacyKey: { exists: false, downloaded: false },
+    ...overrides,
+  });
+}
 
 /** GET /onedrive/status while OneDrive isn't set up for the deployment. */
 export const oneDriveNotConfigured = () =>

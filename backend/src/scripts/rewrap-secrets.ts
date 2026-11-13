@@ -17,7 +17,8 @@
  * with the db_password secret), and rewraps in one
  * transaction: all of it or none. Run again, it finds everything current and changes
  * nothing. Exits 1 if some value opens with neither key (it is listed by table and id).
- * Prints counts and ids, never a value or a key.
+ * Prints counts and ids, never a value or a key, and the backup signers' public keys (not
+ * secrets) for the key before and after.
  */
 
 import { readFileSync } from 'node:fs';
@@ -30,6 +31,7 @@ const { rewrapSecrets } = await import('../services/secretRewrap.js');
 const { keyIdOf } = await import('../utils/crypto-envelope.js');
 const { DATA_ENCRYPTION_SECRET_PATH } = await import('../utils/data-encryption-secret.js');
 const { secretsInEnvironment } = await import('../utils/docker-secrets.js');
+const { signerFromDataEncryptionSecret, signerId } = await import('../utils/backupFormat.js');
 
 function argument(name: string): string | undefined {
   const at = process.argv.indexOf(name);
@@ -69,6 +71,17 @@ try {
   const oldKey = readKey(oldPath, 'old');
   const newKey = readKey(newPath, 'new');
   process.stdout.write(`Old key id ${keyIdOf(oldKey)}, new key id ${keyIdOf(newKey)}${dryRun ? ' (dry run: nothing is written)' : ''}\n`);
+  // Backups are signed with a key that follows the data key: the ones made before the
+  // rotation are signed with the old one, which this server stops trusting. Its public key
+  // (not a secret) lets the restore command trust them again, one by one.
+  const oldSigner = signerId(signerFromDataEncryptionSecret(oldKey).publicKey);
+  const newSigner = signerId(signerFromDataEncryptionSecret(newKey).publicKey);
+  if (oldSigner !== newSigner) {
+    process.stdout.write(
+      `Backups made before the rotation are signed by ${oldSigner}; this server signs as ${newSigner} from now on.\n` +
+        `Keep the old signer: to restore one of those backups, run the restore command with --signer ${oldSigner}\n`
+    );
+  }
 
   await client.query('BEGIN');
   const results = await rewrapSecrets(client, oldKey, newKey);

@@ -3,7 +3,8 @@
 #   - anything under backend/uploads/ (members' uploads), and under a secrets/, data/ or
 #     backups/ directory (the Docker secrets `npm run setup` writes, the compose files' data
 #     volumes, backups), as .gitignore ignores them at any depth;
-#   - an encrypted backup (*.enc, as the backup service names them);
+#   - an encrypted backup (*.tar.age, *.age and the older *.enc, as the backup service names
+#     them, and a *.partial one being written);
 #   - Windows download metadata (*:Zone.Identifier);
 #   - personal Claude Code settings (.claude/settings.local.json);
 #   - data dumps and exports: *.dump, *.backup, *.sql.gz, *.sql other than the migrations
@@ -13,7 +14,8 @@
 #   - environment files other than the templates, cookie jars, key and certificate files;
 #   - password files: Postgres's .pgpass (pgpass.conf on Windows) and .netrc (_netrc), whose
 #     lines (host:port:database:user:password) gitleaks' rules don't read as secrets;
-#   - a file holding a private key (a PEM "BEGIN ... PRIVATE KEY" block).
+#   - a file holding a private key (a PEM "BEGIN ... PRIVATE KEY" block, or an age private
+#     key, AGE-SECRET-KEY-1… or AGE-SECRET-KEY-PQ-1…: tests make theirs at run time).
 #
 # .gitignore keeps these out of a plain `git add`; this catches a forced add, an ignore
 # rule removed, or a file added before its rule. It checks what the index holds (what a
@@ -55,7 +57,7 @@ while IFS= read -r -d '' path; do
       report "$path" "a Docker secret (secrets/ is ignored)" ;;
     data/* | */data/* | backups/* | */backups/*)
       report "$path" "local data or a backup (data/ and backups/ are ignored)" ;;
-    *.enc)
+    *.enc | *.age | *.age.partial)
       report "$path" "an encrypted backup" ;;
     *:zone.identifier)
       report "$path" "Windows download metadata (a Zone.Identifier stream)" ;;
@@ -105,6 +107,20 @@ fi
 while IFS= read -r path; do
   if [ -n "$path" ]; then report "$path" "it holds a private key"; fi
 done <<<"$keys"
+
+# An age private key (a backup key's): Bech32, so at least the checksum's 6 characters after
+# the 1. Built in two parts too.
+age_marker='SECRET-KEY-'
+age_pattern="AGE-${age_marker}(PQ-)?1[0-9A-Z]{50,}"
+status=0
+age_keys=$(git grep --cached -l -I -E -e "$age_pattern") || status=$?
+if [ "$status" -gt 1 ]; then
+  echo "::error::git grep failed (exit $status)"
+  exit 2
+fi
+while IFS= read -r path; do
+  if [ -n "$path" ]; then report "$path" "it holds an age private key"; fi
+done <<<"$age_keys"
 
 if [ "$problems" -gt 0 ]; then
   echo "$problems tracked file(s) must not be in the repository. Remove them from git"

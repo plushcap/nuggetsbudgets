@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { QUERY_MAX_PAGE, queryBoolean, queryInt } from './primitives.js';
 import { instant } from './responses.js';
+import { BACKUP_KEY_KINDS } from './vocabulary.js';
 
 /**
  * Deployment-wide settings (`system_settings`) that a settings page may change.
@@ -151,18 +152,102 @@ export const backupSettingsUpdateSchema = z.object({
 export type BackupSettingsUpdate = z.infer<typeof backupSettingsUpdateSchema>['settings'];
 
 const encryptionKeyText = 'encryptionKey must be text';
+const fileKeyText = 'fileKey must be the 16-byte file key, in base64';
+
+/** Text that holds an age private key (`AGE-SECRET-KEY-1…`, `AGE-SECRET-KEY-PQ-1…`). */
+export function isAgePrivateKeyText(text: string): boolean {
+  return /AGE-SECRET-KEY-(PQ-)?1/i.test(text);
+}
+
+/** Why an age private key isn't taken where the old backup key goes. */
+export const AGE_KEY_IN_OLD_KEY_FIELD =
+  'That is an age private key, which stays in your browser: this field takes the old backup key of an older .enc backup.';
+
+/** An age file key (16 bytes) in base64: what the browser sends once it has opened a backup's header. */
+export const BACKUP_FILE_KEY_PATTERN = /^[A-Za-z0-9+/]{21}[AQgw]==$/;
 
 /**
- * POST /api/backup/restore (a form, with the backup file) and /api/backup/restore/:fileName:
- * the key typed on the Backup page, if any. Without one, the server's own backup key.
+ * POST /api/backup/restore and /api/backup/verify (a form, with the backup file), and their
+ * /:fileName forms (a backup on the server):
+ * - `fileKey`, for an age backup (.tar.age): the file key the browser got by opening the
+ *   backup's header with the owner's private key, which never leaves the browser;
+ * - `encryptionKey`, for an older .enc backup: the old backup key, if typed. Without one, the
+ *   server's own old key.
  */
 export const backupRestoreRequestSchema = z
   .object(
-    { encryptionKey: z.string({ error: encryptionKeyText }).max(1024, { error: encryptionKeyText }).optional() },
+    {
+      encryptionKey: z
+        .string({ error: encryptionKeyText })
+        .max(1024, { error: encryptionKeyText })
+        .refine((key) => !isAgePrivateKeyText(key), { error: AGE_KEY_IN_OLD_KEY_FIELD })
+        .optional(),
+      fileKey: z.string({ error: fileKeyText }).regex(BACKUP_FILE_KEY_PATTERN, { error: fileKeyText }).optional(),
+    },
     { error: encryptionKeyText }
   )
   .default({});
 export type BackupRestoreRequest = z.infer<typeof backupRestoreRequestSchema>;
+
+/** At most this many backup keys: a backup is encrypted to each. */
+export const MAX_BACKUP_RECIPIENTS = 5;
+
+/** The longest text taken as a backup key (a post-quantum public key is 1,959 characters). */
+export const MAX_BACKUP_RECIPIENT_LENGTH = 4000;
+
+
+/** The length of an age public key of each built-in form. */
+const RECIPIENT_LENGTHS: Array<[prefix: string, length: number]> = [
+  ['age1pq1', 1959],
+  ['age1', 62],
+];
+
+/**
+ * What is wrong with a pasted age public key, by its prefix and length only, or null. The
+ * server also checks its checksum; neither answer repeats the key.
+ */
+export function backupRecipientProblem(recipient: string): string | null {
+  const key = recipient.trim();
+  if (!key) return 'Paste the public key: it starts with age1.';
+  if (/^AGE-SECRET-KEY-/i.test(key)) {
+    return 'That is a private key. Paste the public key (age1…) instead, and keep the private key to yourself.';
+  }
+  if (!key.startsWith('age1')) return "That isn't an age public key: one starts with age1 (age1pq1 for a post-quantum key).";
+  if (/\s/.test(key)) return 'A public key has no spaces or line breaks in it.';
+  if (key.length > MAX_BACKUP_RECIPIENT_LENGTH) return 'That is longer than an age public key.';
+  // A hardware key's tag forms (age1tag1…, age1tagpq1…) vary with the plugin.
+  if (key.startsWith('age1tag1') || key.startsWith('age1tagpq1')) return null;
+  const expected = RECIPIENT_LENGTHS.find(([prefix]) => key.startsWith(prefix))?.[1];
+  if (expected !== undefined && key.length !== expected) {
+    return key.length < expected
+      ? 'That public key is cut short: copy all of it.'
+      : "That isn't the length of an age public key: it may be a plugin's own form (a hardware key needs age 1.3's age1tag1 or age1tagpq1 form).";
+  }
+  return null;
+}
+
+const recipientText = 'recipient must be an age public key';
+
+/**
+ * POST /api/backup/recipients (deployment admins, with step-up): a backup key. `checked`
+ * when the browser made the key pair, or was shown the private key file and it matched.
+ */
+export const backupRecipientCreateSchema = z.strictObject({
+  recipient: z
+    .string({ error: recipientText })
+    .max(MAX_BACKUP_RECIPIENT_LENGTH, { error: 'That is longer than an age public key.' })
+    .superRefine((value, ctx) => {
+      const problem = backupRecipientProblem(value);
+      if (problem) ctx.addIssue({ code: 'custom', message: problem });
+    }),
+  label: z
+    .string({ error: 'label must be text' })
+    .trim()
+    .min(1, { error: 'Give the key a name, such as where you keep it' })
+    .max(100, { error: 'A key name is at most 100 characters' }),
+  checked: z.boolean({ error: 'checked must be true or false' }).optional(),
+});
+export type BackupRecipientCreate = z.infer<typeof backupRecipientCreateSchema>;
 
 /** POST /api/backup/check-onedrive-status: whether each of these backups is in OneDrive. */
 export const backupOneDriveStatusRequestSchema = z.object({
@@ -292,6 +377,41 @@ export type DeploymentSettingsSaved = z.infer<typeof deploymentSettingsSavedResp
 
 // ---- Backup answers --------------------------------------------------------
 
+/** One backup key, as GET /api/backup/recipients lists it. */
+export const backupRecipientResponseSchema = z.object({
+  uuid: z.string(),
+  /** The age public key itself: public, and the page matches a private key against it. */
+  recipient: z.string(),
+  label: z.string(),
+  kind: z.enum(BACKUP_KEY_KINDS),
+  /** A hardware key's tag form: the browser can't check one. */
+  hardware: z.boolean(),
+  fingerprint: z.string(),
+  /** When its private key file was shown to match it; null for a pasted key not checked yet. */
+  checkedAt: instant.nullable(),
+  createdAt: instant,
+  /** Who added it, by name; null once they are gone. */
+  createdBy: z.string().nullable(),
+});
+export type BackupRecipient = z.infer<typeof backupRecipientResponseSchema>;
+
+/**
+ * GET /api/backup/recipients: the backup keys, this server's signer, how backups are
+ * encrypted now (`legacy`: with the old key, until a backup key is set up), and the old key.
+ */
+export const backupKeysResponseSchema = z.object({
+  recipients: z.array(backupRecipientResponseSchema),
+  /** The public key this server signs its backups with (`ed25519:…`); null without a data encryption key. */
+  signer: z.string().nullable(),
+  mode: z.enum(['age', 'legacy', 'none']),
+  maxRecipients: z.number().int(),
+  legacyKey: z.object({ exists: z.boolean(), downloaded: z.boolean() }),
+});
+export type BackupKeys = z.infer<typeof backupKeysResponseSchema>;
+
+/** POST /api/backup/recipients and /api/backup/recipients/:uuid/checked: the key as now stored. */
+export const backupRecipientSavedResponseSchema = z.object({ success: z.literal(true), recipient: backupRecipientResponseSchema });
+
 /** GET /api/backup/key/status: whether a backup key exists, and whether it has been downloaded. */
 export const backupKeyStatusResponseSchema = z.object({ exists: z.boolean(), downloaded: z.boolean() });
 export type BackupKeyStatus = z.infer<typeof backupKeyStatusResponseSchema>;
@@ -321,8 +441,10 @@ export const backupStatusResponseSchema = z.object({
     lastRunStartedAt: z.iso.datetime({ offset: true }).nullable(),
     lastRunFinishedAt: z.iso.datetime({ offset: true }).nullable(),
     lastRunOutcome: z.enum(['success', 'failed']).nullable(),
-    /** Backups are on but none can run until a backup key is generated. */
+    /** Backups are on but none can run until a backup key is set up. */
     waitingForBackupKey: z.boolean(),
+    /** Backups are made with the old backup key until a backup key is set up (an upgraded install). */
+    usingOldBackupKey: z.boolean(),
   }),
 });
 export type BackupStatus = z.infer<typeof backupStatusResponseSchema>;
@@ -338,6 +460,8 @@ export const backupFileResponseSchema = z.object({
   sizeFormatted: z.string(),
   /** Whether OneDrive has it: false unless the list was asked to check (`checkOneDrive=true`). */
   onedriveUploaded: z.boolean(),
+  /** From its first bytes: `age` opens with a backup key's private key, `legacy` (.enc) with the old key. */
+  format: z.enum(['age', 'legacy', 'tar', 'unknown']),
 });
 export type BackupFile = z.infer<typeof backupFileResponseSchema>;
 export const backupListResponseSchema = z.object({ success: z.literal(true), backups: z.array(backupFileResponseSchema) });
@@ -345,9 +469,6 @@ export const backupListResponseSchema = z.object({ success: z.literal(true), bac
 /** POST /api/backup/create and the restores (202): it runs in the background; poll its status. */
 export const backupStartedResponseSchema = z.object({ success: z.literal(true), started: z.literal(true), message: z.string() });
 export type BackupStarted = z.infer<typeof backupStartedResponseSchema>;
-
-/** POST /api/backup/key/generate: a new backup key (it is downloaded separately). */
-export const backupKeyGeneratedResponseSchema = z.object({ success: z.literal(true) });
 
 /** POST /api/backup/check-onedrive-status: whether OneDrive has each file asked about (none while OneDrive isn't set up). */
 export const backupOneDriveStatusResponseSchema = z.object({
@@ -375,8 +496,30 @@ export const restoreStatusResponseSchema = z.object({
   previousDatabase: z.string().nullable().optional(),
   /** How many rows each table had once restored. */
   rowCounts: z.record(z.string(), z.number().int()).optional(),
+  /** The backup's own id and time, from its signed manifest (an age backup's). */
+  backupId: z.string().nullable().optional(),
+  backupCreatedAt: instant.nullable().optional(),
 });
 export type RestoreStatus = z.infer<typeof restoreStatusResponseSchema>;
+
+/**
+ * GET /api/backup/verify-status: the verify running, or the last one. A verify restores the
+ * backup into a scratch database, checks it and drops it: the data stays as it is.
+ */
+export const verifyStatusResponseSchema = z.object({
+  status: z.enum(['idle', 'running', 'completed', 'failed']),
+  phase: z.enum(RESTORE_PHASES).optional(),
+  fileName: z.string().optional(),
+  startedAt: instant.optional(),
+  finishedAt: instant.optional(),
+  error: z.string().optional(),
+  backupId: z.string().nullable().optional(),
+  backupCreatedAt: instant.nullable().optional(),
+  schemaVersion: z.string().nullable().optional(),
+  appVersion: z.string().nullable().optional(),
+  rowCounts: z.record(z.string(), z.number().int()).optional(),
+});
+export type VerifyStatus = z.infer<typeof verifyStatusResponseSchema>;
 
 // ---- OneDrive answers -------------------------------------------------------------
 

@@ -215,6 +215,26 @@ export interface Attachments {
   uuid: Generated<string>;
 }
 
+export interface BackupRecipients {
+  /**
+   * When the owner showed the browser the private key file and it matched this public key (made on the Backup page, or Check a key); NULL for a pasted key not checked yet.
+   */
+  checked_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  created_by: number | null;
+  id: Generated<number>;
+  /**
+   * classic (X25519) or post-quantum (ML-KEM-768 + X25519); a server's keys are all of one kind.
+   */
+  kind: string;
+  label: string;
+  /**
+   * The age public key (age1…, age1pq1…, or a hardware key's age1tag1…/age1tagpq1… form).
+   */
+  recipient: string;
+  uuid: Generated<string>;
+}
+
 export interface BillOccurrences {
   budget_item_id: number;
   created_at: Generated<Timestamp>;
@@ -1417,6 +1437,7 @@ export interface DB {
   accounts: Accounts;
   annotations: Annotations;
   attachments: Attachments;
+  backup_recipients: BackupRecipients;
   bill_occurrence_transactions: BillOccurrenceTransactions;
   bill_occurrences: BillOccurrences;
   budget_alert_tracking: BudgetAlertTracking;

@@ -53,11 +53,19 @@ function settingsPool(settings: Record<string, string>): Pool {
   return { connect: async () => client } as unknown as Pool;
 }
 
-function lifecycle(settings: Record<string, string>, options: { keyExists?: boolean; oneDriveService?: OneDriveService } = {}) {
+function lifecycle(
+  settings: Record<string, string>,
+  options: { keyExists?: boolean; legacyKey?: boolean; oneDriveService?: OneDriveService } = {}
+) {
   current.settings = settings;
   const keyExists = options.keyExists ?? true;
+  const legacyKey = options.legacyKey ?? false;
   const backupService = {
-    getBackupKeyStatus: vi.fn(async () => ({ exists: keyExists, downloaded: keyExists })),
+    encryptionState: vi.fn(async () => ({
+      recipients: keyExists ? 1 : 0,
+      legacyKey,
+      mode: keyExists ? 'age' : legacyKey ? 'legacy' : 'none',
+    })),
     listBackups: vi.fn(async () => [
       { fileName: 'nuggets_backup_20260109_030000.enc', filePath: '/b', size: 1, created: new Date('2026-01-09T03:00:00Z') },
     ]),
@@ -188,9 +196,21 @@ describe('ApplicationLifecycleService backup health', () => {
     const health = await service.getBackupHealth();
     expect(health).toMatchObject({ status: 'degraded', automaticBackups: 'waiting-for-backup-key', newestBackupAt: '2026-01-09T03:00:00.000Z' });
     expect(health.problems).toEqual([
-      expect.stringMatching(/none can be made: generate a backup key/),
+      expect.stringMatching(/none can be made: set up a backup key/),
       expect.stringMatching(/The newest backup is \d+ days old/),
     ]);
+    await service.stopBackupScheduler();
+  });
+
+  it('says when backups still use the old backup key', async () => {
+    const { service, initialize, backupService } = lifecycle({ backup_enabled: 'true', backup_frequency_days: '7' }, { keyExists: false, legacyKey: true });
+    const recent = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    backupService.listBackups.mockResolvedValue([{ fileName: 'nuggets_backup_x.enc', filePath: '/b', size: 1, created: recent }]);
+    await initialize();
+    const health = await service.getBackupHealth();
+    expect(health).toMatchObject({ status: 'degraded', automaticBackups: 'on' });
+    expect(health.problems).toEqual([expect.stringMatching(/still use the old backup key/)]);
+    expect(await service.getBackupSchedulerStatus()).toMatchObject({ usingOldBackupKey: true, waitingForBackupKey: false });
     await service.stopBackupScheduler();
   });
 

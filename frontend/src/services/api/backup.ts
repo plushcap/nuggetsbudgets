@@ -11,30 +11,56 @@
 
 import {
   backupCreateStatusResponseSchema,
-  backupKeyGeneratedResponseSchema,
+  backupKeysResponseSchema,
   backupKeyStatusResponseSchema,
   backupListResponseSchema,
   backupOneDriveStatusResponseSchema,
+  backupRecipientSavedResponseSchema,
   backupStartedResponseSchema,
   oneDriveAuthResponseSchema,
   oneDriveConfigResponseSchema,
   oneDriveStatusResponseSchema,
   restoreStatusResponseSchema,
   settingsActionResponseSchema,
+  verifyStatusResponseSchema,
   type BackupCreateStatus,
   type BackupFile,
+  type BackupKeys,
   type BackupKeyStatus,
+  type BackupRecipient,
+  type BackupRecipientCreate,
   type BackupStarted,
   type OneDriveConfig,
   type OneDriveStatus,
   type RestoreStatus,
   type SettingsActionResponse,
+  type VerifyStatus,
 } from '@nuggets/shared';
-import { API_BASE_URL, assertOk, getAuthHeaders, handleResponse, apiGet, apiPost, apiPostFormData } from './base';
+import { API_BASE_URL, assertOk, getAuthHeaders, handleResponse, apiDelete, apiGet, apiPost, apiPostFormData } from './base';
 import { parseAnswer } from './parseAnswer';
 import { logger } from '../../utils/logger';
 
-export type { BackupCreateStatus, BackupFile, BackupKeyStatus, OneDriveConfig, OneDriveStatus, RestoreStatus };
+export type {
+  BackupCreateStatus,
+  BackupFile,
+  BackupKeys,
+  BackupKeyStatus,
+  BackupRecipient,
+  OneDriveConfig,
+  OneDriveStatus,
+  RestoreStatus,
+  VerifyStatus,
+};
+
+/**
+ * What a restore or verify sends with the backup: for an age backup the file key (base64) the
+ * browser got from its header with the private key, which itself never leaves the browser;
+ * for an older .enc one, the old backup key, if typed.
+ */
+export interface BackupKeyAnswer {
+  fileKey?: string;
+  encryptionKey?: string;
+}
 /** What the server answers when it starts a restore (202): the restore runs in the background. */
 export type RestoreStarted = BackupStarted;
 
@@ -91,29 +117,74 @@ export const getBackupCreateStatus = async (): Promise<BackupCreateStatus> => {
 };
 
 /**
- * Start restoring an uploaded backup file (form fields: backup, and optionally
- * encryptionKey). Poll getRestoreStatus() for the outcome.
+ * Start restoring an uploaded backup file (form fields: backup, and fileKey for an age
+ * backup or optionally encryptionKey for an .enc one). Poll getRestoreStatus() for the outcome.
  */
 export const restoreBackup = async (formData: FormData): Promise<RestoreStarted> => {
   // Shared FormData helper attaches the X-CSRF-Token header (and omits Content-Type).
   return parseAnswer(backupStartedResponseSchema, await apiPostFormData<unknown>('/backup/restore', formData), 'restore started');
 };
 
-/** Start restoring one of the backups on the server; without a key, with the server's own. */
-export const restoreBackupFromServer = async (fileName: string, encryptionKey?: string): Promise<RestoreStarted> =>
-  parseAnswer(
-    backupStartedResponseSchema,
-    await apiPost<unknown>(`/backup/restore/${encodeURIComponent(fileName)}`, encryptionKey ? { encryptionKey } : {}),
-    'restore started'
-  );
+/** Start restoring one of the backups on the server, with its file key (age) or the old key (.enc). */
+export const restoreBackupFromServer = async (fileName: string, keys: BackupKeyAnswer): Promise<RestoreStarted> =>
+  parseAnswer(backupStartedResponseSchema, await apiPost<unknown>(`/backup/restore/${encodeURIComponent(fileName)}`, keys), 'restore started');
 
 /** How the restore that is running, or ran last, is going. */
 export const getRestoreStatus = async (): Promise<RestoreStatus> =>
   parseAnswer(restoreStatusResponseSchema, await apiGet<unknown>('/backup/restore-status'), 'restore status');
 
 /**
- * Download a backup file. Its name is one path segment, encoded: any .enc file in
- * the backup directory is listed, whatever its name.
+ * Start verifying an uploaded backup (form fields as for a restore): it is restored into a
+ * scratch database, checked and dropped, while the app keeps serving. Poll getVerifyStatus().
+ */
+export const verifyBackup = async (formData: FormData): Promise<BackupStarted> =>
+  parseAnswer(backupStartedResponseSchema, await apiPostFormData<unknown>('/backup/verify', formData), 'verify started');
+
+/** Start verifying one of the backups on the server. */
+export const verifyBackupFromServer = async (fileName: string, keys: BackupKeyAnswer): Promise<BackupStarted> =>
+  parseAnswer(backupStartedResponseSchema, await apiPost<unknown>(`/backup/verify/${encodeURIComponent(fileName)}`, keys), 'verify started');
+
+/** How the verify that is running, or ran last, is going. */
+export const getVerifyStatus = async (): Promise<VerifyStatus> =>
+  parseAnswer(verifyStatusResponseSchema, await apiGet<unknown>('/backup/verify-status'), 'verify status');
+
+/**
+ * The age header of a backup on the server (at most 16 KiB): the page opens it with the
+ * private key, which stays in the browser.
+ */
+export const getBackupHeader = async (fileName: string): Promise<Uint8Array> => {
+  const response = await fetch(`${API_BASE_URL}/backup/${encodeURIComponent(fileName)}/header`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+  await assertOk(response);
+  return new Uint8Array(await response.arrayBuffer());
+};
+
+// ============================================================================
+// BACKUP KEYS (the owner's age public keys)
+// ============================================================================
+
+/** The backup keys, this server's signer, how backups are encrypted now, and the old key. */
+export const getBackupKeys = async (): Promise<BackupKeys> =>
+  parseAnswer(backupKeysResponseSchema, await apiGet<unknown>('/backup/recipients'), 'backup keys');
+
+/** Add a backup key (a public key). Takes step-up: wrap the call in useReauth's withReauth. */
+export const addBackupKey = async (input: BackupRecipientCreate): Promise<BackupRecipient> =>
+  parseAnswer(backupRecipientSavedResponseSchema, await apiPost<unknown>('/backup/recipients', input), 'backup key').recipient;
+
+/** Remove a backup key. Takes step-up. */
+export const removeBackupKey = async (uuid: string): Promise<SettingsActionResponse> =>
+  parseAnswer(settingsActionResponseSchema, await apiDelete<unknown>(`/backup/recipients/${encodeURIComponent(uuid)}`), 'backup key removed');
+
+/** Mark a backup key checked: its private key file matched it here. */
+export const markBackupKeyChecked = async (uuid: string): Promise<BackupRecipient> =>
+  parseAnswer(backupRecipientSavedResponseSchema, await apiPost<unknown>(`/backup/recipients/${encodeURIComponent(uuid)}/checked`), 'backup key')
+    .recipient;
+
+/**
+ * Download a backup file. Its name is one path segment, encoded: any backup file in the
+ * backup directory is listed, whatever its name.
  */
 export const downloadBackup = async (fileName: string): Promise<Blob> => {
   try {
@@ -149,7 +220,7 @@ export const deleteBackup = async (fileName: string): Promise<SettingsActionResp
 // BACKUP ENCRYPTION KEY
 // ============================================================================
 
-/** Whether a backup key exists and whether it has been downloaded. */
+/** Whether the old backup key exists and whether it has been downloaded. */
 export const getBackupKeyStatus = async (): Promise<BackupKeyStatus> => {
   try {
     const response = await fetch(`${API_BASE_URL}/backup/key/status`, {
@@ -163,22 +234,10 @@ export const getBackupKeyStatus = async (): Promise<BackupKeyStatus> => {
   }
 };
 
-/** Generate (or rotate) the backup encryption key. The key itself is fetched separately via downloadBackupKey(). */
-export const generateBackupKey = async (): Promise<{ success: boolean }> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/backup/key/generate`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      credentials: 'include',
-    });
-    return parseAnswer(backupKeyGeneratedResponseSchema, await handleResponse<unknown>(response), 'backup key generated');
-  } catch (error) {
-    logger.error({ err: error, endpoint: '/backup/key/generate' }, 'Failed to generate backup key');
-    throw error;
-  }
-};
-
-/** Download the current backup key as a text blob (marks it downloaded server-side). */
+/**
+ * Download the old backup key as a text blob (marks it downloaded server-side). Takes
+ * step-up: wrap the call in useReauth's withReauth.
+ */
 export const downloadBackupKey = async (): Promise<Blob> => {
   try {
     const response = await fetch(`${API_BASE_URL}/backup/key/download`, {

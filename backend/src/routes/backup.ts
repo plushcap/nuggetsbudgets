@@ -2,16 +2,22 @@ import { Router, Response, type RequestHandler } from 'express';
 import multer from 'multer';
 import {
   BACKUP_SETTING_KEYS,
+  MAX_BACKUP_RECIPIENTS,
   backupListQuery,
   backupOneDriveStatusRequestSchema,
+  backupRecipientCreateSchema,
   backupRestoreRequestSchema,
   backupSettingsUpdateSchema,
+  type BackupRecipientCreate,
   type BackupRestoreRequest,
   type BackupSettingsUpdate,
 } from '@nuggets/shared';
 import { BackupService, BackupInProgressError, ShuttingDownError } from '../services/BackupService.js';
-import { backupNotFound, noBackupFile, noBackupKey } from '../services/backup/errors.js';
-import { getRestoreStatus, startRestoreJob } from '../services/restoreJob.js';
+import { backupKeyNotFound, backupNotFound, noBackupFile, noBackupKey } from '../services/backup/errors.js';
+import { getRestoreStatus, getVerifyStatus, startRestoreJob, startVerifyJob, type StartRestoreInput } from '../services/restoreJob.js';
+import { requireRecentReauth } from '../middleware/auth.js';
+import { isUuid } from '../middleware/routeParams.js';
+import { isBackupFileName } from '../utils/backupFormat.js';
 import { parsedQuery, validateBody, validateQuery } from '../middleware/validate.js';
 import { authHandler, AuthenticatedRequest } from '../utils/routeHandler.js';
 import { createLogger } from '../utils/logger.js';
@@ -36,8 +42,8 @@ const DEFAULT_MAX_UPLOAD_MB = 4096;
 
 /**
  * The deployment's backups (/api/backup), mounted behind authenticateToken and
- * requireDeploymentAdmin: making, listing, downloading, deleting and restoring them, their
- * schedule and key, and copying them to OneDrive. A refusal (no such backup, one already
+ * requireDeploymentAdmin: making, listing, downloading, deleting, verifying and restoring
+ * them, their schedule and keys, and copying them to OneDrive. A refusal (no such backup, one already
  * running, a shutdown begun) is a DomainError the route wrapper answers; any other failure
  * is its 500.
  */
@@ -70,10 +76,11 @@ export function createBackupRoutes({
       fileSize: (parseInt(config.BACKUP_MAX_FILE_SIZE_MB || '', 10) || DEFAULT_MAX_UPLOAD_MB) * 1024 * 1024,
     },
     fileFilter: (_req, file, cb) => {
-      if (file.originalname.endsWith('.enc')) {
+      // By name here; what the file is comes from its bytes when it is opened.
+      if (isBackupFileName(file.originalname)) {
         cb(null, true);
       } else {
-        cb(new UploadRejectedError('Only .enc backup files are allowed'));
+        cb(new UploadRejectedError('Only backup files (.tar.age, or an older .enc) are allowed'));
       }
     }
   });
@@ -175,46 +182,97 @@ export function createBackupRoutes({
     res.json(manualBackup);
   }));
 
-  /**
-   * Backup-encryption-key management (admin-only via the router mount).
-   *
-   * K is the key backups are encrypted with — separate from the Docker secret,
-   * stored in system_settings encrypted with that secret. The user downloads a
-   * copy to keep for disaster recovery / cross-server restore.
-   */
+  /** Automatic backups wait for a backup key: with one now, the scheduler can arm. One already armed keeps its schedule. */
+  async function armSchedulerIfWaiting(userId: number): Promise<void> {
+    try {
+      const scheduler = await lifecycleService.getBackupSchedulerStatus();
+      if (scheduler.waitingForBackupKey || scheduler.usingOldBackupKey) await lifecycleService.updateBackupSchedulerConfiguration();
+    } catch (error) {
+      logger.error({ err: error, userId }, 'Error restarting the backup scheduler after a backup key changed');
+    }
+  }
 
-  // Whether a backup key exists and whether it has been downloaded yet.
+  /**
+   * The backup keys (admin-only via the router mount): the owner's age public keys, which
+   * every backup is encrypted to. The private keys never reach the server. Adding or removing
+   * one takes step-up: a key of their own would make the backups after it readable to whoever
+   * holds its private key.
+   */
+  router.get('/recipients', authHandler(async (_req: AuthenticatedRequest, res: Response) => {
+    const [recipients, signer, encryption, legacyKey] = await Promise.all([
+      backupService.listRecipients(),
+      backupService.signerPublicId(),
+      backupService.encryptionState(),
+      backupService.getBackupKeyStatus(),
+    ]);
+    res.json({ recipients, signer, mode: encryption.mode, maxRecipients: MAX_BACKUP_RECIPIENTS, legacyKey });
+  }));
+
+  // Add a backup key: checked (prefix, length, checksum), at most five, all of one kind.
+  router.post('/recipients', requireRecentReauth, validateBody(backupRecipientCreateSchema), authHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const body = req.body as BackupRecipientCreate;
+    const recipient = await backupService.addRecipient({
+      recipient: body.recipient,
+      label: body.label,
+      checked: body.checked === true,
+      createdBy: req.user.userId,
+    });
+    logger.warn({ userId: req.user.userId, fingerprint: recipient.fingerprint, kind: recipient.kind }, 'Backup key added: backups from now on are encrypted to it');
+    await armSchedulerIfWaiting(req.user.userId);
+    res.status(201).json({ success: true, recipient });
+  }));
+
+  // Remove a backup key: backups made to it still open with its private key.
+  router.delete('/recipients/:uuid', requireRecentReauth, authHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const uuid = String(req.params.uuid);
+    if (!isUuid(uuid)) throw backupKeyNotFound();
+    await backupService.removeRecipient(uuid);
+    logger.warn({ userId: req.user.userId, uuid }, 'Backup key removed');
+    // The last one gone: automatic backups wait for a key again (or go back to the old key).
+    if ((await backupService.encryptionState()).recipients === 0) {
+      try {
+        await lifecycleService.updateBackupSchedulerConfiguration();
+      } catch (error) {
+        logger.error({ err: error, userId: req.user.userId }, 'Error restarting the backup scheduler after the last backup key was removed');
+      }
+    }
+    res.json({ success: true, message: 'Backup key removed' });
+  }));
+
+  // "Check a key": the browser matched a private key file to this public key. A mark for the
+  // list, so no step-up: it adds no key and opens nothing.
+  router.post('/recipients/:uuid/checked', authHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const uuid = String(req.params.uuid);
+    if (!isUuid(uuid)) throw backupKeyNotFound();
+    const recipient = await backupService.markRecipientChecked(uuid);
+    logger.info({ userId: req.user.userId, uuid }, 'Backup key checked against its private key');
+    res.json({ success: true, recipient });
+  }));
+
+  // Whether the old backup key K exists and whether it has been downloaded.
   router.get('/key/status', authHandler(async (_req: AuthenticatedRequest, res: Response) => {
     res.json(await backupService.getBackupKeyStatus());
   }));
 
-  // Generate (or rotate) the backup key. The plaintext never comes back here — it
-  // only leaves via GET /key/download. Rotating does not re-encrypt old backups.
-  router.post('/key/generate', authHandler(async (req: AuthenticatedRequest, res: Response) => {
-    await backupService.generateBackupKey();
-    logger.warn({ userId: req.user.userId }, 'Backup encryption key generated/rotated');
-    // Automatic backups wait for a key; with one now, the scheduler can arm. One already
-    // armed keeps its schedule: restarting it mid-backup would queue another.
-    try {
-      if ((await lifecycleService.getBackupSchedulerStatus()).waitingForBackupKey) {
-        await lifecycleService.updateBackupSchedulerConfiguration();
-      }
-    } catch (error) {
-      logger.error({ err: error, userId: req.user.userId }, 'Error restarting the backup scheduler after generating a key');
-    }
-    res.json({ success: true });
-  }));
-
-  // Download the current backup key as a .txt file (and mark it downloaded).
-  router.get('/key/download', authHandler(async (req: AuthenticatedRequest, res: Response) => {
+  // Download the old backup key K as a .txt file (and mark it downloaded): the one way to it,
+  // so it takes step-up. It opens every .enc backup made with it, wherever its copies are.
+  router.get('/key/download', requireRecentReauth, authHandler(async (req: AuthenticatedRequest, res: Response) => {
     const key = await backupService.getBackupKeyForDownload();
     if (!key) throw noBackupKey();
-    logger.info({ userId: req.user.userId }, 'Backup encryption key downloaded');
+    logger.info({ userId: req.user.userId }, 'Old backup key downloaded');
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Content-Disposition', contentDisposition('attachment', 'nuggets-backup-key.txt'));
     res.setHeader('Cache-Control', 'no-store');
     res.send(key);
   }));
+
+  /** What a restore or verify request carries, from its body: the file key, or the old key. */
+  function keysFrom(body: BackupRestoreRequest): Pick<StartRestoreInput, 'key' | 'fileKey'> {
+    return {
+      key: body.encryptionKey?.trim() || null,
+      fileKey: body.fileKey ? Buffer.from(body.fileKey, 'base64') : null,
+    };
+  }
 
   /**
    * Start a restore in the background and answer 202. Another backup or restore running
@@ -223,20 +281,28 @@ export function createBackupRoutes({
   function startRestore(
     req: AuthenticatedRequest,
     res: Response,
-    input: { filePath: string; fileName: string; key: string | null; deleteAfter: boolean }
+    input: Omit<StartRestoreInput, 'userId'>
   ): void {
     startRestoreJob({ backupService, schedulers: lifecycleService }, { ...input, userId: req.user.userId });
     res.locals.restoreStarted = true;
-    logger.info({ userId: req.user.userId, fileName: input.fileName, usingCustomKey: input.key !== null }, 'Restore started');
+    logger.info({ userId: req.user.userId, fileName: input.fileName, usingCustomKey: input.key !== null, usingFileKey: input.fileKey !== null }, 'Restore started');
     res.status(202).json({ success: true, started: true, message: 'Restore started' });
+  }
+
+  /** Start a verify in the background and answer 202; refusals as for a restore. */
+  function startVerify(req: AuthenticatedRequest, res: Response, input: Omit<StartRestoreInput, 'userId'>): void {
+    startVerifyJob({ backupService }, { ...input, userId: req.user.userId });
+    res.locals.restoreStarted = true;
+    logger.info({ userId: req.user.userId, fileName: input.fileName, usingFileKey: input.fileKey !== null }, 'Verify started');
+    res.status(202).json({ success: true, started: true, message: 'Verify started' });
   }
 
   /**
    * Restore an uploaded backup, in the background: 202, then poll
    * GET /api/backup/restore-status. The restore takes minutes, longer than a reverse proxy
    * waits, and the server is in maintenance mode while it runs.
-   * POST /api/backup/restore (multipart: backup, and optionally encryptionKey: without it,
-   * this server's backup key)
+   * POST /api/backup/restore (multipart: backup, and fileKey for an age backup, or optionally
+   * encryptionKey for an older .enc one: without it, this server's old key)
    */
   router.post(
     '/restore',
@@ -248,11 +314,10 @@ export function createBackupRoutes({
     validateBody(backupRestoreRequestSchema),
     authHandler(async (req: AuthenticatedRequest, res: Response) => {
       if (!req.file) throw noBackupFile();
-      const { encryptionKey } = req.body as BackupRestoreRequest;
       startRestore(req, res, {
         filePath: req.file.path,
         fileName: req.file.originalname,
-        key: encryptionKey?.trim() || null,
+        ...keysFrom(req.body as BackupRestoreRequest),
         deleteAfter: true,
       });
     })
@@ -261,18 +326,65 @@ export function createBackupRoutes({
   /**
    * Restore one of the backups in the server's backup directory, by its listed name: no
    * upload, so no size limit. In the background, like POST /restore.
-   * POST /api/backup/restore/:fileName  Body: { encryptionKey?: string }
+   * POST /api/backup/restore/:fileName  Body: { fileKey?: string, encryptionKey?: string }
    */
   router.post('/restore/:fileName', refuseWhileShuttingDown, validateBody(backupRestoreRequestSchema), authHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const { encryptionKey } = req.body as BackupRestoreRequest;
     const backup = await backupService.findBackup(String(req.params.fileName));
     if (!backup) throw backupNotFound();
     startRestore(req, res, {
       filePath: backup.filePath,
       fileName: backup.fileName,
-      key: encryptionKey?.trim() || null,
+      ...keysFrom(req.body as BackupRestoreRequest),
       deleteAfter: false,
     });
+  }));
+
+  /**
+   * Verify an uploaded backup: restore it into a scratch database, check it and drop it, in
+   * the background, while the app keeps serving. 202, then poll GET /api/backup/verify-status.
+   * POST /api/backup/verify (multipart, as POST /restore)
+   */
+  router.post(
+    '/verify',
+    refuseWhileShuttingDown,
+    upload.single('backup'),
+    discardUploadUnlessRestoring,
+    refuseNulFields,
+    validateBody(backupRestoreRequestSchema),
+    authHandler(async (req: AuthenticatedRequest, res: Response) => {
+      if (!req.file) throw noBackupFile();
+      startVerify(req, res, {
+        filePath: req.file.path,
+        fileName: req.file.originalname,
+        ...keysFrom(req.body as BackupRestoreRequest),
+        deleteAfter: true,
+      });
+    })
+  );
+
+  /** Verify one of the backups on the server. POST /api/backup/verify/:fileName  Body: as /restore/:fileName */
+  router.post('/verify/:fileName', refuseWhileShuttingDown, validateBody(backupRestoreRequestSchema), authHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const backup = await backupService.findBackup(String(req.params.fileName));
+    if (!backup) throw backupNotFound();
+    startVerify(req, res, { filePath: backup.filePath, fileName: backup.fileName, ...keysFrom(req.body as BackupRestoreRequest), deleteAfter: false });
+  }));
+
+  /** How the last verify went. GET /api/backup/verify-status */
+  router.get('/verify-status', authHandler(async (_req: AuthenticatedRequest, res: Response) => {
+    res.json(getVerifyStatus());
+  }));
+
+  /**
+   * The age header of a backup on the server (at most 16 KiB), for the browser to open with
+   * the owner's private key, which stays in the browser: it sends back only the file key.
+   * GET /api/backup/:fileName/header
+   */
+  router.get('/:fileName/header', authHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const header = await backupService.readBackupHeader(String(req.params.fileName));
+    if (!header) throw backupNotFound();
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(header);
   }));
 
   /**
@@ -309,7 +421,8 @@ export function createBackupRoutes({
         size: backup.size,
         created: backup.created,
         sizeFormatted: formatFileSize(backup.size),
-        onedriveUploaded: onedriveStatus[backup.fileName] || false
+        onedriveUploaded: onedriveStatus[backup.fileName] || false,
+        format: backup.format,
       }))
     });
   }));
@@ -351,7 +464,7 @@ export function createBackupRoutes({
       res.destroy(err);
     });
 
-    // Any .enc file in the directory is listed, whatever its name.
+    // Any backup file in the directory is listed, whatever its name.
     res.setHeader('Content-Disposition', contentDisposition('attachment', backup.fileName));
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Content-Length', backup.size.toString());

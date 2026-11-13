@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import { Kysely, PostgresDialect } from 'kysely';
 import type { DB } from '../../db/schema.generated.js';
 import { BackupScheduler } from '../../services/BackupScheduler.js';
-import type { BackupService } from '../../services/BackupService.js';
+import { BackupInProgressError, type BackupService } from '../../services/BackupService.js';
 import type { OneDriveService } from '../../services/OneDriveService.js';
 import logger from '../../utils/logger.js';
 
@@ -40,12 +40,17 @@ function backupAt(iso: string): Backup {
 function setup(
   settings: Record<string, string>,
   existing: Backup[] = [],
-  options: { keyExists?: boolean; oneDriveConfigured?: boolean; autoSyncUsers?: number[] } = {}
+  options: { keyExists?: boolean; legacyKey?: boolean; oneDriveConfigured?: boolean; autoSyncUsers?: number[] } = {}
 ) {
   const backups = [...existing];
-  const key = { exists: options.keyExists ?? true };
+  // A backup key (a recipient), and the old key an upgraded install has.
+  const key = { exists: options.keyExists ?? true, legacy: options.legacyKey ?? false };
   const backupService = {
-    getBackupKeyStatus: vi.fn(async () => ({ exists: key.exists, downloaded: key.exists })),
+    encryptionState: vi.fn(async () => ({
+      recipients: key.exists ? 1 : 0,
+      legacyKey: key.legacy,
+      mode: key.exists ? 'age' : key.legacy ? 'legacy' : 'none',
+    })),
     createBackup: vi.fn(async () => {
       const made = backupAt(new Date().toISOString());
       backups.push(made);
@@ -148,12 +153,26 @@ describe('BackupScheduler', () => {
       expect(t.backupService.createBackup).not.toHaveBeenCalled();
       expect(await scheduler.getSchedulerStatus()).toMatchObject({ enabled: true, running: false, waitingForBackupKey: true });
 
-      // Generating the key restarts the scheduler (POST /api/backup/key/generate).
+      // Adding a backup key restarts the scheduler (POST /api/backup/recipients).
       t.key.exists = true;
       await scheduler.updateSchedule();
       expect(await scheduler.getSchedulerStatus()).toMatchObject({ running: true, waitingForBackupKey: false });
       await vi.advanceTimersByTimeAsync(10 * 60_000);
       expect(t.backupService.createBackup).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps making backups with the old key on an upgraded install, and says so', async () => {
+      vi.setSystemTime(new Date('2026-01-10T12:00:00Z'));
+      const t = setup(enabled(), [], { keyExists: false, legacyKey: true });
+      scheduler = t.scheduler;
+      await scheduler.startScheduler();
+      expect(await scheduler.getSchedulerStatus()).toMatchObject({ running: true, waitingForBackupKey: false, usingOldBackupKey: true });
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(t.backupService.createBackup).toHaveBeenCalledTimes(1);
+      // A backup key set up: the warning goes.
+      t.key.exists = true;
+      await scheduler.updateSchedule();
+      expect(await scheduler.getSchedulerStatus()).toMatchObject({ running: true, usingOldBackupKey: false });
     });
 
     it('stops waiting when the scheduler is stopped', async () => {
@@ -402,6 +421,64 @@ describe('BackupScheduler', () => {
 
       await advanceTo('2026-01-17T03:00:01Z');
       expect((await scheduler.getSchedulerStatus()).lastRunOutcome).toBe('success');
+    });
+  });
+
+  describe('the backup lock held', () => {
+    it('tries again every few minutes while a verify holds it, rather than skip the period', async () => {
+      vi.setSystemTime(new Date('2026-01-10T12:00:00Z'));
+      const t = setup(enabled(), [backupAt('2026-01-01T03:00:00Z')]);
+      t.backupService.createBackup
+        .mockRejectedValueOnce(new BackupInProgressError('A backup is being verified', 'verify'))
+        .mockRejectedValueOnce(new BackupInProgressError('Held elsewhere', 'elsewhere'));
+      scheduler = t.scheduler;
+      await scheduler.startScheduler();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(t.backupService.createBackup).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
+      expect(t.backupService.createBackup).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
+      expect(t.backupService.createBackup).toHaveBeenCalledTimes(3);
+      expect((await scheduler.getSchedulerStatus()).lastRunOutcome).toBe('success');
+      // The schedule is the one it had: a week after the backup that was due.
+      expect((await scheduler.getSchedulerStatus()).nextBackupTime).toEqual(new Date('2026-01-17T03:00:00Z'));
+    });
+
+    it('does not make a second backup when the lock was another server making this period\'s', async () => {
+      vi.setSystemTime(new Date('2026-01-10T12:00:00Z'));
+      const t = setup(enabled(), [backupAt('2026-01-01T03:00:00Z')]);
+      t.backupService.createBackup.mockImplementationOnce(async () => {
+        // A server sharing the backup directory is making its backup now.
+        t.backups.push(backupAt(new Date().toISOString()));
+        throw new BackupInProgressError('Held elsewhere', 'elsewhere');
+      });
+      scheduler = t.scheduler;
+      await scheduler.startScheduler();
+      await vi.advanceTimersByTimeAsync(60_000);
+      await vi.advanceTimersByTimeAsync(30 * 60_000);
+      expect(t.backupService.createBackup).toHaveBeenCalledTimes(1);
+      await scheduler.stopScheduler();
+    });
+
+    it("skips the period when this process's own backup holds it, and stops retrying when stopped", async () => {
+      vi.setSystemTime(new Date('2026-01-10T12:00:00Z'));
+      const t = setup(enabled(), [backupAt('2026-01-01T03:00:00Z')]);
+      t.backupService.createBackup.mockRejectedValueOnce(new BackupInProgressError('A backup is already in progress', 'backup'));
+      scheduler = t.scheduler;
+      await scheduler.startScheduler();
+      await vi.advanceTimersByTimeAsync(60 * 60_000);
+      expect(t.backupService.createBackup).toHaveBeenCalledTimes(1);
+      await scheduler.stopScheduler();
+
+      const u = setup(enabled(), [backupAt('2026-01-01T03:00:00Z')]);
+      u.backupService.createBackup.mockRejectedValue(new BackupInProgressError('A backup is being verified', 'verify'));
+      const other = u.scheduler;
+      await other.startScheduler();
+      await vi.advanceTimersByTimeAsync(60_000);
+      await other.stopScheduler();
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(60 * 60_000);
+      expect(u.backupService.createBackup).toHaveBeenCalledTimes(1);
     });
   });
 
