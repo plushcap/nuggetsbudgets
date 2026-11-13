@@ -25,7 +25,9 @@
 #   docker build -f backend/Dockerfile.prod  -t ghcr.io/plushcap/nuggets-backend:smoke .
 #   docker build -f frontend/Dockerfile.prod -t ghcr.io/plushcap/nuggets-frontend:smoke .
 #   docker build -f Dockerfile.postgres      -t ghcr.io/plushcap/nuggets-postgres:smoke .
-# Dozzle and the socket proxy are pulled at the versions the manifest pins.
+# Dozzle and the socket proxy are pulled at the versions the manifest pins, before the stack
+# starts; a pull the registry refuses (a rate limit, an outage) is tried again after 5, 15
+# and 30 seconds.
 #
 # Optional environment:
 #   SMOKE_PROJECT        compose project name (default: nuggets-smoke)
@@ -125,6 +127,37 @@ teardown() {
 }
 trap teardown EXIT
 
+# pull_with_retry IMAGE: pulls an image unless it is here already, trying again after each
+# of PULL_RETRY_DELAYS seconds when the registry refuses, and fails the run naming it.
+PULL_RETRY_DELAYS=(5 15 30)
+pull_with_retry() {
+  local image=$1 attempts=$((${#PULL_RETRY_DELAYS[@]} + 1)) attempt=1
+  if docker image inspect "$image" > /dev/null 2>&1; then
+    echo "$image: already here"
+    return 0
+  fi
+  until docker pull --quiet "$image"; do
+    [ "$attempt" -lt "$attempts" ] || fail "could not pull $image (tried $attempts times)"
+    local delay=${PULL_RETRY_DELAYS[$((attempt - 1))]}
+    printf 'pulling %s failed (attempt %d of %d); trying again in %ss\n' \
+      "$image" "$attempt" "$attempts" "$delay" >&2
+    sleep "$delay"
+    attempt=$((attempt + 1))
+  done
+}
+
+log "Pulling the images the stack doesn't build here"
+# Every image in the manifest but the Nuggets ones (built locally, checked above, and never
+# pulled), so that a registry refusing a pull for a moment fails neither `docker run` nor
+# `compose up` below, which then pull nothing.
+images=$(compose config --images) || fail "could not list the stack's images"
+while IFS= read -r image; do
+  case "$image" in
+    '' | ghcr.io/plushcap/nuggets-*) ;;
+    *) pull_with_retry "$image" ;;
+  esac
+done <<< "$images"
+
 log "Secrets and data directories in $WORK"
 # Generated with openssl, as deploy.sh does it (the backend refuses weak ones).
 for name in db_password app_db_password session_secret csrf_secret data_encryption_key; do
@@ -134,7 +167,7 @@ openssl rand -base64 64 | tr -d '\n' > "$SECRETS/jwt_secret.txt"
 # Dozzle's sign-in: one user, written with the pinned image's `dozzle generate`.
 DOZZLE_IMAGE=$(compose config --format json | jq -r '.services.dozzle.image')
 DOZZLE_PASSWORD="$(openssl rand -hex 16)"
-docker run --rm "$DOZZLE_IMAGE" generate smoke --password "$DOZZLE_PASSWORD" > "$SECRETS/dozzle_users.yml" \
+docker run --rm --pull never "$DOZZLE_IMAGE" generate smoke --password "$DOZZLE_PASSWORD" > "$SECRETS/dozzle_users.yml" \
   || fail "could not write Dozzle's users file"
 # Test-only secrets, deleted with the work directory: readable by the containers' users.
 chmod 644 "$SECRETS"/*.txt "$SECRETS/dozzle_users.yml"
@@ -142,8 +175,9 @@ chmod 755 "$SECRETS"
 as_root_in_container 'chown -R 1999:1999 /data/postgres && chown -R 1001:1001 /data/uploads /data/backups /data/temp /data/logs && chmod 700 /data/*'
 
 log "Starting the stack (project $PROJECT, images tagged $NUGGETS_IMAGE_TAG)"
-# --wait: every container running, and healthy where it has a healthcheck.
-compose up -d --wait --wait-timeout 240 || fail "the stack did not come up healthy"
+# --wait: every container running, and healthy where it has a healthcheck. Every image is
+# here by now (--pull never).
+compose up -d --pull never --wait --wait-timeout 240 || fail "the stack did not come up healthy"
 compose ps
 
 # ---------------------------------------------------------------------------
