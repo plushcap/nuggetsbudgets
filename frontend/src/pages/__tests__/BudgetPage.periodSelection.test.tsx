@@ -6,6 +6,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { Theme } from '@radix-ui/themes';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { makeTestQueryClient } from '../../test/renderWithProviders';
+import { apiErrorFrom } from '../../services/api/base';
 import BudgetPage from '../BudgetPage';
 
 /**
@@ -38,6 +39,12 @@ const empty = vi.hoisted(() => [] as never[]);
 // The periods query's data, which a refetch after creating a period replaces.
 const query = vi.hoisted(() => ({ periods: [] as unknown[], created: null as unknown }));
 const createPeriod = vi.hoisted(() => vi.fn());
+const toast = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }));
+vi.mock('react-hot-toast', () => ({ default: toast, toast }));
+
+/** What the API helpers reject with for a 409 answer of `body`. */
+const conflict = (body: Record<string, unknown>) =>
+  apiErrorFrom(new Response(null, { status: 409, statusText: 'Conflict' }), body);
 
 vi.mock('../../hooks/queries', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../hooks/queries')>();
@@ -154,10 +161,7 @@ describe('BudgetPage period selection', () => {
       id: 98, uuid: 'uuid-theirs', name: `${year}-7`, month: 'July', year, month_number: 7,
       start_date: `${year}-07-01`, end_date: `${year}-07-31`, status: 'upcoming',
     };
-    createPeriod.mockRejectedValue(Object.assign(new Error('Budget period for 7/2026 already exists'), {
-      status: 409,
-      response: { data: { error: 'Budget period for 7/2026 already exists', code: 'BUDGET_PERIOD_EXISTS' } },
-    }));
+    createPeriod.mockRejectedValue(conflict({ error: 'Budget period for 7/2026 already exists', code: 'BUDGET_PERIOD_EXISTS' }));
     renderAt('/budgets?period=2026-01');
     await waitFor(() => expect(shownPeriod()).toHaveTextContent('January 2026'));
 
@@ -170,5 +174,23 @@ describe('BudgetPage period selection', () => {
     await waitFor(() => expect(shownPeriod()).toHaveTextContent(`July ${year}`));
     await waitFor(() => expect(location).toBe(`?period=${year}-07`));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  // Creating a period takes in the month's transactions; one another request holds makes it a
+  // 409 that saved nothing. The dialog stays open with the server's reason, to try again.
+  it("says why when the month's transactions are busy, and keeps the dialog open", async () => {
+    const reason = 'A transaction is being changed by another request, so nothing was saved. Try again.';
+    createPeriod.mockRejectedValue(conflict({ error: reason, code: 'TRANSACTION_BUSY' }));
+    renderAt('/budgets?period=2026-01');
+    await waitFor(() => expect(shownPeriod()).toHaveTextContent('January 2026'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create Period' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getAllByRole('combobox')[0]);
+    await userEvent.click(await screen.findByRole('option', { name: 'August' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create Period' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(reason));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });

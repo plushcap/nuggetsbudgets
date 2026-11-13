@@ -34,7 +34,7 @@ export function createBudgetPeriodRoutes(): Router {
   /**
    * POST /api/budget-periods
    * Create a new budget period, taking in the month's transactions that have no period
-   * (unless associate_transactions is false)
+   * (not one a member took out of a period), unless associate_transactions is false
    */
   router.post('/', validateBody(budgetPeriodManagedCreateSchema), tenantHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { year, month, auto_rollover, associate_transactions } = req.body;

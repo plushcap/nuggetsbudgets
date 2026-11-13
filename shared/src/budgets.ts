@@ -314,7 +314,8 @@ export type BudgetPeriodCreateInput = z.infer<typeof budgetPeriodCreateSchema>;
 
 /**
  * POST /api/budget-periods body: a period as {@link budgetPeriodCreateSchema}, which by
- * default also takes in the month's transactions that have no period yet.
+ * default also takes in the month's transactions that have no period yet (not one a member
+ * took out of a period).
  */
 export const budgetPeriodManagedCreateSchema = budgetPeriodCreateSchema.extend({
   auto_rollover: z.boolean({ error: 'auto_rollover must be true or false' }).default(true),

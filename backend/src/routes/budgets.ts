@@ -122,8 +122,10 @@ export function createBudgetRoutes(): Router {
     res.json({ summary: await budgetPeriodSummary(String(req.params.uuid)) });
   }));
 
-  // Create budget period: the period's row, and how many items it was given. A month
-  // that has its period is a 409 (BudgetPeriodExistsError).
+  // Create budget period: the period's row, and how many items it was given. It takes in
+  // the month's transactions that have no period yet (not one a member took out of a period),
+  // as POST /api/budget-periods does (the same BudgetService.createMonthPeriod). A month that
+  // has its period is a 409 (BudgetPeriodExistsError).
   //
   // Note: this app is transaction-based; envelope rollover doesn't apply. The SQL
   // function `create_budget_period_with_items` still has an `p_auto_rollover` parameter

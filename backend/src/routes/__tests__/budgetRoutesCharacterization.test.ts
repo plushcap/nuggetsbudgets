@@ -247,7 +247,8 @@ describe('Budget, budget-period and goal routes: whole answers', () => {
     idPlaceholder('user', tenant.userId);
     idPlaceholder('tenant', tenant.tenantId);
 
-    // April 2024's spending, before its period exists (POST /api/budget-periods takes it in).
+    // March and April 2024's transactions, before their periods exist (the create routes take
+    // them in: POST /api/budgets/periods March's, POST /api/budget-periods April's).
     await pool.query(
       `INSERT INTO transactions (account_id, amount, transaction_date, type, description)
        VALUES ($1, 1000.00, '2024-04-01', 'income', 'Pay'), ($1, -50.10, '2024-04-05', 'expense', 'Shop'),
