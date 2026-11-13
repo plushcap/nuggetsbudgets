@@ -7,7 +7,7 @@ import {
   getBudgetItemMatchingRules, getBudgetItemMatchingRulesByBudgetItem,
   createBudgetItemMatchingRule, updateBudgetItemMatchingRule, deleteBudgetItemMatchingRule,
   getBudgetItemActivity, getBudgetItemTransactions,
-  getBudgetPeriodsManagement, createManagedBudgetPeriod, getEnvelopeTransfers,
+  getBudgetPeriodsManagement, createManagedBudgetPeriod, getEnvelopeTransfers, archiveBudgetPeriod, restoreBudgetPeriod,
 } from '../../services/api';
 import { budgetKeys } from './keys';
 import { invalidateTransactionData } from './invalidation';
@@ -114,7 +114,7 @@ export function useMergeBudgetItemMutation() {
   });
 }
 // Creating a period (either way) assigns it the transactions in its dates that have no
-// period; deleting one unassigns them.
+// period.
 export function useCreateBudgetPeriodMutation() {
   const invalidate = useInvalidateBudgetsAndTransactions();
   return useMutation({ mutationFn: (args: Parameters<typeof createBudgetPeriod>) => createBudgetPeriod(...args), onSuccess: invalidate });
@@ -123,9 +123,20 @@ export function useCreateManagedBudgetPeriodMutation() {
   const invalidate = useInvalidateBudgetsAndTransactions();
   return useMutation({ mutationFn: (args: Parameters<typeof createManagedBudgetPeriod>) => createManagedBudgetPeriod(...args), onSuccess: invalidate });
 }
+// Only a period without transactions is deleted; the transaction lists still refresh, as
+// their period filters list the periods.
 export function useDeleteBudgetPeriodMutation() {
   const invalidate = useInvalidateBudgetsAndTransactions();
   return useMutation({ mutationFn: (uuid: string) => deleteBudgetPeriod(uuid), onSuccess: invalidate });
+}
+// Archiving or restoring a period changes only which periods the pickers offer.
+export function useArchiveBudgetPeriodMutation() {
+  const invalidate = useInvalidateBudgets();
+  return useMutation({ mutationFn: (uuid: string) => archiveBudgetPeriod(uuid), onSuccess: invalidate });
+}
+export function useRestoreBudgetPeriodMutation() {
+  const invalidate = useInvalidateBudgets();
+  return useMutation({ mutationFn: (uuid: string) => restoreBudgetPeriod(uuid), onSuccess: invalidate });
 }
 export function useUpdateBudgetAmountMutation() {
   const invalidate = useInvalidateBudgets();

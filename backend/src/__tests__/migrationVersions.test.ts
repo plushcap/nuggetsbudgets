@@ -28,11 +28,11 @@ describe('migration files', () => {
   });
 
   it("get a version from `migrate create` that the runner takes: UTC now, or after the newest it knows", () => {
-    // The repository's own directory: the baseline is the newest, dated after the day it was made.
-    expect(generateTimestamp(new Date('2026-11-11T05:00:00Z'))).toBe('20261113050000');
-    expect(generateTimestamp(new Date('2026-12-01T10:20:30Z'))).toBe('20261201102030');
     const own = mkdtempSync(path.join(tmpdir(), 'nuggets-create-'));
     try {
+      // No migration files: the baseline is the newest, dated after the day it was made.
+      expect(generateTimestamp(new Date('2026-11-11T05:00:00Z'), own)).toBe('20261113050000');
+      expect(generateTimestamp(new Date('2026-12-01T10:20:30Z'), own)).toBe('20261201102030');
       writeFileSync(path.join(own, '20261201000000_newest.sql'), 'SELECT 1;\n');
       writeFileSync(path.join(own, 'README.md'), 'not a migration\n');
       expect(generateTimestamp(new Date('2026-11-11T05:00:00Z'), own)).toBe('20261201050000');
@@ -40,6 +40,10 @@ describe('migration files', () => {
     } finally {
       rmSync(own, { recursive: true, force: true });
     }
+    // The repository's own directory, with a clock behind it: newer than every file in it.
+    const versions = readdirSync(dir).filter((f) => /^\d{14}_.*\.sql$/.test(f)).map((f) => f.slice(0, 14));
+    const next = generateTimestamp(new Date('2026-11-11T05:00:00Z'));
+    expect([BASELINE.version, ...versions].filter((v) => v >= next)).toEqual([]);
   });
 
   it('are all the directory holds, with the file that keeps it in git', () => {

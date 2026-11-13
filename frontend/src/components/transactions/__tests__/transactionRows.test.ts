@@ -63,6 +63,11 @@ describe('the transaction table row labels', () => {
     expect(latestBudgetPeriods(periods).map((p) => p.id)).toStrictEqual([4, 3, 2]);
     expect(latestBudgetPeriods(periods.slice(0, 1)).map((p) => p.id)).toStrictEqual([1]);
   });
+
+  it('leaves out an archived period', () => {
+    const withArchived = periods.map((p) => (p.id === 3 ? { ...p, archived_at: '2026-11-01T12:00:00.000Z' } : p));
+    expect(latestBudgetPeriods(withArchived).map((p) => p.id)).toStrictEqual([4, 2, 1]);
+  });
 });
 
 describe('transactionRowLookups', () => {

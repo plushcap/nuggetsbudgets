@@ -14,7 +14,7 @@ import OverspentItemsModal from '../components/closeout/OverspentItemsModal';
 import { Box, Flex, Heading, Text, Callout, Card, Select, Grid } from '@radix-ui/themes';
 import DashboardSummaryCard from '../components/DashboardSummaryCard';
 import { TrendingDown, Wallet } from 'lucide-react';
-import { periodKey, periodsNewestFirst } from '../utils/budgetPeriods';
+import { periodChoices, periodKey } from '../utils/budgetPeriods';
 import { useBudgetPeriodSelection } from '../hooks/useBudgetPeriodSelection';
 import { EMPTY_LIST } from '../utils/emptyList';
 import { centsOf, centsToAmount } from '../utils/currency';
@@ -128,7 +128,7 @@ const CloseOutPage: React.FC = () => {
               >
                 <Select.Trigger className="min-w-[180px]" aria-label="Budget period" />
                 <Select.Content>
-                  {periodsNewestFirst(budgetPeriods).map(period => (
+                  {periodChoices(budgetPeriods, currentPeriod.id).map(period => (
                     <Select.Item key={period.id} value={periodKey(period)}>
                       {new Date(period.year, period.month_number - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                     </Select.Item>

@@ -22,3 +22,15 @@ export const transferItemsNotInPeriod = (): BudgetPeriodError =>
 /** The ledger has no account marked as its envelope account: 404 NO_ENVELOPE_ACCOUNT, a state the budget page shows. */
 export const noEnvelopeAccount = (): BudgetPeriodError =>
   new BudgetPeriodError(404, 'NO_ENVELOPE_ACCOUNT', 'No envelope account configured');
+
+/**
+ * A period that has transactions can't be deleted (it would leave them with no period): 409
+ * BUDGET_PERIOD_HAS_TRANSACTIONS, with their number. Archiving it hides it instead.
+ */
+export const budgetPeriodHasTransactions = (name: string, transactionCount: number): BudgetPeriodError =>
+  new BudgetPeriodError(
+    409,
+    'BUDGET_PERIOD_HAS_TRANSACTIONS',
+    `${name} has ${transactionCount} ${transactionCount === 1 ? 'transaction' : 'transactions'}, so it can't be deleted. Archive it to hide it instead.`,
+    { transaction_count: transactionCount },
+  );

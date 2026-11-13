@@ -156,21 +156,20 @@ describe('Creating a budget period', () => {
     expect(await periodOf(earlier)).toBeNull();
   });
 
-  it('leaves out a transaction a member took out of a period, on both routes, unless its own month was remade', async () => {
+  it('leaves out a transaction a member took out of a period, on both routes', async () => {
     const year = YEAR + 1;
     const account = (await tenant.pool.query(
       `INSERT INTO accounts (name, account_type, account_group, type) VALUES ('Taken-out checking', 'checking', 'cash', 'Asset') RETURNING id`
     )).rows[0].id as number;
-    const september = async (day: number, description: string, periodId: number | null = null) =>
+    const transaction = async (month: number, day: number, description: string, periodId: number | null = null) =>
       (await tenant.pool.query(
         `INSERT INTO transactions (account_id, amount, transaction_date, type, description, budget_period_id)
-         VALUES ($1, -12.34, $2, 'expense', $3, $4) RETURNING id`,
-        [account, `${year}-09-${String(day).padStart(2, '0')}`, description, periodId]
+         VALUES ($1, -12.34, make_date($2, $3, $4), 'expense', $5, $6) RETURNING id`,
+        [account, year, month, day, description, periodId]
       )).rows[0].id as number;
     const periodOf = async (id: number) =>
       (await tenant.pool.query(`SELECT budget_period_id FROM transactions WHERE id = $1`, [id])).rows[0].budget_period_id as number | null;
-    const uuidOf = async (periodId: number) =>
-      (await tenant.pool.query(`SELECT uuid FROM budget_period WHERE id = $1`, [periodId])).rows[0].uuid as string;
+    const takeOut = (id: number) => tenant.pool.query(`UPDATE transactions SET budget_period_id = NULL WHERE id = $1`, [id]);
     /** A period made from the settings page, taking in nothing: its id. */
     const emptyPeriod = async (month: number) => {
       const res = await request(app).post('/api/budget-periods').send({ year, month, associate_transactions: false });
@@ -180,32 +179,61 @@ describe('Creating a budget period', () => {
 
     // A member moved one September transaction into October's period, then took it out of it.
     const october = await emptyPeriod(10);
-    const takenOut = await september(10, 'Moved to October, then taken out', october);
-    await tenant.pool.query(`UPDATE transactions SET budget_period_id = NULL WHERE id = $1`, [takenOut]);
-    // And moved another into November's period, which was deleted since.
+    const takenOut = await transaction(9, 10, 'Moved to October, then taken out', october);
+    await takeOut(takenOut);
+    // Moved another into November's, took it out, and deleted the emptied period.
     const november = await emptyPeriod(11);
-    const movedToDeleted = await september(11, 'Moved to November, which was deleted', november);
-    expect((await request(app).delete(`/api/budget-periods/${await uuidOf(november)}`)).status).toBe(200);
-    expect(await periodOf(movedToDeleted)).toBeNull();
-    const untouched = await september(12, 'Never in a period');
+    const takenOutOfDeleted = await transaction(9, 11, 'Moved to November, taken out, November deleted', november);
+    await takeOut(takenOutOfDeleted);
+    const uuid = (await tenant.pool.query(`SELECT uuid FROM budget_period WHERE id = $1`, [november])).rows[0].uuid as string;
+    expect((await request(app).delete(`/api/budget-periods/${uuid}`)).status).toBe(200);
+    const untouched = await transaction(9, 12, 'Never in a period');
+    // And a December one moved into October's and taken out.
+    const decemberTakenOut = await transaction(12, 5, 'December, moved to October, then taken out', october);
+    await takeOut(decemberTakenOut);
+    const decemberUntouched = await transaction(12, 6, 'December, never in a period');
 
     // The Budget page's route: the untouched one goes in, the member's choices stand.
+    const september = await request(app).post('/api/budgets/periods').send({ year, month: 9 });
+    expect(september.status).toBe(201);
+    expect(await periodOf(untouched)).toBe(september.body.id);
+    expect(await periodOf(takenOut)).toBeNull();
+    expect(await periodOf(takenOutOfDeleted)).toBeNull();
+
+    // The settings page's route, the same.
+    const december = await request(app).post('/api/budget-periods').send({ year, month: 12 });
+    expect(december.status).toBe(201);
+    expect(december.body.transactions_associated).toBe(1);
+    expect(await periodOf(decemberUntouched)).toBe(december.body.period_id);
+    expect(await periodOf(decemberTakenOut)).toBeNull();
+  });
+
+  // A delete of a period with transactions took them out of it before such a delete was refused,
+  // and ledgers still have rows it left that way: the period it took them out of is gone, and
+  // its month's period made again takes them back, as the bank sync does.
+  it("takes back into its month's period made again a row that left the period deleted before", async () => {
+    const year = YEAR + 2;
+    const account = (await tenant.pool.query(
+      `INSERT INTO accounts (name, account_type, account_group, type) VALUES ('Remade checking', 'checking', 'cash', 'Asset') RETURNING id`
+    )).rows[0].id as number;
     const first = await request(app).post('/api/budgets/periods').send({ year, month: 9 });
     expect(first.status).toBe(201);
-    expect(await periodOf(untouched)).toBe(first.body.id);
-    expect(await periodOf(takenOut)).toBeNull();
-    expect(await periodOf(movedToDeleted)).toBeNull();
+    const row = (await tenant.pool.query(
+      `INSERT INTO transactions (account_id, amount, transaction_date, type, description, budget_period_id)
+       VALUES ($1, -12.34, make_date($2, 9, 14), 'expense', 'Left by a delete', $3) RETURNING id`,
+      [account, year, first.body.id]
+    )).rows[0].id as number;
+    const periodOf = async () =>
+      (await tenant.pool.query(`SELECT budget_period_id FROM transactions WHERE id = $1`, [row])).rows[0].budget_period_id as number | null;
 
-    // September deleted and made again, from the settings page: what its deletion took out of
-    // it goes back in; the others still stay out.
+    // What such a delete did: the period's transactions out of it, then the period.
+    await tenant.pool.query(`UPDATE transactions SET budget_period_id = NULL WHERE budget_period_id = $1`, [first.body.id]);
     expect((await request(app).delete(`/api/budget-periods/${first.body.uuid}`)).status).toBe(200);
-    expect(await periodOf(untouched)).toBeNull();
-    const again = await request(app).post('/api/budget-periods').send({ year, month: 9 });
+    expect(await periodOf()).toBeNull();
+
+    const again = await request(app).post('/api/budgets/periods').send({ year, month: 9 });
     expect(again.status).toBe(201);
-    expect(again.body.transactions_associated).toBe(1);
-    expect(await periodOf(untouched)).toBe(again.body.period_id);
-    expect(await periodOf(takenOut)).toBeNull();
-    expect(await periodOf(movedToDeleted)).toBeNull();
+    expect(await periodOf()).toBe(again.body.id);
   });
 
   it('gives one 201 and one 409 to two requests for the same month at once', async () => {

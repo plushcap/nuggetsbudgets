@@ -31,6 +31,22 @@ export function periodsNewestFirst<T extends PeriodLike>(periods: readonly T[]):
   return [...periods].sort((a, b) => b.year - a.year || b.month_number - a.month_number);
 }
 
+/** What a picker needs to tell an archived period, and the one it has chosen: `BudgetPeriod`'s. */
+interface ChoosablePeriod extends PeriodLike {
+  id: number;
+  uuid: string;
+  archived_at?: string | null | undefined;
+}
+
+/**
+ * The periods a picker offers, newest first: not the archived ones, which a member hid
+ * (Settings → Budget Periods), but the one it has chosen, `selected` (its id or uuid), archived
+ * or not, so the picker still shows what it holds: a transaction's period, the period shown.
+ */
+export function periodChoices<T extends ChoosablePeriod>(periods: readonly T[], selected?: number | string | null | undefined): T[] {
+  return periodsNewestFirst(periods.filter((p) => !p.archived_at || p.id === selected || p.uuid === selected));
+}
+
 /** The `YYYY-MM` key a period goes by in the Budget page's URL and saved selection. */
 export function periodKey(period: PeriodLike): string {
   return `${period.year}-${String(period.month_number).padStart(2, '0')}`;

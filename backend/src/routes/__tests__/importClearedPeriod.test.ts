@@ -53,6 +53,19 @@ describe('A bank sync and a row taken out of its budget period', () => {
     return { id: row.id, importId };
   };
   const periodOf = async (id: number) => (await one<{ budget_period_id: number | null }>('SELECT budget_period_id FROM transactions WHERE id = $1', [id])).budget_period_id;
+  /**
+   * Delete a period that has transactions, as a delete did before such a delete was refused: its
+   * transactions out of it (the trigger remembers the period and its first day), then the period.
+   * Ledgers still have rows a delete left that way. The delete is refused now, changing nothing.
+   */
+  const deleteAsBefore = async (periodId: number) => {
+    const { uuid } = await one<{ uuid: string }>('SELECT uuid FROM budget_period WHERE id = $1', [periodId]);
+    await expect(withTenant(tenant.tenantId, () => new BudgetService().deletePeriod(uuid))).rejects.toMatchObject({
+      code: 'BUDGET_PERIOD_HAS_TRANSACTIONS',
+    });
+    await tenant.pool.query('UPDATE transactions SET budget_period_id = NULL WHERE budget_period_id = $1', [periodId]);
+    await withTenant(tenant.tenantId, () => new BudgetService().deletePeriod(uuid));
+  };
 
   beforeAll(async () => {
     tenant = await createTestTenant('Import cleared period');
@@ -136,8 +149,7 @@ describe('A bank sync and a row taken out of its budget period', () => {
     expect(await sync(acct.id, feed)).toMatchObject({ imported: 1 });
     const row = await one<{ id: number }>('SELECT id FROM transactions WHERE import_transaction_id = $1', [feed[0]!.id]);
     expect(await periodOf(row.id)).toBe(march.id);
-    const { uuid } = await one<{ uuid: string }>('SELECT uuid FROM budget_period WHERE id = $1', [march.id]);
-    await withTenant(tenant.tenantId, () => new BudgetService().deletePeriod(uuid));
+    await deleteAsBefore(march.id);
     expect(await periodOf(row.id)).toBeNull();
     const again = await period(2031, 3);
     expect(await sync(acct.id, feed)).toMatchObject({ updated: 1, failed: 0 });
@@ -231,8 +243,7 @@ describe('A bank sync and a row taken out of its budget period', () => {
        RETURNING id`,
       [acct.id, `${acct.importId}-own-deleted`, april.id]
     );
-    const { uuid } = await one<{ uuid: string }>('SELECT uuid FROM budget_period WHERE id = $1', [april.id]);
-    await withTenant(tenant.tenantId, () => new BudgetService().deletePeriod(uuid));
+    await deleteAsBefore(april.id);
     await tenant.pool.query(`UPDATE transactions SET updated_at = now() - interval '1 hour' WHERE id = $1`, [row.id]);
     const again = await period(2034, 4);
     const feed: SimplefinTransaction[] = [{ id: `${acct.importId}-other`, amount: '-3.00', description: 'OTHER', posted: posted('2034-04-20') }];

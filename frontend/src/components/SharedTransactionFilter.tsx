@@ -6,7 +6,7 @@ import { Card, TextField, Select, Button, Flex, Text, Badge, Box, Grid } from '@
 import CurrencyInput from './CurrencyInput';
 import FieldError, { fieldErrorProps } from './forms/FieldError';
 import RadixDatePicker from './RadixDatePicker';
-import { periodsNewestFirst } from '../utils/budgetPeriods';
+import { periodChoices } from '../utils/budgetPeriods';
 import { REVIEW_STATUSES, REVIEW_STATUS_LABELS, TRANSACTION_TYPE_LABELS, type TransactionReviewStatus, type TransactionType, formatMoney, budgetItemStatus } from '@nuggets/shared';
 import { TRANSACTION_TYPE_OPTIONS } from '../utils/vocabularyOptions';
 
@@ -312,7 +312,7 @@ const SharedTransactionFilter: React.FC<SharedTransactionFilterProps> = ({
                   <Select.Trigger id={`${fieldId}-budget-period`} />
                   <Select.Content>
                     <Select.Item value="none">All Periods</Select.Item>
-                    {periodsNewestFirst(budgetPeriods).map(period => (
+                    {periodChoices(budgetPeriods, localFilters.budgetPeriodId).map(period => (
                       <Select.Item key={period.id} value={period.id.toString()}>
                         {period.name}
                       </Select.Item>

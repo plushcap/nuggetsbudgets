@@ -177,7 +177,10 @@ describe('a write of several transactions that waits too long for one of them', 
     expect(await repair()).toEqual({ updated: 3, errors: 0 });
   });
 
-  it('creating and deleting a budget period answer 409 TRANSACTION_BUSY', async () => {
+  // Creating a period takes in its month's transactions, so it waits for a busy one and answers
+  // TRANSACTION_BUSY. Deleting one doesn't touch its transactions: one that has any is refused at
+  // once, held or not, and an empty one is deleted.
+  it('creating a budget period answers 409 TRANSACTION_BUSY; deleting one with transactions is refused without waiting', async () => {
     const row = await add('2021-02-10');
     const create = () => request(app).post('/api/budget-periods').send({ year: 2021, month: 2, auto_rollover: false });
     const periodOf = async () => (await tenant.pool.query<{ uuid: string }>('SELECT uuid FROM budget_period WHERE year = 2021 AND month_number = 2')).rows[0];
@@ -191,10 +194,13 @@ describe('a write of several transactions that waits too long for one of them', 
     expect(created.body.transactions_associated).toBe(1);
     const period = (await periodOf())!;
 
-    expectBusy(await whileDeleting(row.id, () => request(app).delete(`/api/budget-periods/${period.uuid}`)), 'budget period delete');
+    const refused = await whileDeleting(row.id, () => request(app).delete(`/api/budget-periods/${period.uuid}`));
+    expect(refused.status, JSON.stringify(refused.body)).toBe(409);
+    expect(refused.body).toMatchObject({ code: 'BUDGET_PERIOD_HAS_TRANSACTIONS', transaction_count: 1 });
     expect(await periodOf()).toEqual(period);
     expect(await columnOf(row.id, 'budget_period_id')).not.toBeNull();
 
+    await tenant.pool.query('UPDATE transactions SET budget_period_id = NULL WHERE id = $1', [row.id]);
     const deleted = await request(app).delete(`/api/budget-periods/${period.uuid}`);
     expect(deleted.status, JSON.stringify(deleted.body)).toBe(200);
     expect(await periodOf()).toBeUndefined();

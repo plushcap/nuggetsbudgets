@@ -39,7 +39,7 @@ import RadixMerchantSelector from '../components/RadixMerchantSelector';
 import RadixDatePicker from '../components/RadixDatePicker';
 import CurrencyInput from '../components/CurrencyInput';
 import { nullableAmountInput, refuseAmountPastColumn } from '../components/forms/optionalAmount';
-import { periodsNewestFirst } from '../utils/budgetPeriods';
+import { periodChoices } from '../utils/budgetPeriods';
 import { assignableBudgetItems } from '../utils/budgetItems';
 import { focusFirstError } from '../utils/focusFirstError';
 import { EMPTY_LIST } from '../utils/emptyList';
@@ -401,7 +401,7 @@ const AddTransactionPage: React.FC = () => {
                       <Select.Trigger id="add-tx-budget-period" />
                       <Select.Content>
                         <Select.Item value="none">Select budget period (optional)</Select.Item>
-                        {periodsNewestFirst(budgetPeriods).map(period => (
+                        {periodChoices(budgetPeriods, field.value).map(period => (
                           <Select.Item key={period.id} value={period.id.toString()}>
                             {period.name}
                           </Select.Item>

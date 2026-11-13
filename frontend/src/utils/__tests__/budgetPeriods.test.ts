@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { periodsNewestFirst, periodKey, resolvePeriodIndex } from '../budgetPeriods';
+import { periodChoices, periodsNewestFirst, periodKey, resolvePeriodIndex } from '../budgetPeriods';
 
 const p = (year: number, month_number: number) => ({ year, month_number, name: `${year}-${month_number}` });
 
@@ -70,5 +70,30 @@ describe('resolvePeriodIndex (the Budget page selection)', () => {
     const noneActive = periods.map((x) => ({ ...x, status: 'closed' }));
     expect(resolvePeriodIndex(noneActive, null, null, '2027-06-01')).toBe(3);
     expect(resolvePeriodIndex([], null, null, '2027-06-01')).toBe(0);
+  });
+});
+
+describe('periodChoices', () => {
+  const period = (id: number, month_number: number, archived_at: string | null = null) =>
+    ({ id, uuid: `uuid-${id}`, year: 2026, month_number, archived_at });
+  // Oldest first, as the API sends them; August is archived.
+  const periods = [period(1, 7), period(2, 8, '2026-11-01T12:00:00.000Z'), period(3, 9), period(4, 10)];
+
+  it('offers the periods that are not archived, newest first', () => {
+    expect(periodChoices(periods).map((p) => p.id)).toEqual([4, 3, 1]);
+    expect(periodChoices(periods, null).map((p) => p.id)).toEqual([4, 3, 1]);
+  });
+
+  it('keeps the archived period that is chosen, by its id or its uuid', () => {
+    expect(periodChoices(periods, 2).map((p) => p.id)).toEqual([4, 3, 2, 1]);
+    expect(periodChoices(periods, 'uuid-2').map((p) => p.id)).toEqual([4, 3, 2, 1]);
+    // A chosen period that isn't archived changes nothing.
+    expect(periodChoices(periods, 3).map((p) => p.id)).toEqual([4, 3, 1]);
+  });
+
+  it('does not mutate the source array (the query cache)', () => {
+    const snapshot = [...periods];
+    periodChoices(periods, 2);
+    expect(periods).toEqual(snapshot);
   });
 });

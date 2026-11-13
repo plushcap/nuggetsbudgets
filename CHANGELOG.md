@@ -51,6 +51,22 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
   The server won't start until you do, except for a `BACKUP_DB_USER` that the new compose
   files no longer pass, which is ignored (backups run as the owner).
 
+### Changed
+
+- A budget period with transactions can no longer be deleted, which left its transactions
+  without a period. **Settings → Budget Periods** offers to archive it instead: an archived
+  period leaves the period pickers (the Budget and Close-Out pages, a transaction's period,
+  the filters, transfers and exports), and its transactions, budget and every envelope balance
+  stay as they are. The page hides archived periods until **Show archived** is pressed, and
+  restores one with a click. A period with no transactions is still deleted, with its budget.
+  A picker still shows the period it holds, archived or not (a transaction's period, the
+  period a link opens).
+
+  The API refuses such a delete with 409 `BUDGET_PERIOD_HAS_TRANSACTIONS` (with
+  `transaction_count`), and its answer no longer has `transactions_unassociated`. Periods carry
+  `archived_at`; `POST /api/budget-periods/:uuid/archive` and `…/restore` set and clear it. The
+  database migration that adds the column runs when the server starts.
+
 ### Fixed
 
 - The plain-text part of notification emails reads as the email does: apostrophes, `=` and
@@ -65,10 +81,10 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
   of a generic failure.
 - A new budget period, made either way, no longer takes in a transaction a member took out of a
   period (for instance one moved to another month's period and then taken out of it), as the
-  bank sync already didn't. One that was in another month's period when that period was deleted
-  stays out too. As with the bank sync, a transaction that last left its own month's period
-  (taken out of it, or the period deleted) goes back in when that period has been deleted and
-  the month's period is made again.
+  bank sync already didn't. As with the bank sync, a transaction that last left its own month's
+  period goes back in when that period has been deleted and the month's period is made again;
+  that includes the transactions a delete took out of their period before such a delete was
+  refused (see Changed).
 
 ## 3.0.0 (2026-11-12)
 

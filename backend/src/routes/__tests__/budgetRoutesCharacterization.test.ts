@@ -23,6 +23,7 @@ import {
   budgetItemMatchingRuleResponseSchema,
   budgetItemResponseSchema,
   budgetItemTransferResponseSchema,
+  budgetPeriodArchiveResponseSchema,
   budgetPeriodCreatedResponseSchema,
   budgetPeriodDeletedResponseSchema,
   budgetPeriodItemsResponseSchema,
@@ -199,7 +200,10 @@ describe('Budget, budget-period and goal routes: whole answers', () => {
     'goals: balance history': goalBalanceHistoryResponseSchema,
     'goals: balance history by account': goalAccountBalanceHistoryResponseSchema,
     'periods: delete May': budgetPeriodDeletedResponseSchema,
-    'periods: delete April': budgetPeriodDeletedResponseSchema,
+    'periods: archive April': budgetPeriodArchiveResponseSchema,
+    'periods: archive April again': budgetPeriodArchiveResponseSchema,
+    'periods: list with April archived': budgetPeriodListResponseSchema,
+    'periods: restore April': budgetPeriodArchiveResponseSchema,
   };
   /** Send, pin the answer under `label` (ids named `id` are rows of `idTable`), and return the raw body. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -456,7 +460,14 @@ describe('Budget, budget-period and goal routes: whole answers', () => {
     // ---- deleting a period
     await step('periods: delete May', 'period', 'delete', `/api/budget-periods/${may.uuid}`);
     await step('periods: delete one that is not there', 'period', 'delete', `/api/budget-periods/${NOWHERE}`);
-    await step('periods: delete April', 'period', 'delete', `/api/budget-periods/${april.uuid}`);
+    // April has transactions: refused, and archived instead.
+    await step('periods: delete April, which has transactions', 'period', 'delete', `/api/budget-periods/${april.uuid}`);
+    await step('periods: archive April', 'period', 'post', `/api/budget-periods/${april.uuid}/archive`);
+    await step('periods: archive April again', 'period', 'post', `/api/budget-periods/${april.uuid}/archive`);
+    await step('periods: list with April archived', 'period', 'get', '/api/budgets/periods');
+    await step('periods: archive one that is not there', 'period', 'post', `/api/budget-periods/${NOWHERE}/archive`);
+    await step('periods: restore April', 'period', 'post', `/api/budget-periods/${april.uuid}/restore`);
+    await step('periods: restore one that is not there', 'period', 'post', `/api/budget-periods/${NOWHERE}/restore`);
     void march;
   });
 });

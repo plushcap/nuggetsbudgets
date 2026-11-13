@@ -16,9 +16,10 @@ const TransferMoneyPage: React.FC = () => {
   const { data: periodsRaw = [], isLoading: periodsLoading } = useBudgetPeriodsQuery();
   const loading = accountsLoading || periodsLoading;
 
-  // The 3 most recent budget periods (year desc, month desc).
+  // The 3 most recent budget periods not archived (year desc, month desc).
   const budgetPeriods = useMemo(() => {
-    return [...periodsRaw]
+    return periodsRaw
+      .filter((period) => !period.archived_at)
       .sort((a, b) => (b.year !== a.year ? b.year - a.year : b.month_number - a.month_number))
       .slice(0, 3);
   }, [periodsRaw]);

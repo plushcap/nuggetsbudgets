@@ -12,7 +12,8 @@ import {
 
 /**
  * /api/budget-periods: the budget-period settings page (its periods with their counts,
- * creating and deleting one), and the budget page's transfers and item activity.
+ * creating, archiving, restoring and deleting one), and the budget page's transfers and item
+ * activity.
  * Each route checks its input (a shared schema) and calls a service:
  * BudgetService for every change to budget data, services/budgetPeriods/ for the reads.
  * A period or period item is named by its uuid. A refusal the service
@@ -53,17 +54,35 @@ export function createBudgetPeriodRoutes(): Router {
 
   /**
    * DELETE /api/budget-periods/:uuid
-   * Delete a budget period and associated data
+   * Delete a budget period that has no transactions, with its items and budget events. One
+   * that has transactions is refused (409 BUDGET_PERIOD_HAS_TRANSACTIONS): archive it instead.
    */
   router.delete('/:uuid', tenantHandler(async (req: AuthenticatedRequest, res: Response) => {
     const result = await budgetService.deletePeriod(String(req.params.uuid));
     res.json({
       success: true,
       message: `Budget period "${result.name}" deleted successfully`,
-      transactions_unassociated: result.transactionsUnassociated,
       budget_items_deleted: result.budgetItemsDeleted,
       budget_transactions_deleted: result.budgetTransactionsDeleted,
     });
+  }));
+
+  /**
+   * POST /api/budget-periods/:uuid/archive
+   * Archive a budget period: hidden from the period pickers, its transactions and budget kept.
+   */
+  router.post('/:uuid/archive', tenantHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const period = await budgetService.archivePeriod(String(req.params.uuid));
+    res.json({ success: true, message: `Budget period "${period.name}" archived`, period });
+  }));
+
+  /**
+   * POST /api/budget-periods/:uuid/restore
+   * Restore an archived budget period to the period pickers.
+   */
+  router.post('/:uuid/restore', tenantHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const period = await budgetService.restorePeriod(String(req.params.uuid));
+    res.json({ success: true, message: `Budget period "${period.name}" restored`, period });
   }));
 
   /**

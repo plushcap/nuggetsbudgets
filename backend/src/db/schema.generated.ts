@@ -371,6 +371,10 @@ export interface BudgetItemUsageHistory {
 }
 
 export interface BudgetPeriod {
+  /**
+   * When a member archived the period, which hides it from the period pickers and keeps its transactions and budget; NULL while it is shown.
+   */
+  archived_at: Timestamp | null;
   created_at: Generated<Timestamp>;
   end_date: string;
   id: Generated<number>;
