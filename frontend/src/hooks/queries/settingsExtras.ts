@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  getBackupSettings, getBackupSchedulerStatus,
+  getBackupSettings, getBackupSchedulerStatus, getBackupKeys,
   getDeploymentSettings, updateDeploymentSettings,
   getOneDriveStatus,
   getUserPasskeys, getAdminUserPasskeys, getSimpleFinAccounts, getSimpleFinAccountTransactions,
@@ -95,6 +95,11 @@ export function useBackupSettingsQuery(options?: QueryOverrides) {
 }
 export function useBackupSchedulerStatusQuery(options?: QueryOverrides) {
   return useQuery({ queryKey: ['backups', 'scheduler'], queryFn: getBackupSchedulerStatus, ...options });
+}
+/** The backup keys (the owner's age public keys), the server's signer, and the old key. */
+export const backupKeysQueryKey = ['backups', 'keys'] as const;
+export function useBackupKeysQuery(options?: QueryOverrides) {
+  return useQuery({ queryKey: backupKeysQueryKey, queryFn: getBackupKeys, ...options });
 }
 
 // ------------------------------------------------------ deployment settings

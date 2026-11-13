@@ -48,3 +48,12 @@ regexes = [
   '''^\*+$''',
   '''(?i)^(password|passwd|pass|pw|secret|changeme|replace[_-]?me|your[_-]?password|test_password|\.\.\.)$''',
 ]
+
+# An age private key: a backup key's (AGE-SECRET-KEY-1…, classic) or a post-quantum one
+# (AGE-SECRET-KEY-PQ-1…), which the default rules may not read. Bech32 upper case: the
+# data and its 6-character checksum after the 1. The tests make theirs at run time.
+[[rules]]
+id = "age-secret-key"
+description = "An age private key (a backup key)"
+regex = '''\bAGE-SECRET-KEY-(?:PQ-)?1[02-9AC-HJ-NP-Z]{50,}\b'''
+keywords = ["age-secret-key-"]

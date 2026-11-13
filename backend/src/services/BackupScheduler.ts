@@ -35,6 +35,15 @@ const CATCH_UP_DELAY_MS = 10_000;
 /** Retention never deletes the newest backups, whatever dates the files report. */
 const MIN_BACKUPS_KEPT = 3;
 
+/**
+ * A scheduled backup that finds the backup lock held by a verify (here, or the restore
+ * command's in another process) tries again this often, rather than skip the whole period.
+ */
+const LOCK_RETRY_MS = 5 * 60 * 1000;
+
+/** For at most this long: a lock held longer than that is not a verify. */
+const LOCK_RETRY_FOR_MS = 12 * 60 * 60 * 1000;
+
 
 const DEFAULT_FREQUENCY_DAYS = 7;
 const DEFAULT_RETENTION_DAYS = 90;
@@ -62,6 +71,8 @@ export interface BackupSchedulerStatus {
   lastRunOutcome: 'success' | 'failed' | null;
   /** Backups are on but no backup key exists yet, so nothing is armed until one does. */
   waitingForBackupKey: boolean;
+  /** Backups are made with the old backup key: an upgraded install with no backup key set up yet. */
+  usingOldBackupKey: boolean;
 }
 
 /** An integer setting within `range`, or `fallback` (with a warning) when it isn't one. */
@@ -104,6 +115,9 @@ export class BackupScheduler implements Scheduler {
   /** Bumped by every start and stop, so work begun before one can't arm a timer after it. */
   private generation = 0;
   private waitingForBackupKey = false;
+  private usingOldBackupKey = false;
+  /** A retry of a scheduled backup the backup lock held up (LOCK_RETRY_MS). */
+  private retryTimer: NodeJS.Timeout | null = null;
 
   /**
    * @param options.db where it reads its settings (system_settings, control plane): globalDb,
@@ -122,6 +136,7 @@ export class BackupScheduler implements Scheduler {
     const generation = ++this.generation;
 
     this.waitingForBackupKey = false;
+    this.usingOldBackupKey = false;
     try {
       const settings = await this.getBackupSettings();
       this.enabled = settings.enabled;
@@ -130,14 +145,20 @@ export class BackupScheduler implements Scheduler {
         return;
       }
 
-      // Every backup is encrypted with the backup key, so without one a backup can only
+      // Every backup is encrypted to the backup keys, so without one a backup can only
       // fail: a fresh install logged that as an error a minute after starting. Wait for
-      // the key instead; generating it restarts the scheduler (POST /api/backup/key/generate).
-      if (!(await this.backupService.getBackupKeyStatus()).exists) {
-        if (generation !== this.generation) return;
+      // one instead; adding it restarts the scheduler (POST /api/backup/recipients). An
+      // upgraded install that has the old key keeps making backups with it meanwhile.
+      const encryption = await this.backupService.encryptionState();
+      if (generation !== this.generation) return;
+      this.usingOldBackupKey = encryption.mode === 'legacy';
+      if (encryption.mode === 'none') {
         this.waitingForBackupKey = true;
-        logger.warn('Automatic backups are on, but no backup key has been generated yet: they start once one is, in Settings → Backup');
+        logger.warn('Automatic backups are on, but no backup key has been set up yet: they start once one is, in Settings → Database Backup');
         return;
+      }
+      if (this.usingOldBackupKey) {
+        logger.warn('Automatic backups still use the old backup key: set up a backup key in Settings → Database Backup');
       }
 
       // The one missed-backup check: from the newest backup there is.
@@ -164,6 +185,7 @@ export class BackupScheduler implements Scheduler {
     this.isShuttingDown = true;
     this.generation++;
     this.waitingForBackupKey = false;
+    this.usingOldBackupKey = false;
     this.clearTimer();
 
     // Wait for any currently running backup operation to complete
@@ -198,6 +220,10 @@ export class BackupScheduler implements Scheduler {
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
+    }
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
     }
     this.nextRunAt = null;
   }
@@ -350,11 +376,20 @@ export class BackupScheduler implements Scheduler {
     return newest;
   }
 
-  private async performScheduledBackup(settings: BackupSettings): Promise<void> {
+  private async performScheduledBackup(settings: BackupSettings, retry: { since: number; until: number } | null = null): Promise<void> {
     // Don't start new backup operations if shutting down
     if (this.isShuttingDown) {
       logger.info('Skipping scheduled backup - scheduler is shutting down');
       return;
+    }
+    // A retry: another process held the lock. If that was a server sharing this backup
+    // directory making its own backup, this period has one: don't make a second.
+    if (retry) {
+      const newest = await this.newestBackupTime().catch(() => null);
+      if (newest && newest.getTime() >= retry.since - MIN_RUN_GAP_MS) {
+        logger.info({ newestBackup: newest.toISOString() }, 'A backup was made while the lock was held — this period has its backup');
+        return;
+      }
     }
     if (this.currentBackupPromise) {
       logger.warn('Previous scheduled backup is still running — skipping this cycle');
@@ -378,8 +413,21 @@ export class BackupScheduler implements Scheduler {
       outcome = 'success';
     } catch (error) {
       if (error instanceof BackupInProgressError) {
-        // A manual backup, or another server, is making one right now.
-        logger.warn({ err: error }, 'Another backup is in progress — skipping this scheduled backup');
+        if (error.heldBy === 'backup') {
+          // A manual backup here is making one right now: that is this period's backup.
+          logger.warn({ err: error }, 'Another backup is in progress — skipping this scheduled backup');
+          return;
+        }
+        // A verify (here, or the restore command's), or another process: it ends in minutes,
+        // and skipping would cost the whole period's backup. Try again until it has.
+        const since = retry?.since ?? startedAt.getTime();
+        const until = retry?.until ?? Date.now() + LOCK_RETRY_FOR_MS;
+        if (Date.now() + LOCK_RETRY_MS > until) {
+          logger.warn({ err: error }, 'The backup lock stayed held — skipping this scheduled backup');
+          return;
+        }
+        logger.info({ heldBy: error.heldBy, retryInMs: LOCK_RETRY_MS }, 'The backup lock is held — trying the scheduled backup again shortly');
+        this.armRetry(settings, { since, until });
         return;
       }
       if (error instanceof ShuttingDownError) {
@@ -399,8 +447,21 @@ export class BackupScheduler implements Scheduler {
     this.lastRunOutcome = outcome;
   }
 
+  /** Try a held-up scheduled backup again in LOCK_RETRY_MS, unless the scheduler stops or restarts first. */
+  private armRetry(settings: BackupSettings, retry: { since: number; until: number }): void {
+    const generation = this.generation;
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = runDetached(() =>
+      setTimeout(() => {
+        this.retryTimer = null;
+        if (this.isShuttingDown || generation !== this.generation) return;
+        void this.performScheduledBackup(settings, retry);
+      }, LOCK_RETRY_MS)
+    );
+  }
+
   private async runAutomaticBackup(settings: BackupSettings): Promise<void> {
-    // Encrypted with the backup key, like a manual backup.
+    // Encrypted to the backup keys, like a manual backup.
     logger.info({ frequencyDays: settings.frequencyDays }, 'Creating automatic backup');
     const result = await this.backupService.createBackup();
     logger.info({ fileName: result.fileName }, 'Automatic backup created');
@@ -516,6 +577,7 @@ export class BackupScheduler implements Scheduler {
       lastRunFinishedAt: this.lastRunFinishedAt,
       lastRunOutcome: this.lastRunOutcome,
       waitingForBackupKey: this.waitingForBackupKey,
+      usingOldBackupKey: this.usingOldBackupKey,
     };
   }
 }

@@ -37,6 +37,7 @@ describeDb('BackupService advisory lock (Postgres)', () => {
     try {
       await holder.query('SELECT pg_advisory_lock($1)', [key]);
       await expect(service.createBackup()).rejects.toBeInstanceOf(BackupInProgressError);
+      await expect(service.createBackup()).rejects.toMatchObject({ heldBy: 'elsewhere' });
       expect(BackupService.isBackupInProgress()).toBe(false);
       await holder.query('SELECT pg_advisory_unlock($1)', [key]);
 

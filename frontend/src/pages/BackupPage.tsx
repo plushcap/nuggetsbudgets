@@ -6,11 +6,10 @@ import {
   FileText, Trash2, Calendar, HardDrive,
   AlertTriangle, Clock, CheckCircle,
   Settings as SettingsIcon, Zap,
-  ChevronLeft, ChevronRight, Key, RotateCcw
+  ChevronLeft, ChevronRight, RotateCcw, ShieldCheck
 } from 'lucide-react';
 import { Box, Card, Flex, Grid, Text, Button, TextField, IconButton, Switch, Callout } from '@radix-ui/themes';
 import { logger } from '../utils/logger';
-import { textColorProps } from '../utils/textColor';
 import { useSeededState } from '../hooks/useSeededState';
 import { errorMessage, errorDetailsText, apiErrorMessage } from '../utils/errors';
 import { useConfirmation } from '../hooks/useConfirmation';
@@ -27,15 +26,20 @@ import {
   restoreBackup as apiRestoreBackup,
   restoreBackupFromServer,
   getRestoreStatus,
+  verifyBackup as apiVerifyBackup,
+  verifyBackupFromServer,
+  getVerifyStatus,
+  getBackupHeader,
   downloadBackup as apiDownloadBackup,
   deleteBackup as apiDeleteBackup,
-  getBackupKeyStatus,
-  generateBackupKey,
-  downloadBackupKey,
 } from '../services/api';
-import type { BackupKeyStatus, RestoreStatus } from '../services/api/backup';
+import type { BackupKeyAnswer, RestoreStatus, VerifyStatus } from '../services/api/backup';
 import { SessionExpiredError } from '../services/api/base';
-import { useBackupSchedulerStatusQuery, useBackupSettingsQuery } from '../hooks/queries';
+import { useBackupKeysQuery, useBackupSchedulerStatusQuery, useBackupSettingsQuery } from '../hooks/queries';
+import BackupKeysCard from '../components/backup/BackupKeysCard';
+import BackupKeyPrompt, { useBackupKeyPrompt } from '../components/backup/BackupKeyPrompt';
+import { backupFormatOf, headerOfFile } from '../utils/ageKeys';
+import { formatInstantDate } from '../utils/dateUtils';
 import NuggetSpinner from '../components/NuggetSpinner';
 import { saveBlob } from '../utils/saveBlob';
 import PageContainer from '../components/PageContainer';
@@ -68,6 +72,38 @@ class SignInReplacedError extends Error {}
 
 /** How the restore ended, as the server's status says: its message is the reason to show. */
 class RestoreOutcomeError extends Error {}
+
+/** A backup's file name, by its extension: `.tar.age` (or `.age`), or an older `.enc`. What it is comes from its bytes. */
+const isBackupFileName = (name: string) => name.endsWith('.age') || name.endsWith('.enc');
+
+/** What the file chooser offers for a backup. */
+const BACKUP_FILE_TYPES = '.tar.age,.age,.enc';
+
+/** The backup a status names, in words: its signed id and date, when it has them. */
+const backupNamed = (status: { backupId?: string | null | undefined; backupCreatedAt?: string | null | undefined }) =>
+  status.backupId ? `${status.backupId}${status.backupCreatedAt ? `, made ${formatInstantDate(status.backupCreatedAt)}` : ''}` : null;
+
+/** Wait for the verify the server started: it runs in the background, while the app keeps serving. */
+async function waitForVerify(onProgress: (status: VerifyStatus) => void): Promise<VerifyStatus> {
+  const deadline = Date.now() + RESTORE_WAIT_MS;
+  let unreachable = 0;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    let status: VerifyStatus;
+    try {
+      status = await getVerifyStatus();
+      unreachable = 0;
+    } catch (error) {
+      if (++unreachable >= 30) throw new RestoreOutcomeError('Lost contact with the server during the verify', { cause: error });
+      continue;
+    }
+    onProgress(status);
+    if (status.status === 'completed') return status;
+    if (status.status === 'failed') throw new RestoreOutcomeError(status.error || 'The backup did not verify');
+    if (status.status === 'idle') throw new RestoreOutcomeError('The server restarted before the verify finished');
+  }
+  throw new RestoreOutcomeError('Gave up waiting for the verify; it may still be running on the server');
+}
 
 /**
  * Wait for the restore the server started to finish: it runs in the background (it can
@@ -107,11 +143,13 @@ const BackupPage: React.FC = () => {
   const [restoring, setRestoring] = useState(false);
   const [restorePhase, setRestorePhase] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [encryptionKey, setEncryptionKey] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [verifyPhase, setVerifyPhase] = useState<string | null>(null);
+  const { askForKey, promptProps } = useBackupKeyPrompt();
 
-  // Backup encryption key (K) — separate from the Docker secret; user downloads it.
-  const [keyStatus, setKeyStatus] = useState<BackupKeyStatus | null>(null);
-  const [keyBusy, setKeyBusy] = useState(false);
+  // The backup keys: backups can be made once there is one (or, on an upgraded install, the old key).
+  const keysQuery = useBackupKeysQuery();
+  const canBackUp = keysQuery.data ? keysQuery.data.mode !== 'none' : false;
 
   // Scheduler state
   const schedulerStatusQuery = useBackupSchedulerStatusQuery();
@@ -131,60 +169,6 @@ const BackupPage: React.FC = () => {
   const [onedriveStatus, setOnedriveStatus] = useState<{ configured: boolean; connected: boolean } | null>(null);
   const [onedriveStatusLoading, setOnedriveStatusLoading] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
-
-  // A promise chain, like fetchBackups below (see there).
-  const loadKeyStatus = useCallback(
-    () =>
-      getBackupKeyStatus()
-        .then((status) => setKeyStatus(status))
-        .catch((error: unknown) => {
-          logger.error({ err: error }, 'Failed to load backup key status');
-        }),
-    [],
-  );
-
-  const handleDownloadKey = async () => {
-    try {
-      setKeyBusy(true);
-      const blob = await downloadBackupKey();
-      saveBlob(blob, 'nuggets-backup-key.txt');
-      toast.success('Backup key downloaded — store it somewhere safe and separate from your backups.');
-      await loadKeyStatus();
-    } catch (error) {
-      logger.error({ err: error }, 'Failed to download backup key');
-      toast.error('Failed to download backup key');
-    } finally {
-      setKeyBusy(false);
-    }
-  };
-
-  const handleGenerateKey = async () => {
-    // Rotating means older backups still need the OLD key — warn before replacing.
-    if (keyStatus?.exists) {
-      const confirmed = await confirmAsync({
-        title: 'Generate a new backup key?',
-        message: 'This replaces your current backup key. New backups will use the new key, but any EXISTING backup can still only be restored with the key it was made with. Keep your old key safe too.',
-        variant: 'warning',
-        confirmText: 'Generate new key',
-      });
-      if (!confirmed) return;
-    }
-    try {
-      setKeyBusy(true);
-      await generateBackupKey();
-      // Immediately download the new key so the user always has a copy.
-      const blob = await downloadBackupKey();
-      saveBlob(blob, 'nuggets-backup-key.txt');
-      toast.success('New backup key generated and downloaded. Store it somewhere safe!');
-      // A first key lets automatic backups start (the server re-arms the scheduler).
-      await Promise.all([loadKeyStatus(), schedulerStatusQuery.refetch()]);
-    } catch (error) {
-      logger.error({ err: error }, 'Failed to generate backup key');
-      toast.error('Failed to generate backup key');
-    } finally {
-      setKeyBusy(false);
-    }
-  };
 
   /**
    * Fill in the OneDrive upload status of `backupList`. `knownStatus` is the
@@ -262,8 +246,7 @@ const BackupPage: React.FC = () => {
 
   useEffect(() => {
     void fetchBackups();
-    void loadKeyStatus();
-  }, [fetchBackups, loadKeyStatus]);
+  }, [fetchBackups]);
 
   const reloadBackups = () => {
     setLoading(true);
@@ -405,17 +388,40 @@ const BackupPage: React.FC = () => {
   };
 
   const handleFileSelect = (file: File) => {
-    if (!file.name.endsWith('.enc')) {
-      toast.error('Please select a .enc backup file');
+    if (!isBackupFileName(file.name)) {
+      toast.error('Please select a backup file (.tar.age, or an older .enc)');
       return;
     }
     setSelectedFile(file);
   };
 
-  // A key typed in the Restore section: optional (without one, the server's own backup key),
-  // but a real one is at least 32 characters.
-  const typedKey = encryptionKey.trim();
-  const typedKeyInvalid = typedKey.length > 0 && typedKey.length < 32;
+  /** What opens a backup chosen on this computer: the prompt reads its header from the file itself. */
+  const keysForUpload = async (file: File, action: 'restore' | 'verify'): Promise<BackupKeyAnswer | null> => {
+    const format = await backupFormatOf(file).catch(() => 'unknown' as const);
+    if (format === 'unknown') {
+      toast.error("That file isn't a Nuggets backup");
+      return null;
+    }
+    return askForKey({ format, fileName: file.name, action, header: () => headerOfFile(file) });
+  };
+
+  /** What opens a backup on the server: the prompt fetches its header. */
+  const keysForServer = async (backup: Backup, action: 'restore' | 'verify'): Promise<BackupKeyAnswer | null> => {
+    if (backup.format !== 'age' && backup.format !== 'legacy') {
+      toast.error("That file isn't a backup this version can open");
+      return null;
+    }
+    return askForKey({ format: backup.format, fileName: backup.fileName, action, header: () => getBackupHeader(backup.fileName) });
+  };
+
+  /** A restore or verify form: the backup file, and what opens it. */
+  const backupForm = (file: File, keys: BackupKeyAnswer) => {
+    const formData = new FormData();
+    formData.append('backup', file);
+    if (keys.fileKey) formData.append('fileKey', keys.fileKey);
+    if (keys.encryptionKey) formData.append('encryptionKey', keys.encryptionKey);
+    return formData;
+  };
 
   const confirmRestore = (what: string) =>
     confirmAsync({
@@ -439,10 +445,10 @@ const BackupPage: React.FC = () => {
     setRestorePhase('Starting the restore');
     try {
       await start();
-      await waitForRestore((status) => setRestorePhase(status.phase ? RESTORE_PHASES[status.phase] : null));
-      toast.success('Backup restored. The page reloads with the restored data.');
+      const done = await waitForRestore((status) => setRestorePhase(status.phase ? RESTORE_PHASES[status.phase] : null));
+      const named = backupNamed(done);
+      toast.success(`Backup${named ? ` ${named}` : ''} restored. The page reloads with the restored data.`);
       setSelectedFile(null);
-      setEncryptionKey('');
       setTimeout(() => window.location.reload(), 3000);
     } catch (error) {
       if (error instanceof SignInReplacedError) {
@@ -464,29 +470,53 @@ const BackupPage: React.FC = () => {
       toast.error('Please select a backup file');
       return;
     }
-    if (typedKeyInvalid) {
-      toast.error('Encryption key must be at least 32 characters');
-      return;
-    }
-    if (!(await confirmRestore(selectedFile.name))) return;
-
-    const formData = new FormData();
-    formData.append('backup', selectedFile);
-    if (typedKey) formData.append('encryptionKey', typedKey);
-    await runRestore(async () => {
-      await apiRestoreBackup(formData);
-      const fileInput = document.getElementById('backup-file') as HTMLInputElement | null;
-      if (fileInput) fileInput.value = '';
-    });
+    // The key first: a wrong one is said before a large upload, and before the confirmation.
+    const keys = await keysForUpload(selectedFile, 'restore');
+    if (!keys || !(await confirmRestore(selectedFile.name))) return;
+    await runRestore(() => apiRestoreBackup(backupForm(selectedFile, keys)));
   };
 
-  const restoreFromServer = async (fileName: string) => {
-    if (typedKeyInvalid) {
-      toast.error('Encryption key must be at least 32 characters');
+  const restoreFromServer = async (backup: Backup) => {
+    const keys = await keysForServer(backup, 'restore');
+    if (!keys || !(await confirmRestore(backup.fileName))) return;
+    await runRestore(() => restoreBackupFromServer(backup.fileName, keys));
+  };
+
+  /** Start a verify with `start`, then follow it: the data stays as it is, and the app keeps serving. */
+  const runVerify = async (start: () => Promise<unknown>) => {
+    setVerifying(true);
+    setVerifyPhase('Starting the verify');
+    try {
+      await start();
+      const done = await waitForVerify((status) => setVerifyPhase(status.phase ? RESTORE_PHASES[status.phase] : null));
+      const named = backupNamed(done);
+      toast.success(`Backup${named ? ` ${named}` : ''} verified: it restores, migrates and passes the checks. Nothing was changed.`, {
+        duration: 8000,
+      });
+    } catch (error) {
+      const detail = error instanceof RestoreOutcomeError ? error.message : apiErrorMessage(error, 'the server log has the details');
+      toast.error(`The backup did not verify: ${detail}`);
+      logger.error({ err: error }, 'Failed to verify backup');
+    } finally {
+      setVerifying(false);
+      setVerifyPhase(null);
+    }
+  };
+
+  const verifyUpload = async () => {
+    if (!selectedFile) {
+      toast.error('Please select a backup file');
       return;
     }
-    if (!(await confirmRestore(fileName))) return;
-    await runRestore(() => restoreBackupFromServer(fileName, typedKey || undefined));
+    const keys = await keysForUpload(selectedFile, 'verify');
+    if (!keys) return;
+    await runVerify(() => apiVerifyBackup(backupForm(selectedFile, keys)));
+  };
+
+  const verifyFromServer = async (backup: Backup) => {
+    const keys = await keysForServer(backup, 'verify');
+    if (!keys) return;
+    await runVerify(() => verifyBackupFromServer(backup.fileName, keys));
   };
 
   const downloadBackup = async (fileName: string) => {
@@ -633,8 +663,20 @@ const BackupPage: React.FC = () => {
                     <AlertTriangle size={16} />
                   </Callout.Icon>
                   <Callout.Text>
-                    Automatic backups are on, but every backup is encrypted with your backup key and none has
-                    been generated yet. They start once you generate one under Backup Encryption Key.
+                    Automatic backups are on, but every backup is encrypted to your backup keys and there is none
+                    yet. They start once you make or add one under Backup keys.
+                  </Callout.Text>
+                </Callout.Root>
+              )}
+
+              {status?.scheduler?.usingOldBackupKey && (
+                <Callout.Root highContrast color="amber">
+                  <Callout.Icon>
+                    <AlertTriangle size={16} />
+                  </Callout.Icon>
+                  <Callout.Text>
+                    Backups still use the old backup key, which this server holds. Set up a backup key under Backup
+                    keys, and backups from then on open only with your private key.
                   </Callout.Text>
                 </Callout.Root>
               )}
@@ -780,73 +822,16 @@ const BackupPage: React.FC = () => {
             <Flex direction="column" gap="1" style={{ fontSize: '14px' }}>
               <Text>• Complete database with all financial data and user accounts</Text>
               <Text>• All uploaded images and attachments included</Text>
-              <Text>• AES-256-GCM encryption using Docker secrets</Text>
-              <Text>• Single encrypted file for easy storage and transfer</Text>
+              <Text>• Encrypted with age to your backup keys: only your private keys open it, not this server</Text>
+              <Text>• Signed by this server, so a restore here takes only its own backups</Text>
+              <Text>• One file that opens with the age command too (age -d, then tar)</Text>
             </Flex>
           </Flex>
         </Callout.Text>
       </Callout.Root>
 
-      {/* Backup Encryption Key */}
-      <Card mb="6">
-        <Flex direction="column" gap="4">
-          <Flex align="center" gap="2">
-            <Key size={24} className="text-[var(--accent-11)]" />
-            <Text size="5" weight="bold">Backup Encryption Key</Text>
-          </Flex>
-
-          <Text size="2" color="gray">
-            Your backups are encrypted with this key — kept separate from the server's own secret.
-            You need it to restore, so download it and store it somewhere safe and separate from
-            your backups.
-          </Text>
-
-          {keyStatus && !keyStatus.exists && (
-            <Callout.Root highContrast color="amber">
-              <Callout.Icon><AlertTriangle size={16} /></Callout.Icon>
-              <Callout.Text>
-                No backup key yet — you must generate one before you can create backups. Generating
-                it downloads a copy; store it somewhere safe and separate from your backups.
-              </Callout.Text>
-            </Callout.Root>
-          )}
-
-          {keyStatus?.exists && !keyStatus.downloaded && (
-            <Callout.Root color="red">
-              <Callout.Icon><AlertTriangle size={16} /></Callout.Icon>
-              <Callout.Text>
-                You haven't downloaded your backup key. Without it you cannot restore your backups —
-                download it now and store it safely.
-              </Callout.Text>
-            </Callout.Root>
-          )}
-
-          {keyStatus?.exists && keyStatus.downloaded && (
-            <Callout.Root highContrast color="green">
-              <Callout.Icon><CheckCircle size={16} /></Callout.Icon>
-              <Callout.Text>Backup key is set and has been downloaded.</Callout.Text>
-            </Callout.Root>
-          )}
-
-          <Flex gap="3" wrap="wrap">
-            <Button
-              onClick={handleGenerateKey}
-              disabled={keyBusy}
-              loading={keyBusy}
-              variant={keyStatus?.exists ? 'soft' : 'solid'}
-            >
-              <Key size={16} />
-              {keyStatus?.exists ? 'Generate New Key' : 'Generate Backup Key'}
-            </Button>
-            {keyStatus?.exists && (
-              <Button onClick={handleDownloadKey} disabled={keyBusy} variant="soft">
-                <Download size={16} />
-                Download Key
-              </Button>
-            )}
-          </Flex>
-        </Flex>
-      </Card>
+      {/* Backup keys: the owner's age public keys */}
+      <BackupKeysCard />
 
       <Grid columns={{ initial: '1', lg: '2' }} gap="6">
         {/* Create Backup */}
@@ -857,14 +842,14 @@ const BackupPage: React.FC = () => {
               <Text size="5" weight="bold">Create Backup</Text>
             </Flex>
 
-            {!keyStatus?.exists && (
+            {keysQuery.data && !canBackUp && (
               <Text size="1" color="amber" highContrast>
-                Generate a backup key above before creating a backup.
+                Make or add a backup key above before creating a backup.
               </Text>
             )}
             <Button
               onClick={createBackup}
-              disabled={creating || !keyStatus?.exists}
+              disabled={creating || !canBackUp}
               loading={creating}
               size="3"
               style={{ width: '100%' }}
@@ -899,42 +884,18 @@ const BackupPage: React.FC = () => {
             </Callout.Root>
 
             <Flex direction="column" gap="2" align="start">
-              <Text as="div" id="backup-file-caption" size="2" weight="medium">Backup File (.enc)</Text>
+              <Text as="div" id="backup-file-caption" size="2" weight="medium">Backup File (.tar.age, or an older .enc)</Text>
               {/* The file chosen shows in the card below. */}
-              <FilePickerButton accept=".enc" onFiles={([file]) => file && handleFileSelect(file)} aria-describedby="backup-file-caption" size="3">
+              <FilePickerButton accept={BACKUP_FILE_TYPES} onFiles={([file]) => file && handleFileSelect(file)} aria-describedby="backup-file-caption backup-file-hint" size="3">
                 <Upload size={16} />
                 {selectedFile ? 'Choose another backup file' : 'Choose backup file'}
               </FilePickerButton>
-            </Flex>
-
-            <Flex direction="column" gap="2">
-              <Text as="label" htmlFor="restore-backup-key" size="2" weight="medium">Backup Key (optional)</Text>
-              <TextField.Root
-                id="restore-backup-key"
-                type="password"
-                value={encryptionKey}
-                onChange={(e) => setEncryptionKey(e.target.value)}
-                placeholder="Leave empty to use this server's backup key"
-                size="3"
-                style={{ fontFamily: 'monospace' }}
-              />
-              <Flex justify="between" align="start" gap="2">
-                <Text size="1" color="gray" style={{ flex: 1 }}>
-                  Leave it empty for a backup made with this server's current backup key. Otherwise
-                  paste the key it was made with (an older key of this server's). Here, the app
-                  restores only backups this server made; one from another server is restored with
-                  the restore command on the server (node dist/scripts/restore.js, with
-                  --allow-foreign and --key-file for the key it was made with). It also applies to
-                  Restore in the backup history below.
-                </Text>
-                <Text
-                  size="1"
-                  {...textColorProps(typedKey.length >= 32 ? 'green' : typedKey.length > 0 ? 'red' : 'gray')}
-                  style={{ fontFamily: 'monospace', flexShrink: 0 }}
-                >
-                  {typedKey.length} chars
-                </Text>
-              </Flex>
+              <Text id="backup-file-hint" size="1" color="gray">
+                Restore and Verify ask for the private key of one of the backup keys it was made for (an older .enc backup:
+                the old backup key). The key stays in this browser. Verify restores it into a scratch database, checks it and
+                drops it, while the app keeps running. Here, the app restores only backups this server made; another server’s
+                goes through the restore command on the server.
+              </Text>
             </Flex>
 
             {selectedFile && (
@@ -951,20 +912,36 @@ const BackupPage: React.FC = () => {
               </Card>
             )}
 
-            <Button
-              onClick={restoreBackup}
-              disabled={restoring || !selectedFile || typedKeyInvalid}
-              loading={restoring}
-              size="3"
-              color="orange"
-              style={{ width: '100%' }}
-            >
-              <Upload size={16} />
-              {restoring ? 'Restoring...' : 'Restore Database'}
-            </Button>
+            <Grid columns={{ initial: '1', sm: '2' }} gap="3">
+              <Button
+                onClick={() => void verifyUpload()}
+                disabled={verifying || restoring || !selectedFile}
+                loading={verifying}
+                size="3"
+                variant="soft"
+              >
+                <ShieldCheck size={16} />
+                {verifying ? 'Verifying...' : 'Verify'}
+              </Button>
+              <Button
+                onClick={() => void restoreBackup()}
+                disabled={restoring || verifying || !selectedFile}
+                loading={restoring}
+                size="3"
+                color="orange"
+              >
+                <Upload size={16} />
+                {restoring ? 'Restoring...' : 'Restore Database'}
+              </Button>
+            </Grid>
             {restorePhase && (
               <Text size="2" color="gray" role="status">
                 {restorePhase}…
+              </Text>
+            )}
+            {verifyPhase && (
+              <Text size="2" color="gray" role="status">
+                Verifying: {verifyPhase}…
               </Text>
             )}
           </Flex>
@@ -1056,12 +1033,21 @@ const BackupPage: React.FC = () => {
                         </IconButton>
                       )}
                       <IconButton
-                        onClick={() => void restoreFromServer(backup.fileName)}
+                        onClick={() => void verifyFromServer(backup)}
+                        variant="soft"
+                        title="Verify"
+                        aria-label="Verify this backup"
+                        disabled={verifying || restoring}
+                      >
+                        <ShieldCheck size={20} />
+                      </IconButton>
+                      <IconButton
+                        onClick={() => void restoreFromServer(backup)}
                         variant="soft"
                         color="orange"
                         title="Restore"
                         aria-label="Restore this backup"
-                        disabled={restoring}
+                        disabled={restoring || verifying}
                       >
                         <RotateCcw size={20} />
                       </IconButton>
@@ -1127,6 +1113,7 @@ const BackupPage: React.FC = () => {
 
       {/* Confirmation Dialog */}
       <ConfirmationDialog {...dialogProps} />
+      <BackupKeyPrompt {...promptProps} />
     </PageContainer>
   );
 };

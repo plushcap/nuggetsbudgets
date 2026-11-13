@@ -6,16 +6,28 @@
  * this server didn't make, and to prove a backup restores.
  *
  * Usage (in the backend image, which has the database settings, secrets and pg_restore):
- *   node dist/scripts/restore.js <backup.enc> --verify [--key-file <file>] [--allow-foreign]
- *   node dist/scripts/restore.js <backup.enc> --yes    [--key-file <file>] [--allow-foreign]
+ *   node dist/scripts/restore.js <backup.tar.age> --verify --identity-file <file|->
+ *   node dist/scripts/restore.js <backup.tar>     --yes    --decrypted
+ *   node dist/scripts/restore.js <backup.enc>     --yes    [--key-file <file>]
+ *   (any of them with [--signer <ed25519:…>] or [--allow-foreign])
  *
  *   --verify         Restore into a scratch database, migrate and check it, report what it
  *                    holds, and drop it. Changes nothing; the app may keep running.
  *   --yes            Replace the app's data and upload files with the backup's, the way the
  *                    Backup page does. Stop the backend first: this refuses while anything
  *                    else is connected to the database.
- *   --key-file       A file holding the backup key the backup was made with (the one the
- *                    Backup page downloads). Without it, this server's own backup key.
+ *   --identity-file  An age backup (.tar.age): a file holding the private key of one of the
+ *                    backup keys it was made for, as age-keygen writes it. `-` reads it from
+ *                    standard input (docker exec -i … < key.txt), so it is never written to
+ *                    the server's disk.
+ *   --decrypted      The file is a bundle you decrypted on your own machine (age -d -i key.txt
+ *                    backup.tar.age > backup.tar): for a key age opens and this can't, such as
+ *                    a hardware key. The signature is checked just the same.
+ *   --key-file       An older .enc backup: a file holding the backup key it was made with (the
+ *                    one the Backup page downloads). Without it, this server's own old key.
+ *   --signer         Trust this signer besides this server's own: the public key a backup was
+ *                    signed with (ed25519:…, which the Backup page shows and rewrap-secrets
+ *                    prints for the key before a rotation). Repeat it for more.
  *   --allow-foreign  Restore a backup this server didn't sign: one from another server or
  *                    one made before backups were signed. A backup's contents run on the
  *                    database, so only use this for a backup you trust.
@@ -39,25 +51,60 @@ process.env.LOG_LEVEL ??= 'warn';
 const __dirname = getDirname(import.meta.url);
 
 const USAGE =
-  'Usage: node dist/scripts/restore.js <backup.enc> (--verify | --yes) [--key-file <file>] [--allow-foreign]\n' +
-  '  --verify  restore into a scratch database, check it and drop it (changes nothing)\n' +
-  "  --yes     replace the app's data with the backup's (stop the backend first)\n";
+  'Usage: node dist/scripts/restore.js <backup> (--verify | --yes)\n' +
+  '         [--identity-file <file|->] [--decrypted] [--key-file <file>] [--signer <ed25519:…>]... [--allow-foreign]\n' +
+  '  --verify         restore into a scratch database, check it and drop it (changes nothing)\n' +
+  "  --yes            replace the app's data with the backup's (stop the backend first)\n" +
+  '  --identity-file  a .tar.age backup: your private key file (- reads it from standard input)\n' +
+  '  --decrypted      the file is a backup you decrypted yourself (age -d), a .tar\n' +
+  '  --key-file       an older .enc backup: the old backup key it was made with\n' +
+  "  --signer         also trust this signer's backups (the public key the Backup page shows)\n";
 
 function parseArgs(argv: string[]) {
-  const options = { file: '', keyFile: '', verify: false, yes: false, allowForeign: false, help: false };
-  // One iterator, so --key-file can take the argument after it.
+  const options = {
+    file: '',
+    keyFile: '',
+    identityFile: '',
+    signers: [] as string[],
+    decrypted: false,
+    verify: false,
+    yes: false,
+    allowForeign: false,
+    help: false,
+  };
+  // One iterator, so an option can take the argument after it.
   const args = argv[Symbol.iterator]();
+  const value = (arg: string, name: string): string | null => {
+    if (arg === name) return args.next().value ?? '';
+    if (arg.startsWith(`${name}=`)) return arg.slice(name.length + 1);
+    return null;
+  };
   for (const arg of args) {
+    let given: string | null;
     if (arg === '--verify') options.verify = true;
     else if (arg === '--yes') options.yes = true;
     else if (arg === '--allow-foreign') options.allowForeign = true;
+    else if (arg === '--decrypted') options.decrypted = true;
     else if (arg === '--help' || arg === '-h') options.help = true;
-    else if (arg === '--key-file') options.keyFile = args.next().value ?? '';
-    else if (arg.startsWith('--key-file=')) options.keyFile = arg.slice('--key-file='.length);
+    else if ((given = value(arg, '--key-file')) !== null) options.keyFile = given || ' ';
+    else if ((given = value(arg, '--identity-file')) !== null) options.identityFile = given || ' ';
+    else if ((given = value(arg, '--signer')) !== null) options.signers.push(given);
     else if (!arg.startsWith('-') && !options.file) options.file = arg;
     else throw new Error(`Unknown argument: ${arg}`);
   }
   return options;
+}
+
+/** Standard input, all of it, up to `limit` bytes: the private key, never written to disk. */
+async function readStdin(limit: number): Promise<string> {
+  const parts: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of process.stdin as AsyncIterable<Buffer>) {
+    size += chunk.length;
+    if (size > limit) throw new Error('Standard input is longer than a private key file');
+    parts.push(chunk);
+  }
+  return Buffer.concat(parts).toString('utf8');
 }
 
 let options: ReturnType<typeof parseArgs>;
@@ -71,8 +118,13 @@ if (options.help) {
   process.stdout.write(USAGE);
   process.exit(0);
 }
-if (!options.file || options.verify === options.yes || (options.keyFile === '' && process.argv.includes('--key-file'))) {
+// An option given without its value (`--key-file` last) was recorded as ' '.
+if (!options.file || options.verify === options.yes || options.keyFile === ' ' || options.identityFile === ' ' || options.signers.includes('')) {
   process.stderr.write(USAGE);
+  process.exit(2);
+}
+if (options.decrypted && options.identityFile) {
+  process.stderr.write('--decrypted takes a backup you decrypted already: it needs no --identity-file.\n' + USAGE);
   process.exit(2);
 }
 
@@ -92,6 +144,15 @@ const { servingRolePassword } = await import('../db/servingRole.js');
 const { sessionOptions } = await import('../db/pgSession.js');
 const { handleConnectionErrors } = await import('../db/connectionErrors.js');
 const { BackupService, RestoreFailedError, RestoreRefusedError, assertBackupFileExists } = await import('../services/BackupService.js');
+const { parseIdentityFile, parseSignerId } = await import('../utils/backupFormat.js');
+
+// A --signer that isn't a signer's public key is a usage mistake, like a missing value.
+const signers = options.signers.map((text) => parseSignerId(text));
+if (signers.some((signer) => signer === null)) {
+  process.stderr.write(`--signer takes a signer's public key: ed25519: and 43 characters, as the Backup page shows it.\n${USAGE}`);
+  process.exit(2);
+}
+const trustedSigners = signers.filter((signer): signer is Buffer => signer !== null);
 const { createLogger } = await import('../utils/logger.js');
 const logger = createLogger({ service: 'RestoreCli' });
 
@@ -114,6 +175,10 @@ const write = (line: string) => process.stdout.write(`${line}\n`);
 
 try {
   const key = options.keyFile ? (await readFile(options.keyFile, 'utf8')).trim() : null;
+  // The private key: from standard input, or a file. Its text is never printed, whatever is wrong with it.
+  const identities = options.identityFile
+    ? parseIdentityFile(options.identityFile === '-' ? await readStdin(64 * 1024) : await readFile(options.identityFile, 'utf8'))
+    : null;
   const file = path.resolve(options.file);
   // A path that names no file is said so first, not found out by decrypting it.
   await assertBackupFileExists(file).catch((error: unknown) => {
@@ -131,6 +196,10 @@ try {
   write(`${options.verify ? 'Checking' : 'Restoring'} ${file} (database ${location.database} on ${location.host}:${location.port})`);
   const result = await service.restoreFromFile(file, {
     key,
+    identities,
+    decrypted: options.decrypted,
+    signers: trustedSigners,
+    fileName: path.basename(file),
     allowForeign: options.allowForeign,
     verifyOnly: options.verify,
     onPhase: (phase) => write(`  ${phase}`),
@@ -139,7 +208,10 @@ try {
       if (others.length > 0) throw new Error(`Something connected to database ${location.database} meanwhile (${others.join(', ')})`);
     },
   });
-  write(`Signature: ${{ valid: "this server's", invalid: "another server's, or changed", unsigned: 'none (made before backups were signed)', unchecked: 'not checked (no data encryption key)' }[result.signature]}`);
+  const signedBy = { valid: trustedSigners.length ? 'this server or a --signer' : "this server's", invalid: "another server's, or changed", unsigned: 'none (made before backups were signed)', unchecked: 'not checked (no data encryption key)' }[result.signature];
+  write(`Format: ${result.format === 'age' ? 'age (.tar.age)' : 'the older .enc format'}`);
+  write(`Signature: ${signedBy}${result.signer ? ` (${result.signer})` : ''}`);
+  if (result.manifest?.backupId) write(`Backup: ${result.manifest.backupId}`);
   write(`Backup made: ${result.manifest?.createdAt ?? 'unknown'}; schema version ${result.manifest?.schemaVersion ?? 'unknown'}; app ${result.manifest?.appVersion ?? 'unknown'}`);
   write(`Rows: ${Object.entries(result.rowCounts).map(([table, n]) => `${table} ${n}`).join(', ')}`);
   if (result.cutover) {
@@ -148,6 +220,11 @@ try {
   }
   if (options.verify) {
     write('OK: the backup restores, migrates and passes the checks. Nothing was changed.');
+    // The browser can't check a hardware key: opening a backup this server made to it alone counts.
+    if (options.decrypted && result.signature === 'valid' && result.manifest?.recipients) {
+      const marked = await service.markOnlyHardwareRecipientChecked(result.manifest.recipients).catch(() => null);
+      if (marked) write(`Backup key "${marked}" (a hardware key) now shows as checked.`);
+    }
   } else {
     write(`Restored, with ${result.uploadedFilesRestored} upload file(s).`);
     write(`The data from before is kept as database ${result.previousDatabase}, and its upload files in ${result.previousUploads}, until the next restore.`);

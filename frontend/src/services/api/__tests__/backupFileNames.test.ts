@@ -23,7 +23,7 @@ describe('backup file names in URLs', () => {
 
     await downloadBackup(name);
     await deleteBackup(name);
-    await restoreBackupFromServer(name);
+    await restoreBackupFromServer(name, {});
 
     expect(api.unhandled).toEqual([]);
     expect(api.calls('GET /backup/download/:fileName').map((r) => r.params.fileName)).toEqual([name]);

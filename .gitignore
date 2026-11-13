@@ -86,8 +86,11 @@ backups/
 *.sql.gz
 *.dump
 *.backup
-# Encrypted backups (the backup service's nuggets_backup_*.enc)
+# Encrypted backups (the backup service's nuggets_backup_*.tar.age, the older *.enc, and
+# one being written, *.partial)
 *.enc
+*.age
+*.age.partial
 
 # Local data directories (configurable volume storage)
 data/

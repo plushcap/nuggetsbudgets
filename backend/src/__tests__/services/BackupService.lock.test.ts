@@ -4,7 +4,7 @@ import { mkdtemp, readdir, rename, rm, utimes, writeFile } from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import type { Pool } from 'pg';
-import { BackupService, BackupInProgressError, backupTimeFromFileName } from '../../services/BackupService.js';
+import { BackupService, BackupInProgressError, backupIdFromFileName, backupTimeFromFileName } from '../../services/BackupService.js';
 
 /**
  * Overlapping backups and backup dates. Pure unit: the pool is a fake that grants (or
@@ -28,12 +28,17 @@ function lockPool(locked = true) {
   return { pool: pool as unknown as Pool, client, queries };
 }
 
-type Steps = Record<'createDatabaseDump' | 'writeManifest' | 'createArchiveWithUploads' | 'encryptBackup' | 'getActiveBackupKey', (...args: never[]) => Promise<unknown>>;
+type Steps = Record<
+  'createDatabaseDump' | 'writeManifest' | 'createArchiveWithUploads' | 'encryptBackup' | 'getActiveBackupKey' | 'listRecipients',
+  (...args: never[]) => Promise<unknown>
+>;
 
 /** Stub the expensive steps of createBackup; the dump waits for `gate` when one is given. */
 function stubSteps(service: BackupService, gate?: Promise<void>) {
   const steps = service as unknown as Steps & { encryptionService: { initialize: () => Promise<void> } };
   vi.spyOn(steps.encryptionService, 'initialize').mockResolvedValue();
+  // An upgraded install with the old key and no backup key yet: it makes .enc backups.
+  vi.spyOn(steps, 'listRecipients').mockResolvedValue([]);
   vi.spyOn(steps, 'getActiveBackupKey').mockResolvedValue('backup-key');
   vi.spyOn(steps, 'createDatabaseDump').mockImplementation((async (tempDir: string, backupId: string) => {
     await gate;
@@ -102,8 +107,11 @@ describe('BackupService', () => {
       stubSteps(service);
 
       await expect(service.createBackup()).rejects.toBeInstanceOf(BackupInProgressError);
+      // Another process holds it: a scheduled backup tries again (BackupScheduler), as it
+      // does for a verify, rather than skip the period as for this process's own backup.
+      await expect(service.createBackup()).rejects.toMatchObject({ heldBy: 'elsewhere' });
       expect(queries.some((q) => /pg_try_advisory_lock/.test(q))).toBe(true);
-      expect(client.release).toHaveBeenCalledOnce();
+      expect(client.release).toHaveBeenCalledTimes(2);
       expect(BackupService.isBackupInProgress()).toBe(false);
       expect(await readdir(backupDir)).toEqual([]);
     });
@@ -184,6 +192,29 @@ describe('BackupService', () => {
       expect(created[files.current]).toBe(Date.UTC(2025, 0, 3, 3, 4, 5, 678));
       expect(created[files.renamed]).toBe(mtime.getTime());
       expect(backups.map((b) => b.fileName)).toEqual([files.current, files.legacy, files.renamed]);
+    });
+
+    it('lists age backups and the older .enc ones, by their bytes, and never one still being written', async () => {
+      await writeFile(path.join(backupDir, 'nuggets_backup_20261120_012958_362.tar.age'), 'age-encryption.org/v1\n-> X25519 x\n');
+      await writeFile(path.join(backupDir, 'nuggets_backup_20261119_012958_362.enc'), Buffer.from([0x03, 1, 2, 3]));
+      await writeFile(path.join(backupDir, 'nuggets_backup_20261121_012958_362.tar.age.partial'), 'age-encryption.org/v1\n');
+      await writeFile(path.join(backupDir, 'renamed.age'), 'not age at all');
+      const backups = await new BackupService({} as Pool).listBackups();
+      expect(backups.map((b) => [b.fileName, b.format])).toEqual([
+        ['nuggets_backup_20261120_012958_362.tar.age', 'age'],
+        ['nuggets_backup_20261119_012958_362.enc', 'legacy'],
+        ['renamed.age', 'unknown'],
+      ]);
+      expect(backupTimeFromFileName('nuggets_backup_20261120_012958_362.tar.age')?.toISOString()).toBe('2026-11-20T01:29:58.362Z');
+    });
+
+    it("reads a backup's id from its name: an age or .enc backup's, nothing else", () => {
+      expect(backupIdFromFileName('nuggets_backup_20261120_012958_362.tar.age')).toBe('nuggets_backup_20261120_012958_362');
+      expect(backupIdFromFileName('nuggets_backup_20261120_012958_362.enc')).toBe('nuggets_backup_20261120_012958_362');
+      // A name without the milliseconds is an older .enc backup's, and not a signed id.
+      for (const name of ['nuggets_backup_20261120_012958.enc', 'copied-from-the-nas.tar.age', 'nuggets_backup_20261120_012958_362.tar', 'nuggets_backup_20261120_012958_362.tar.age.partial']) {
+        expect(backupIdFromFileName(name), name).toBeNull();
+      }
     });
 
     // The stamp was the server's local time, so the same file read 4-5 hours apart

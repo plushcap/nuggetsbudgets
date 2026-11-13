@@ -5,6 +5,7 @@ import { readDataEncryptionSecret, DATA_ENCRYPTION_SECRET_PATH } from '../utils/
 import { errorMessage } from '../utils/errors.js';
 import { ControlPlaneError } from './controlPlaneErrors.js';
 import { backupSigningKey } from '../utils/backupCrypto.js';
+import { signerFromDataEncryptionSecret, type BackupSigner } from '../utils/backupFormat.js';
 
 const logger = createLogger({ service: 'EncryptionService' });
 
@@ -90,6 +91,16 @@ export class EncryptionService {
   async getBackupSigningKey(): Promise<Buffer> {
     await this.initialize();
     return backupSigningKey(this.encryptionKey!);
+  }
+
+  /**
+   * The Ed25519 key this server signs its age backups with, derived from the data
+   * encryption secret. Its public key can be handed out (the Backup page shows it, the
+   * restore command's --signer takes one): it only checks a signature.
+   */
+  async getBackupSigner(): Promise<BackupSigner> {
+    await this.initialize();
+    return signerFromDataEncryptionSecret(this.encryptionKey!);
   }
 
   /**

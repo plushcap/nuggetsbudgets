@@ -321,7 +321,10 @@ These are the patterns most likely to be violated. Treat them as hard rules.
   live in the DB stay Docker secret files. A new encrypted column or setting goes in
   `REWRAP_TARGETS` / `ENCRYPTED_SETTINGS` (`services/secretRewrap.ts`), or rotating the key
   (`rewrap-secrets`) leaves it unreadable. Stored credentials are sealed
-  with the key's id (`seal(…, keyId)`, envelope v3); backup files stay v2.
+  with the key's id (`seal(…, keyId)`, envelope v3). Backup files are age (`utils/backupFormat.ts`),
+  encrypted to the owner's public keys (`backup_recipients`), whose private keys never reach the
+  server; the restore gets only a backup's file key, which `REDACT_PATHS` keeps out of the logs. An
+  age library's error message is never shown, logged or kept as a cause: it can repeat a private key.
 - **Cookies and CSRF:** read a cookie's name from `sessionCookieName()` /
   `csrfCookieName()` (`__Host-` prefixed whenever cookies are Secure: in production, or with
   `COOKIE_SECURE=true` or an https `DOMAIN_URL`), never a literal. A cookie-authenticated

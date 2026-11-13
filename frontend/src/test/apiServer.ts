@@ -37,7 +37,7 @@ export interface ApiRequest {
 export const TEST_CSRF_TOKEN = 'test-csrf-token';
 const CSRF_EXEMPT = ['POST /auth/login', 'POST /auth/setup-admin'];
 
-/** What a route answers: a JSON body (status 200), or a status with one. */
+/** What a route answers: a JSON body (status 200), or a status with one; a Uint8Array body goes as bytes. */
 export type ApiReply = { status: number; body?: unknown } | unknown;
 export type ApiRoute = ApiReply | ((req: ApiRequest) => ApiReply | Promise<ApiReply>);
 
@@ -109,6 +109,10 @@ export function mockApi(routes: Record<string, ApiRoute>, { csrfExempt = CSRF_EX
       }
       const reply = typeof route === 'function' ? await route(req) : route;
       const { status, body } = isReply(reply) ? reply : { status: 200, body: reply };
+      // Bytes go as they are (a backup's header); anything else as JSON.
+      if (body instanceof Uint8Array) {
+        return new Response(new Uint8Array(body), { status, headers: { 'Content-Type': 'application/octet-stream' } });
+      }
       return new Response(body === undefined ? null : JSON.stringify(body), {
         status,
         headers: { 'Content-Type': 'application/json' },

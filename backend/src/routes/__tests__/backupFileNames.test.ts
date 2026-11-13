@@ -7,6 +7,11 @@ import path from 'path';
 import type { Pool } from 'pg';
 import type { ApplicationLifecycleService } from '../../services/ApplicationLifecycleService.js';
 
+// Step-up is the auth tests' (route-authorization); here the session counts as recent.
+vi.mock('../../middleware/auth.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../middleware/auth.js')>()),
+  requireRecentReauth: (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
 vi.mock('../../services/OneDriveService.js', () => ({ OneDriveService: class { isConfigured = async () => false; } }));
 
 import { createBackupRoutes } from '../backup.js';
@@ -113,7 +118,7 @@ describe('backup routes and file names', () => {
     const gone = 'nuggets_backup_20261102_030000_000.enc';
     const find = vi
       .spyOn(BackupService.prototype, 'findBackup')
-      .mockResolvedValueOnce({ fileName: gone, filePath: path.join(backups, gone), size: 9, created: new Date() });
+      .mockResolvedValueOnce({ fileName: gone, filePath: path.join(backups, gone), size: 9, created: new Date(), format: 'legacy' });
     try {
       const res = await request(app).get(`/api/backup/download/${gone}`).expect(404);
       expect(res.body).toMatchObject({ code: 'NOT_FOUND', error: 'Backup file not found' });

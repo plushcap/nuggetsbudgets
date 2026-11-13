@@ -15,11 +15,14 @@ import { AAD, DOMAIN, deriveKey, envelopeKeyId, keyIdOf, open, seal } from '../u
  * run changes nothing), then with the old one (sealed again under the new key, as v3 with
  * its key id). A value neither opens is counted and left as it is.
  *
- * Not here, and not changed by a rotation: backup files (encrypted with the backup key K,
- * which is itself one of the values below and keeps its value; a backup made before
- * backup keys existed was encrypted with the data key itself, and needs the old key to
- * restore), and notification unsubscribe links, signed with a key derived from the data
- * key: links in emails sent before the rotation stop working.
+ * Not here, and not changed by a rotation: backup files (age backups are encrypted to the
+ * owner's public keys; older .enc ones with the backup key K, which is itself one of the
+ * values below and keeps its value; a backup made before backup keys existed was encrypted
+ * with the data key itself, and needs the old key to restore). The key backups are signed
+ * with follows the data key, so this server stops trusting the signature of the backups
+ * made before: the script prints the old signer for the restore command's --signer. And
+ * notification unsubscribe links, signed with a key derived from the data key: links in
+ * emails sent before the rotation stop working.
  */
 
 type Domain = typeof DOMAIN.credential | typeof DOMAIN.onedrive;

@@ -10,8 +10,8 @@
 #   - every migration the backend image ships is applied, and the API refuses a request
 #     without a session (401 with its error code);
 #   - the first admin can be set up with the logged setup token, and signs in;
-#   - a backup can be created and downloaded, and restoring it (in the background) brings the
-#     data back;
+#   - a backup key (an age key pair made for the run) can be added, a backup created and
+#     downloaded, and restoring it (in the background) with its file key brings the data back;
 #   - the frontend serves the app, on an app route too, with its security headers, and the
 #     backend sends its deny-all Content-Security-Policy;
 #   - Dozzle asks for a sign-in, and lets the user in the dozzle_users secret in.
@@ -276,13 +276,19 @@ json_post /api/tags '{"name": "smoke-before-backup"}'
 expect 201 "creating a tag"
 
 log "Backup"
-json_post /api/backup/key/generate '{}'
-expect 200 "generating the backup key"
-# Backups are encrypted with this key, and a restore takes it back, as the Backup page does.
-api GET /api/backup/key/download
-expect 200 "downloading the backup key"
-cp "$BODY" "$WORK/backup-key.txt"
-[ "$(tr -d '[:space:]' < "$WORK/backup-key.txt" | wc -c)" -ge 32 ] || fail "the backup key is too short"
+# A backup key made for this run, with the backend image's own age library: the private key
+# stays in $WORK (deleted afterwards), and the server gets the public key, as from the
+# Backup page. Adding a key takes step-up, which signing in just now counts as.
+backend_node() { compose exec -T backend node --input-type=module -e "$1"; }
+backend_node 'import { generateHybridIdentity, identityToRecipient } from "age-encryption";
+  const identity = await generateHybridIdentity();
+  console.log(identity); console.log(await identityToRecipient(identity));' > "$WORK/backup-key.txt" \
+  || fail "making a backup key with the backend image's age library"
+identity=$(sed -n 1p "$WORK/backup-key.txt")
+recipient=$(sed -n 2p "$WORK/backup-key.txt")
+[[ "$recipient" == age1pq1* ]] || fail "the backup key's public key is not a post-quantum age key"
+json_post /api/backup/recipients "$(jq -n --arg r "$recipient" '{recipient: $r, label: "smoke test", checked: true}')"
+expect 201 "adding the backup key"
 json_post /api/backup/create '{}'
 expect 202 "starting a backup"
 backup_file=""
@@ -301,6 +307,20 @@ api GET "/api/backup/download/$backup_file"
 expect 200 "downloading the backup"
 cp "$BODY" "$WORK/$backup_file"
 [ -s "$WORK/$backup_file" ] || fail "the downloaded backup is empty"
+[[ "$backup_file" == *.tar.age ]] || fail "the backup is not an age backup: $backup_file"
+[ "$(head -c 21 "$WORK/$backup_file")" = "age-encryption.org/v1" ] || fail "the backup does not start with age's header"
+# What the Backup page does in the browser: open the backup's header with the private key, and
+# send the server only the file key. The age command can't print one, so the image's age
+# library does it, reading the private key and the header on standard input.
+api GET "/api/backup/$backup_file/header"
+expect 200 "the backup's header"
+file_key=$({ printf '%s\n' "$identity"; cat "$BODY"; } | backend_node 'import { Decrypter } from "age-encryption";
+  const chunks = []; for await (const chunk of process.stdin) chunks.push(chunk);
+  const input = Buffer.concat(chunks); const cut = input.indexOf(10);
+  const decrypter = new Decrypter(); decrypter.addIdentity(input.subarray(0, cut).toString("utf8"));
+  console.log(Buffer.from(await decrypter.decryptHeader(input.subarray(cut + 1))).toString("base64"));') \
+  || fail "opening the backup's header with the backup key"
+[[ "$file_key" =~ ^[A-Za-z0-9+/]{22}==$ ]] || fail "the file key is not 16 bytes in base64"
 
 log "Changes after the backup"
 api GET /api/tags
@@ -314,7 +334,7 @@ expect 201 "creating a second tag"
 
 log "Restore"
 api POST /api/backup/restore -F "backup=@$WORK/$backup_file;type=application/octet-stream" \
-  -F "encryptionKey=<$WORK/backup-key.txt"
+  -F "fileKey=$file_key"
 expect 202 "starting the restore"
 # The restore runs in the background; follow it until it is done. The restored data
 # has the backup's sign-ins: should this one not be among them, the status answers 401 and

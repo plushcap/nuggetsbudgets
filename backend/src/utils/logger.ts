@@ -43,6 +43,8 @@ const SECRET_KEYS = [
   'token', 'accessToken', 'access_token', 'refreshToken', 'refresh_token', 'setup_token', 'setupToken',
   'accessUrl', 'access_url',
   'secret', 'clientSecret', 'client_secret', 'smtpPassword', 'apiKey', 'api_key',
+  // A backup's file key (it opens that backup), the old backup key, and age private keys.
+  'fileKey', 'encryptionKey', 'identity', 'identities',
   'authorization', 'cookie',
 ];
 /** Headers that carry a credential, in any `headers` object (a request's, a response's, an HTTP client's). */

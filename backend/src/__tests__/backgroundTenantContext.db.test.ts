@@ -78,7 +78,7 @@ describe('Tenant context in background work', () => {
     let fired!: (seen: Seen) => void;
     const seen = new Promise<Seen>((resolve) => (fired = resolve));
     const backupService = {
-      getBackupKeyStatus: async () => ({ exists: true, downloaded: true }),
+      encryptionState: async () => ({ recipients: 1, legacyKey: false, mode: 'age' }),
       // None yet: a catch-up backup is armed.
       listBackups: async () => [],
       createBackup: async () => {

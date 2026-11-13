@@ -26,8 +26,49 @@ import { getDbLocation, getOwnerCredentials, type DbCredentials, type DbLocation
 import { assertServingRoleEnforcesRls, servingRolePassword } from '../db/servingRole.js';
 import { definerFunctionsRevokeSql, servingRoleGrantsSql } from '../db/servingRoleGrants.js';
 import { decryptBackupFile, encryptBackupFile, type BackupSignature } from '../utils/backupCrypto.js';
+import {
+  BACKUP_ID,
+  BackupBundleError,
+  BackupWrongKeyError,
+  MAX_BACKUP_RECIPIENTS,
+  RecipientProblem,
+  SIGNED_TAIL_BYTES,
+  UploadChangedError,
+  assertRecipientsCompatible,
+  bundleChunks,
+  checkRecipient,
+  checkSignedTail,
+  countStanzas,
+  decryptBundle,
+  detectBackupFormat,
+  encryptToRecipients,
+  extractBundle,
+  copyAndHashBundle,
+  hashFile,
+  isBackupFileName,
+  isHardwareRecipient,
+  publishFile,
+  readAgeHeader,
+  recipientFingerprint,
+  recipientKind,
+  signerId,
+  sweepPartialBackups,
+  type BackupFileFormat,
+  type BundleKey,
+  type RecipientKind,
+} from '../utils/backupFormat.js';
+import {
+  backupKeyKindMismatch,
+  backupKeyNotFound,
+  damagedBackupHeader,
+  duplicateBackupKey,
+  invalidBackupKey,
+  notAnAgeBackup,
+  tooManyBackupKeys,
+} from './backup/errors.js';
 import { runPgTool, terminatePgTools } from '../utils/pgTools.js';
 import { ZipArchive } from 'archiver';
+import { sql } from 'kysely';
 import { config } from '../config.js';
 
 const __dirname = getDirname(import.meta.url);
@@ -45,11 +86,21 @@ export interface BackupManifest {
   /** Max applied schema_migrations.version at backup time, or null if unknown. */
   schemaVersion: string | null;
   createdAt: string;
+  /** The backup's id, signed (an age backup's; format 4): its file name should be it. */
+  backupId?: string;
+  /** The fingerprints of the keys an age backup was encrypted to. */
+  recipients?: string[];
 }
+
+/** What holds the backup lock: this process's backup, restore or verify, or another process. */
+export type BackupLockHolder = 'backup' | 'restore' | 'verify' | 'elsewhere';
 
 /** A backup was refused because another one is running, in this process or another server. */
 export class BackupInProgressError extends ControlPlaneError {
-  constructor(message = 'A backup is already in progress') {
+  constructor(
+    message = 'A backup is already in progress',
+    readonly heldBy: BackupLockHolder = 'backup'
+  ) {
     super(409, 'BACKUP_IN_PROGRESS', message);
     this.name = 'BackupInProgressError';
   }
@@ -70,12 +121,41 @@ export class ShuttingDownError extends ControlPlaneError {
 const RESTORE_STOPPED_BY_SHUTDOWN =
   'The server shut down before the restore replaced the data, so nothing was changed. Restore the backup again once the server has restarted.';
 
-/** No backup key has been generated yet: no key, no backup. Its message says what to do. */
+/** No backup key has been set up yet: no key, no backup. Its message says what to do. */
 export class BackupKeyMissingError extends ControlPlaneError {
   constructor() {
-    super(409, 'BACKUP_KEY_MISSING', 'No backup encryption key has been generated. Generate one in Settings → Backup before creating a backup.');
+    super(
+      409,
+      'BACKUP_KEY_MISSING',
+      'No backup key has been set up. Make one or add your public key under Backup keys in Settings → Database Backup before creating a backup.'
+    );
     this.name = 'BackupKeyMissingError';
   }
+}
+
+/** The stored backup keys can't be used together (a mix of kinds, or one that no longer parses). */
+export class BackupKeysUnusableError extends ControlPlaneError {
+  constructor(reason: string) {
+    super(409, 'BACKUP_KEYS_UNUSABLE', `The backup keys can't be used: ${reason} Fix them under Backup keys in Settings → Database Backup.`);
+    this.name = 'BackupKeysUnusableError';
+  }
+}
+
+/** One of the owner's public keys a backup is encrypted to, as the Backup page lists it. */
+export interface BackupRecipient {
+  uuid: string;
+  /** The age public key. */
+  recipient: string;
+  label: string;
+  kind: RecipientKind;
+  /** A hardware key's tag form, which the browser can't check. */
+  hardware: boolean;
+  fingerprint: string;
+  /** When the private key file was shown to match it, or null (a pasted key not checked yet). */
+  checkedAt: string | null;
+  createdAt: string;
+  /** Who added it, by name, or null when they are gone. */
+  createdBy: string | null;
 }
 
 /** A failed restore. `databaseChanged` says whether it got as far as replacing the data. */
@@ -130,9 +210,15 @@ export async function assertBackupFileExists(file: string): Promise<void> {
  * restore command and --allow-foreign, vouching for it.
  */
 export class ForeignBackupError extends RestoreRefusedError {
-  constructor(readonly signature: Exclude<BackupSignature, 'valid'>) {
+  constructor(
+    readonly signature: Exclude<BackupSignature, 'valid'>,
+    /** An age backup's signer (`ed25519:…`), which the restore command's --signer can trust. */
+    readonly signer: string | null = null
+  ) {
     const why = {
-      invalid: "it is not signed by this server: it was made by another server (one with a different data_encryption_key), or changed since",
+      invalid: signer
+        ? `it is signed by ${signer}, not by this server: it was made by another server (one with a different data_encryption_key, or before it was rotated), or changed since`
+        : "it is not signed by this server: it was made by another server (one with a different data_encryption_key), or changed since",
       unsigned: 'it was made before backups were signed',
       unchecked: 'this server has no data encryption key to check its signature with',
     }[signature];
@@ -140,11 +226,13 @@ export class ForeignBackupError extends RestoreRefusedError {
       `This backup can't be restored here because ${why}. ` +
         'A restore runs what the backup holds on the database, so the app restores only backups this server made. ' +
         'To restore it anyway, a deployment admin with a shell on the server can stop the backend and run the restore command in a ' +
-        "container of its own from the backend's image, with its mounts, secrets and database settings: docker run --rm " +
+        "container of its own from the backend's image, with its mounts, secrets and database settings: docker run --rm -i " +
         '--volumes-from nuggets_backend --network <the stack network> -e USE_DOCKER_SECRETS=true -e NODE_ENV=production ' +
         '-e DB_HOST=postgres -e DB_NAME=<database> -e DB_USER=nuggets_app -e MIGRATION_DB_USER=<the owner role> ' +
-        '--entrypoint node <the backend image> dist/scripts/restore.js <backup file> --yes --allow-foreign ' +
-        "--key-file <a file holding the key the backup was made with, unless it is this server's current one>.",
+        '--entrypoint node <the backend image> dist/scripts/restore.js <backup file> --yes ' +
+        (signer ? `--signer ${signer} (the signer you trust; --allow-foreign trusts any) ` : '--allow-foreign ') +
+        'and, for a .tar.age backup, --identity-file - with your private key on standard input; for an older .enc one, ' +
+        "--key-file <a file holding the key it was made with, unless it is this server's current one>.",
       undefined,
       'BACKUP_NOT_SIGNED_HERE'
     );
@@ -156,8 +244,24 @@ export class ForeignBackupError extends RestoreRefusedError {
 export type { RestorePhase };
 
 export interface RestoreOptions {
-  /** The key the user typed; without one, this server's backup key (then the legacy Docker-secret key). */
+  /**
+   * An older .enc backup: the key the user typed; without one, this server's backup key (then
+   * the legacy Docker-secret key).
+   */
   key?: string | null;
+  /** An age backup: its file key, which the browser got by opening the header with the private key. */
+  fileKey?: Buffer | null;
+  /** An age backup: the private keys (the restore command's --identity-file). */
+  identities?: readonly string[] | null;
+  /** The file is a bundle the owner decrypted (`age -d`), not encrypted (the restore command's --decrypted). */
+  decrypted?: boolean;
+  /** Signers to trust besides this server's own (the restore command's --signer): Ed25519 public keys. */
+  signers?: readonly Buffer[];
+  /**
+   * The name the backup was listed or uploaded under. When it is a backup's name, the id its
+   * signed manifest names must be the same (an older backup renamed is refused).
+   */
+  fileName?: string | null;
   /** Restore a backup this server didn't sign (the restore command's --allow-foreign). */
   allowForeign?: boolean;
   /** Do everything but replace the data: restore into a scratch database, check it, drop it. */
@@ -169,7 +273,11 @@ export interface RestoreOptions {
 
 export interface RestoreResult {
   manifest: BackupManifest | null;
+  /** age, or the older .enc format. */
+  format: 'age' | 'legacy';
   signature: BackupSignature;
+  /** An age backup's signer (`ed25519:…`), or null for an .enc one. */
+  signer: string | null;
   /** Row counts of a few tables in the restored data. */
   rowCounts: Record<string, number>;
   /** The replaced database, kept under this name (null for verifyOnly). */
@@ -183,6 +291,25 @@ export interface RestoreResult {
    * why). Null when there was no cutover.
    */
   cutover: { drift: SchemaDrift | null } | null;
+}
+
+/** A backup in the backup directory, as listBackups lists it. */
+export interface ListedBackup {
+  fileName: string;
+  filePath: string;
+  size: number;
+  created: Date;
+  /** What its first bytes say it is: age (opens with a backup key's private key), legacy (the old key). */
+  format: BackupFileFormat;
+}
+
+/** A backup createBackup made. */
+export interface CreatedBackup {
+  filePath: string;
+  fileName: string;
+  fileSize: number;
+  /** The SHA-256 of the file as written (an age backup's), or null (an .enc one). */
+  sha256: string | null;
 }
 
 export interface BackupServiceOptions {
@@ -252,9 +379,12 @@ const BACKUP_APPLICATION_NAME = 'nuggets-backup';
 /** Tables whose row counts a restore reports (those that exist). */
 const COUNTED_TABLES = ['tenants', 'users', 'accounts', 'transactions', 'budget_items', 'stored_images'];
 
-/** A backup or restore this process is running. */
+/** What an operation is: a backup, a restore, or a verify (a restore into a scratch database that is then dropped). */
+export type OperationKind = 'backup' | 'restore' | 'verify';
+
+/** A backup, restore or verify this process is running. */
 interface Operation {
-  kind: 'backup' | 'restore';
+  kind: OperationKind;
   /** The database it backs up or replaces. */
   database: string;
   done: Promise<void>;
@@ -280,10 +410,16 @@ let currentOperation: Operation | null = null;
 /** A shutdown has begun: no backup or restore starts any more (refuseNewOperations). */
 let refusingOperations = false;
 
-function claimOperation(kind: 'backup' | 'restore', database: string): { operation: Operation; release: () => void } {
+const IN_PROGRESS: Record<OperationKind, string> = {
+  backup: 'A backup is already in progress',
+  restore: 'A restore is in progress',
+  verify: 'A backup is being verified; try again when it has finished',
+};
+
+function claimOperation(kind: OperationKind, database: string): { operation: Operation; release: () => void } {
   if (refusingOperations) throw new ShuttingDownError();
   if (currentOperation) {
-    throw new BackupInProgressError(currentOperation.kind === 'restore' ? 'A restore is in progress' : 'A backup is already in progress');
+    throw new BackupInProgressError(IN_PROGRESS[currentOperation.kind], currentOperation.kind);
   }
   let finish!: () => void;
   const done = new Promise<void>((resolve) => (finish = resolve));
@@ -303,8 +439,43 @@ function stopIfShuttingDown(): void {
   if (refusingOperations) throw new ShuttingDownError(RESTORE_STOPPED_BY_SHUTDOWN);
 }
 
-/** `nuggets_backup_YYYYMMDD_HHMMSS[_mmm].enc`, the names createBackup gives its files. */
-const BACKUP_FILE_NAME = /^nuggets_backup_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})(?:_(\d{3}))?\.enc$/;
+/**
+ * `nuggets_backup_YYYYMMDD_HHMMSS[_mmm].tar.age` (age) or `.enc` (the format before), the
+ * names createBackup gives its files.
+ */
+const BACKUP_FILE_NAME = /^nuggets_backup_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})(?:_(\d{3}))?\.(?:enc|tar\.age)$/;
+
+/**
+ * The time a backup's name says it was made: `YYYYMMDD_HHMMSS`, and the milliseconds when the
+ * name has them (an older .enc one's may not). Null when it isn't a backup's name.
+ */
+export function backupStampOfFileName(fileName: string): { stamp: string; millis: string | null } | null {
+  const match = BACKUP_FILE_NAME.exec(fileName);
+  if (!match) return null;
+  const [, year, month, day, hours, minutes, seconds, millis] = match;
+  return { stamp: `${year}${month}${day}_${hours}${minutes}${seconds}`, millis: millis ?? null };
+}
+
+/**
+ * The time a file's name claims for it, read as loosely as a person would: a backup's stamp
+ * anywhere in it, in any case (`Nuggets_backup_…`, `….age`, `….tar.age.tar.age`), or null. A
+ * restore checks it against the signed id, so a near-miss name can't pass for an older backup.
+ */
+export function claimedBackupStamp(fileName: string): { stamp: string; millis: string | null } | null {
+  const match = /nuggets_backup_(\d{8})_(\d{6})(?:_(\d{3}))?/i.exec(fileName);
+  if (!match) return null;
+  const [, date, time, millis] = match;
+  return { stamp: `${date}_${time}`, millis: millis ?? null };
+}
+
+/** The id a backup's name says it is (`nuggets_backup_…_mmm`), or null when it isn't a backup's name. */
+export function backupIdFromFileName(fileName: string): string | null {
+  const id = fileName.replace(/\.(?:enc|tar\.age)$/, '');
+  return BACKUP_FILE_NAME.test(fileName) && BACKUP_ID.test(id) ? id : null;
+}
+
+/** How many times a backup is tried when an upload changes while it is read. */
+const UPLOAD_CHANGED_ATTEMPTS = 3;
 
 /**
  * When a backup was made, read from its file name, or null when the name carries no
@@ -320,6 +491,18 @@ export function backupTimeFromFileName(fileName: string): Date | null {
   // Date.UTC rolls an impossible date (month 13, Feb 30) over instead of failing.
   if (created.getUTCFullYear() !== year || created.getUTCMonth() !== month - 1 || created.getUTCDate() !== day) return null;
   return created;
+}
+
+/** A timestamptz as pg returns it (a Date), as ISO-8601, or null. */
+function instant(value: Date | string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  return (value instanceof Date ? value : new Date(value)).toISOString();
+}
+
+/** A person's name as a list shows it: their name, else their email; null when they are gone. */
+function personName(row: { first_name: string | null; last_name: string | null; email: string | null }): string | null {
+  const name = [row.first_name, row.last_name].filter((part) => part && part.trim()).join(' ').trim();
+  return name || row.email || null;
 }
 
 /** `base` + `suffix` as a database name: Postgres keeps 63 bytes of one. */
@@ -366,9 +549,14 @@ export class BackupService {
     return currentOperation?.kind === 'backup';
   }
 
-  /** Whether this process is restoring a backup right now. */
+  /** Whether this process is restoring a backup right now (a verify is not a restore: the data stays). */
   static isRestoreInProgress(): boolean {
     return currentOperation?.kind === 'restore';
+  }
+
+  /** Whether this process is verifying a backup right now. */
+  static isVerifyInProgress(): boolean {
+    return currentOperation?.kind === 'verify';
   }
 
   /**
@@ -390,22 +578,22 @@ export class BackupService {
    * The backup or restore this process is running, if any: which, on what database, and
    * (a restore) whether it is replacing the data, past the point where it can be stopped.
    */
-  static runningOperation(): { kind: 'backup' | 'restore'; database: string; replacingData: boolean } | null {
+  static runningOperation(): { kind: OperationKind; database: string; replacingData: boolean } | null {
     if (!currentOperation) return null;
     const { kind, database, replacingData } = currentOperation;
     return { kind, database, replacingData };
   }
 
   /**
-   * Make a restore that hasn't begun replacing the data fail now rather than at its next
-   * step: its pg_restore is stopped, and its sessions on the scratch database ended. It
-   * then drops the scratch database, and the data stays as it was. Call it after
+   * Make a restore that hasn't begun replacing the data, or a verify, fail now rather than at
+   * its next step: its pg_restore is stopped, and its sessions on the scratch database ended.
+   * It then drops the scratch database, and the data stays as it was. Call it after
    * refuseNewOperations, which keeps the restore from starting anything new; call it again
    * if the restore goes on (a query it started just after). False when no such restore runs.
    */
   static async interruptRestore(): Promise<boolean> {
     const operation = currentOperation;
-    if (operation?.kind !== 'restore' || operation.replacingData) return false;
+    if ((operation?.kind !== 'restore' && operation?.kind !== 'verify') || operation.replacingData) return false;
     operation.interrupted = true;
     terminatePgTools();
     await operation.interrupt?.();
@@ -521,24 +709,25 @@ export class BackupService {
     }
   }
 
-  // ── Backup key (K) management ────────────────────────────────────────────────
-  // K is the key backups are encrypted with — deliberately SEPARATE from the
-  // Docker secret. It's stored in system_settings encrypted with the Docker
-  // secret (so the server can auto-encrypt scheduled backups), and the user
-  // downloads a copy to keep for disaster recovery / cross-server restore.
+  // ── The old backup key (K) ───────────────────────────────────────────────────
+  // Before backups were age, K was the key they were encrypted with: a random key, stored in
+  // system_settings encrypted with the data encryption secret, which a deployment admin
+  // downloads. It stays, only to open the .enc backups made with it, and to keep making
+  // them on an upgraded install until a backup key (a recipient) is set up. Nothing new
+  // makes one.
   private static readonly BACKUP_KEY_SETTING = 'backup_data_key';
   private static readonly BACKUP_KEY_DOWNLOADED_SETTING = 'backup_key_downloaded';
 
   /**
-   * Its settings (system_settings: the schedule, the backup key) on its own pool, never a
-   * request's transaction, through systemSettings.ts. Made on first use.
+   * Its settings (system_settings: the schedule, the old key) and keys (backup_recipients)
+   * on its own pool, never a request's transaction. Made on first use.
    */
   private settingsDb(): Kysely<DB> {
     this.settingsKysely ??= new Kysely<DB>({ dialect: new PostgresDialect({ pool: this.db }) });
     return this.settingsKysely;
   }
 
-  /** The active backup key K (decrypted), or null if none has been generated. */
+  /** The old backup key K (decrypted), or null if this server never had one. */
   private async getActiveBackupKey(): Promise<string | null> {
     await this.encryptionService.initialize();
     const stored = await readSystemSetting(BackupService.BACKUP_KEY_SETTING, this.settingsDb());
@@ -549,23 +738,6 @@ export class BackupService {
   /** Store one backup setting (system_settings, category 'backup'): the schedule, or the key. */
   async saveBackupSetting(key: string, value: string): Promise<void> {
     await writeSystemSetting(key, value, { category: 'backup' }, this.settingsDb());
-  }
-
-  /**
-   * Generate a new random backup key, store it encrypted, and reset the
-   * "downloaded" flag. Returns nothing — the plaintext key only ever leaves the
-   * server through {@link getBackupKeyForDownload} (the download stream).
-   *
-   * NOTE: rotating the key does NOT re-encrypt existing backups — older backups
-   * still require the key they were made with. The UI warns about this.
-   */
-  async generateBackupKey(): Promise<void> {
-    await this.encryptionService.initialize();
-    const key = crypto.randomBytes(32).toString('base64'); // 44-char key
-    const encrypted = await this.encryptionService.encryptString(key);
-    await this.saveBackupSetting(BackupService.BACKUP_KEY_SETTING, encrypted);
-    await this.saveBackupSetting(BackupService.BACKUP_KEY_DOWNLOADED_SETTING, 'false');
-    logger.info('Generated a new backup encryption key');
   }
 
   /** The values of the named system settings; a key that isn't set is left out. */
@@ -582,7 +754,7 @@ export class BackupService {
     return readSystemSettingsIn('backup', { keys }, this.settingsDb());
   }
 
-  /** Whether a backup key exists and whether the user has downloaded it. */
+  /** Whether the old backup key K exists and whether the user has downloaded it. */
   async getBackupKeyStatus(): Promise<{ exists: boolean; downloaded: boolean }> {
     const stored = await readSystemSettings(
       [BackupService.BACKUP_KEY_SETTING, BackupService.BACKUP_KEY_DOWNLOADED_SETTING],
@@ -595,14 +767,142 @@ export class BackupService {
   }
 
   /**
-   * Return the plaintext backup key for the user to download, marking it as
-   * downloaded. Returns null if no key has been generated yet.
+   * Return the old backup key K for the user to download, marking it as downloaded. Null if
+   * this server never had one.
    */
   async getBackupKeyForDownload(): Promise<string | null> {
     const key = await this.getActiveBackupKey();
     if (!key) return null;
     await this.saveBackupSetting(BackupService.BACKUP_KEY_DOWNLOADED_SETTING, 'true');
     return key;
+  }
+
+  // ── Backup keys (recipients) ─────────────────────────────────────────────────
+  // The owner's age public keys (backup_recipients, control plane). The server stores only
+  // these: the private keys stay with the owner, and the server can't open its own backups.
+
+  /** The backup keys, oldest first. */
+  async listRecipients(): Promise<BackupRecipient[]> {
+    const rows = await this.settingsDb()
+      .selectFrom('backup_recipients as r')
+      .leftJoin('users as u', 'u.id', 'r.created_by')
+      .select(['r.uuid', 'r.recipient', 'r.label', 'r.checked_at', 'r.created_at', 'u.first_name', 'u.last_name', 'u.email'])
+      .orderBy('r.created_at')
+      .orderBy('r.id')
+      .execute();
+    return rows.map((row) => ({
+      uuid: row.uuid,
+      recipient: row.recipient,
+      label: row.label,
+      kind: recipientKind(row.recipient),
+      hardware: isHardwareRecipient(row.recipient),
+      fingerprint: recipientFingerprint(row.recipient),
+      checkedAt: instant(row.checked_at),
+      createdAt: instant(row.created_at) ?? '',
+      createdBy: personName(row),
+    }));
+  }
+
+  /**
+   * Add a backup key: checked as age reads it (the message never repeats the key), at most
+   * MAX_BACKUP_RECIPIENTS, all of one kind, none twice. `checked` when the browser made it, or
+   * was shown the private key file and it matched. Under a table lock, so two adds can't
+   * together pass the limit or mix the kinds.
+   */
+  async addRecipient(input: { recipient: string; label: string; checked: boolean; createdBy: number | null }): Promise<BackupRecipient> {
+    const recipient = input.recipient.trim();
+    let kind: RecipientKind;
+    try {
+      kind = checkRecipient(recipient);
+    } catch (error) {
+      throw invalidBackupKey(error instanceof RecipientProblem ? error.message : "That public key isn't valid.");
+    }
+    const uuid = await this.settingsDb()
+      .transaction()
+      .execute(async (trx) => {
+        await sql`LOCK TABLE public.backup_recipients IN SHARE ROW EXCLUSIVE MODE`.execute(trx);
+        const existing = await trx.selectFrom('backup_recipients').select(['recipient']).execute();
+        if (existing.some((row) => row.recipient === recipient)) throw duplicateBackupKey();
+        if (existing.length >= MAX_BACKUP_RECIPIENTS) throw tooManyBackupKeys(MAX_BACKUP_RECIPIENTS);
+        const other = existing.find((row) => recipientKind(row.recipient) !== kind);
+        if (other) throw backupKeyKindMismatch(recipientKind(other.recipient));
+        const row = await trx
+          .insertInto('backup_recipients')
+          .values({
+            recipient,
+            label: input.label.trim(),
+            kind,
+            checked_at: input.checked ? new Date().toISOString() : null,
+            created_by: input.createdBy,
+          })
+          .returning('uuid')
+          .executeTakeFirstOrThrow();
+        return row.uuid;
+      });
+    logger.info({ uuid, kind, fingerprint: recipientFingerprint(recipient), checked: input.checked }, 'Backup key added');
+    const added = (await this.listRecipients()).find((r) => r.uuid === uuid);
+    if (!added) throw backupKeyNotFound();
+    return added;
+  }
+
+  /** Remove a backup key. Backups made to it still open with its private key. */
+  async removeRecipient(uuid: string): Promise<void> {
+    const removed = await this.settingsDb().deleteFrom('backup_recipients').where('uuid', '=', uuid).returning('recipient').executeTakeFirst();
+    if (!removed) throw backupKeyNotFound();
+    logger.info({ uuid, fingerprint: recipientFingerprint(removed.recipient) }, 'Backup key removed');
+  }
+
+  /** Mark a backup key checked: its private key file was shown to match it ("Check a key"). */
+  async markRecipientChecked(uuid: string): Promise<BackupRecipient> {
+    const updated = await this.settingsDb()
+      .updateTable('backup_recipients')
+      .set({ checked_at: new Date().toISOString() })
+      .where('uuid', '=', uuid)
+      .returning('uuid')
+      .executeTakeFirst();
+    if (!updated) throw backupKeyNotFound();
+    const recipient = (await this.listRecipients()).find((r) => r.uuid === uuid);
+    if (!recipient) throw backupKeyNotFound();
+    return recipient;
+  }
+
+  /**
+   * After the restore command's --decrypted verify opened a backup this server signed: when
+   * it was made to one key only, and that is a hardware key, that key opened it, so it counts
+   * as checked (the browser can't check one). With more keys the bundle doesn't say which
+   * opened it, so nothing is marked. Returns the label marked, or null.
+   */
+  async markOnlyHardwareRecipientChecked(fingerprints: readonly string[]): Promise<string | null> {
+    if (fingerprints.length !== 1) return null;
+    const recipient = (await this.listRecipients()).find((r) => r.fingerprint === fingerprints[0]);
+    if (!recipient?.hardware || recipient.checkedAt) return null;
+    await this.markRecipientChecked(recipient.uuid);
+    return recipient.label;
+  }
+
+  /**
+   * This server's signer, as `ed25519:…`: the Backup page shows it, and the restore
+   * command's --signer takes one. Null without a data encryption key.
+   */
+  async signerPublicId(): Promise<string | null> {
+    try {
+      return signerId((await this.encryptionService.getBackupSigner()).publicKey);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * How backups are encrypted now: to the backup keys (age); with the old key K, an upgraded
+   * install's until it has a backup key; or not at all.
+   */
+  async encryptionState(): Promise<{ recipients: number; legacyKey: boolean; mode: 'age' | 'legacy' | 'none' }> {
+    const [recipients, legacy] = await Promise.all([
+      this.settingsDb().selectFrom('backup_recipients').select((eb) => eb.fn.countAll<string>().as('n')).executeTakeFirstOrThrow(),
+      this.getBackupKeyStatus(),
+    ]);
+    const count = Number(recipients.n);
+    return { recipients: count, legacyKey: legacy.exists, mode: count > 0 ? 'age' : legacy.exists ? 'legacy' : 'none' };
   }
 
   /**
@@ -614,7 +914,7 @@ export class BackupService {
    * Two that ran together could share a temp directory, and one's cleanup deleted the
    * other's dump.
    */
-  async createBackup(): Promise<{ filePath: string; fileName: string; fileSize: number }> {
+  async createBackup(): Promise<CreatedBackup> {
     // Claimed before the first await, so two calls in this process can't both get past it.
     // Refused (ShuttingDownError) once a shutdown has begun.
     const { release } = claimOperation('backup', this.location.database);
@@ -656,7 +956,8 @@ export class BackupService {
         throw error;
       }
       if (!locked) {
-        throw new BackupInProgressError('A backup or restore is already in progress on another server');
+        // Another process: another server, or the restore command (its --verify among them).
+        throw new BackupInProgressError('A backup or restore is already in progress on another server', 'elsewhere');
       }
 
       try {
@@ -682,65 +983,137 @@ export class BackupService {
     }
   }
 
-  private async createBackupLocked(): Promise<{ filePath: string; fileName: string; fileSize: number }> {
+  private async createBackupLocked(): Promise<CreatedBackup> {
     // This will throw an error if Docker secret is missing
     await this.encryptionService.initialize();
 
-    // No key, no backup: refuse before doing any work if the backup key is absent,
-    // so we never produce a backup encrypted with anything but the user's key.
-    if (!(await this.getActiveBackupKey())) {
+    // No key, no backup: refuse before doing any work without a backup key, so no backup is
+    // ever encrypted with anything but a key the owner holds.
+    const recipients = (await this.listRecipients()).map((r) => r.recipient);
+    if (recipients.length === 0) {
+      // The upgrade window: an install that had the old key keeps making .enc backups with it
+      // until a backup key is set up, so the upgrade leaves no gap.
+      if (await this.getActiveBackupKey()) {
+        logger.warn('Backups still use the old backup key: set up a backup key in Settings → Database Backup');
+        return this.createLegacyBackup();
+      }
       throw new BackupKeyMissingError();
     }
+    try {
+      assertRecipientsCompatible(recipients);
+    } catch (error) {
+      throw new BackupKeysUnusableError(error instanceof RecipientProblem ? error.message : 'one of them is not a valid key.');
+    }
 
-    // To the millisecond: two backups in the same second used to share a temp directory and
-    // a file name, so the second overwrote the first.
+    // An upload that changes while it is read fails that attempt: a signed bundle whose
+    // member is cut short couldn't be parsed. The next attempt reads them again.
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.createAgeBackup(recipients);
+      } catch (error) {
+        if (!(error instanceof UploadChangedError) || attempt >= UPLOAD_CHANGED_ATTEMPTS) throw error;
+        logger.warn({ attempt, member: error.member }, 'An upload changed while the backup read it; making the backup again');
+      }
+    }
+  }
+
+  /** A new backup id: to the millisecond, so two backups in a second don't share a name. */
+  private newBackupId(): string {
     const now = new Date();
-    const backupId = `nuggets_backup_${this.formatDate(now)}_${String(now.getMilliseconds()).padStart(3, '0')}`;
+    return `nuggets_backup_${this.formatDate(now)}_${String(now.getUTCMilliseconds()).padStart(3, '0')}`;
+  }
+
+  /**
+   * An age backup: the dump, then in one pass the bundle (signed as it is written), encrypted
+   * to `recipients`, into `<id>.tar.age.partial` in the backup directory, flushed, then
+   * renamed. No plaintext copy of the bundle is written. The server can't open what it wrote,
+   * so it checks what it can: a stanza per recipient, and the file on disk is what it wrote.
+   */
+  private async createAgeBackup(recipients: string[]): Promise<CreatedBackup> {
+    const backupId = this.newBackupId();
+    const createdAt = backupTimeFromFileName(`${backupId}.tar.age`) ?? new Date();
+    const fileName = `${backupId}.tar.age`;
+    const finalPath = path.join(this.backupLocation, fileName);
+    const partialPath = `${finalPath}.partial`;
+    let tempDir: string | null = null;
+    let partialWritten = false;
+    try {
+      tempDir = await this.makeWorkDir(backupId);
+      logger.info({ backupId }, 'Creating database dump');
+      const dumpFile = await this.createDatabaseDump(tempDir, backupId);
+
+      await fs.mkdir(this.backupLocation, { recursive: true });
+      const signer = await this.encryptionService.getBackupSigner();
+      logger.info({ backupId, recipients: recipients.length }, 'Writing the encrypted backup');
+      partialWritten = true;
+      const written = await encryptToRecipients(
+        bundleChunks({
+          dumpFile,
+          uploadsDir: this.uploadsDir,
+          manifest: {
+            backupId,
+            createdAt: createdAt.toISOString(),
+            appVersion: appVersion(),
+            schemaVersion: await this.readSchemaVersion(),
+            recipients: recipients.map(recipientFingerprint),
+          },
+          signer,
+          onUploadsListed: ({ files, bytes, skipped }) => {
+            if (skipped > 0) logger.warn({ skipped }, 'Uploads that are not regular files (links, devices) or have names a backup refuses were left out');
+            if (files === 0) logger.warn({ uploadsDir: this.uploadsDir }, 'No upload files: the backup holds the database only');
+            else logger.info({ files, bytes }, 'Backing up the upload files');
+          },
+        }),
+        recipients,
+        partialPath
+      );
+
+      // What the server can check of a file it can't open.
+      const stanzas = countStanzas(await readAgeHeader(partialPath));
+      if (stanzas !== recipients.length) throw new Error(`The backup's header has ${stanzas} key stanzas, not ${recipients.length}`);
+      const onDisk = await hashFile(partialPath);
+      if (onDisk.sha256 !== written.sha256 || onDisk.size !== written.size) throw new Error('The backup file on disk is not what was written');
+
+      await publishFile(partialPath, finalPath);
+      partialWritten = false;
+      await fs.rm(tempDir, { recursive: true, force: true });
+      tempDir = null;
+      logger.info({ fileName, sizeMB: (written.size / 1024 / 1024).toFixed(2), sha256: written.sha256 }, 'Backup created successfully');
+      return { filePath: finalPath, fileName, fileSize: written.size, sha256: written.sha256 };
+    } catch (error) {
+      if (tempDir) await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+      if (partialWritten) await fs.rm(partialPath, { force: true }).catch(() => {});
+      if (error instanceof UploadChangedError) throw error;
+      throw new Error(`Backup creation failed: ${errorMessage(error)}`, { cause: error });
+    }
+  }
+
+  /** An .enc backup with the old key K: the format before age, for the upgrade window only. */
+  private async createLegacyBackup(): Promise<CreatedBackup> {
+    const backupId = this.newBackupId();
     let tempDir: string | null = null;
 
     try {
       tempDir = await this.makeWorkDir(backupId);
 
-      // Step 1: Create PostgreSQL dump
       logger.info({ backupId }, 'Creating database dump');
       const dumpFile = await this.createDatabaseDump(tempDir, backupId);
 
-      // Step 1b: Write the version manifest (lets restore verify compatibility
-      // BEFORE touching the target database).
-      logger.info({ backupId }, 'Writing backup manifest');
+      // The version manifest (lets restore check compatibility before touching the database).
       const manifestFile = await this.writeManifest(tempDir);
 
-      // Step 2: Create archive with database + manifest + uploads
       logger.info({ backupId }, 'Creating archive with uploads');
       const archiveFile = await this.createArchiveWithUploads(tempDir, backupId, dumpFile, manifestFile);
 
-      // Step 3: Encrypt the archive
-      logger.info({ backupId }, 'Encrypting backup');
+      logger.info({ backupId }, 'Encrypting backup with the old backup key');
       const encryptedFile = await this.encryptBackup(archiveFile);
 
-      // Step 4: Move to backup location
-      logger.info({ backupId }, 'Moving to backup location');
       const finalPath = await this.moveToBackupLocation(encryptedFile, backupId);
-
-      // Step 5: Cleanup temp files
       await fs.rm(tempDir, { recursive: true, force: true });
-
-      // Get file stats
       const stats = await fs.stat(finalPath);
-
-      logger.info({
-        fileName: path.basename(finalPath),
-        sizeMB: (stats.size / 1024 / 1024).toFixed(2)
-      }, 'Backup created successfully');
-
-      return {
-        filePath: finalPath,
-        fileName: path.basename(finalPath),
-        fileSize: stats.size
-      };
-
+      logger.info({ fileName: path.basename(finalPath), sizeMB: (stats.size / 1024 / 1024).toFixed(2) }, 'Backup created successfully');
+      return { filePath: finalPath, fileName: path.basename(finalPath), fileSize: stats.size, sha256: null };
     } catch (error) {
-      // Cleanup on error
       if (tempDir) await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
       throw new Error(`Backup creation failed: ${errorMessage(error)}`, { cause: error });
     }
@@ -780,6 +1153,17 @@ export class BackupService {
     return dumpFile;
   }
 
+  /** The newest applied migration (schema_migrations, which isn't tenant-scoped), or null. */
+  private async readSchemaVersion(): Promise<string | null> {
+    try {
+      const result = await this.db.query<{ version: string }>('SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1');
+      return result.rows[0]?.version ?? null;
+    } catch (error) {
+      logger.warn({ err: error }, 'Could not read schema_migrations version for backup manifest');
+      return null;
+    }
+  }
+
   /**
    * Write the backup manifest (manifest.json) into the temp dir.
    *
@@ -790,17 +1174,7 @@ export class BackupService {
   private async writeManifest(tempDir: string): Promise<string> {
     const manifestPath = path.join(tempDir, 'manifest.json');
 
-    let schemaVersion: string | null = null;
-    try {
-      // schema_migrations is not tenant-scoped, so the serving pool can read it.
-      const result = await this.db.query<{ version: string }>(
-        'SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1'
-      );
-      schemaVersion = result.rows[0]?.version ?? null;
-    } catch (error) {
-      logger.warn({ err: error }, 'Could not read schema_migrations version for backup manifest');
-    }
-
+    const schemaVersion = await this.readSchemaVersion();
     const manifest: BackupManifest = {
       manifestVersion: 1,
       appVersion: appVersion(),
@@ -1052,7 +1426,9 @@ export class BackupService {
   async restoreFromFile(backupFilePath: string, options: RestoreOptions = {}): Promise<RestoreResult> {
     // A restore accepted (restoreJob) just before the shutdown began: it never started.
     stopIfShuttingDown();
-    const { operation, release } = claimOperation('restore', this.location.database);
+    // A verify is an operation of its own: it stops no scheduler and puts nothing in
+    // maintenance mode, since the data stays as it is.
+    const { operation, release } = claimOperation(options.verifyOnly ? 'verify' : 'restore', this.location.database);
     try {
       return await this.restoreClaimed(backupFilePath, options, operation);
     } finally {
@@ -1091,26 +1467,13 @@ export class BackupService {
       lock = await this.connect(live);
       const { rows } = await lock.query<{ locked: boolean }>('SELECT pg_try_advisory_lock($1) AS locked', [BackupService.BACKUP_LOCK_KEY]);
       if (rows[0]?.locked !== true) {
-        throw new BackupInProgressError('A backup or restore is already in progress (on another server, or in the restore command)');
+        throw new BackupInProgressError('A backup or restore is already in progress (on another server, or in the restore command)', 'elsewhere');
       }
 
-      phase('decrypting');
-      const zipFile = path.join(tempDir, 'backup.zip');
-      const signature = await this.decryptForRestore(backupFilePath, zipFile, options.key ?? null);
-      if (signature !== 'valid') {
-        if (!options.allowForeign) throw new ForeignBackupError(signature);
-        logger.warn({ restoreId, signature }, 'Restoring a backup this server did not sign (--allow-foreign)');
-      }
-
-      phase('checking');
       const extractDir = path.join(tempDir, 'extracted');
-      await safeExtractZip(zipFile, extractDir);
-      await fs.rm(zipFile, { force: true });
-      const dumpName = (await fs.readdir(extractDir)).find((f) => f.endsWith('.dump'));
-      if (!dumpName) throw new RestoreRefusedError('This backup has no database dump in it');
-      const dumpFile = path.join(extractDir, dumpName);
+      const opened = await this.openBackup(backupFilePath, tempDir, extractDir, options, phase, restoreId);
+      const { manifest, signature, signer, format, dumpFile } = opened;
       // Refuses a backup newer than this code before anything is created.
-      const manifest = await this.readManifest(extractDir);
       this.assertRestorable(manifest);
       await this.assertArchiveContents(dumpFile);
 
@@ -1150,7 +1513,7 @@ export class BackupService {
 
       if (options.verifyOnly) {
         await this.dropDatabase(scratch);
-        return { manifest, signature, rowCounts, previousDatabase: null, previousUploads: null, uploadedFilesRestored: 0, cutover };
+        return { manifest, format, signature, signer, rowCounts, previousDatabase: null, previousUploads: null, uploadedFilesRestored: 0, cutover };
       }
 
       await options.beforeSwap?.();
@@ -1193,7 +1556,9 @@ export class BackupService {
       logger.info({ restoreId, previousDatabase, previousUploads: uploads.previous, rowCounts }, 'Restore completed successfully');
       return {
         manifest,
+        format,
         signature,
+        signer,
         rowCounts,
         previousDatabase,
         previousUploads: uploads.previous,
@@ -1218,6 +1583,140 @@ export class BackupService {
       if (lock) await lock.end().catch(() => {});
       if (tempDir) await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
     }
+  }
+
+  /**
+   * Open a backup for a restore or a verify, by its format (its first bytes, never its name):
+   * decrypt it, check that this server signed it (or that it may restore it anyway), and
+   * extract it into `extractDir`. Nothing is parsed before the signature is checked.
+   *
+   * - age: decrypted with the file key (the web app) or the private keys (the restore
+   *   command) into one scratch file, hashed as it goes; its tail is checked byte for byte,
+   *   then the signature, then the tar is parsed, its members checked against the signed
+   *   manifest. A file named as a backup must be the backup its signed manifest names.
+   * - a bundle the owner decrypted (the restore command's --decrypted): the same, from the
+   *   hashing on.
+   * - .enc (the format before): decrypted with the old key, the signature checked, then the zip
+   *   extracted, as before.
+   */
+  private async openBackup(
+    file: string,
+    tempDir: string,
+    extractDir: string,
+    options: RestoreOptions,
+    phase: (p: RestorePhase) => void,
+    restoreId: string
+  ): Promise<{ manifest: BackupManifest | null; signature: BackupSignature; signer: string | null; format: 'age' | 'legacy'; dumpFile: string }> {
+    const detected = await detectBackupFormat(file);
+    phase('decrypting');
+
+    if (detected === 'legacy' && !options.decrypted) {
+      const zipFile = path.join(tempDir, 'backup.zip');
+      const signature = await this.decryptForRestore(file, zipFile, options.key ?? null);
+      if (signature !== 'valid') {
+        if (!options.allowForeign) throw new ForeignBackupError(signature);
+        logger.warn({ restoreId, signature }, 'Restoring a backup this server did not sign (--allow-foreign)');
+      }
+      phase('checking');
+      await safeExtractZip(zipFile, extractDir);
+      await fs.rm(zipFile, { force: true });
+      const dumpName = (await fs.readdir(extractDir)).find((f) => f.endsWith('.dump'));
+      if (!dumpName) throw new RestoreRefusedError('This backup has no database dump in it');
+      return { manifest: await this.readManifest(extractDir), signature, signer: null, format: 'legacy', dumpFile: path.join(extractDir, dumpName) };
+    }
+
+    let bundle: { digest: Buffer; tail: Buffer; size: number };
+    let tarFile: string;
+    if (options.decrypted) {
+      if (detected !== 'tar') {
+        throw new RestoreRefusedError(
+          detected === 'age' || detected === 'legacy'
+            ? 'This backup is still encrypted: --decrypted takes the tar that age -d makes of it'
+            : "This file isn't a decrypted Nuggets backup (a tar)",
+          undefined,
+          'NOT_A_BACKUP'
+        );
+      }
+      // Copied into the scratch directory as it is hashed: what is checked is what is parsed,
+      // even if the owner's file changes meanwhile.
+      tarFile = path.join(tempDir, 'backup.tar');
+      bundle = await copyAndHashBundle(file, tarFile);
+    } else if (detected === 'age') {
+      const key: BundleKey | null = options.fileKey
+        ? { fileKey: options.fileKey }
+        : options.identities?.length
+          ? { identities: options.identities }
+          : null;
+      if (!key) {
+        throw new RestoreRefusedError(
+          'This backup is encrypted with age: it opens with the private key of one of the backup keys it was made for. Choose your key file.',
+          undefined,
+          'BACKUP_KEY_REQUIRED'
+        );
+      }
+      tarFile = path.join(tempDir, 'backup.tar');
+      try {
+        bundle = await decryptBundle(file, key, tarFile);
+      } catch (error) {
+        if (error instanceof BackupWrongKeyError) throw new RestoreRefusedError(error.message, undefined, 'WRONG_BACKUP_KEY');
+        if (error instanceof BackupBundleError) throw new RestoreRefusedError(error.message, undefined, 'BACKUP_DAMAGED');
+        throw error;
+      }
+    } else {
+      throw new RestoreRefusedError("This isn't a Nuggets backup file, or it was made by a newer version of Nuggets", undefined, 'NOT_A_BACKUP');
+    }
+
+    phase('checking');
+    const own = await this.encryptionService.getBackupSigner().catch(() => null);
+    const trusted = [...(own ? [own.publicKey] : []), ...(options.signers ?? [])];
+    let checked: { signature: BackupSignature; signer: string };
+    try {
+      checked = checkSignedTail(bundle, trusted);
+    } catch (error) {
+      if (error instanceof BackupBundleError) throw new RestoreRefusedError(error.message, undefined, 'BACKUP_DAMAGED');
+      throw error;
+    }
+    if (checked.signature !== 'valid') {
+      // A trusted signer whose signature doesn't check out: the file was changed, not made
+      // elsewhere, so the message doesn't name a signer to trust.
+      const trustedSigner = trusted.some((key) => signerId(key) === checked.signer);
+      if (!options.allowForeign) throw new ForeignBackupError(checked.signature, trustedSigner ? null : checked.signer);
+      logger.warn({ restoreId, signature: checked.signature, signer: checked.signer }, 'Restoring a backup this server did not sign (--allow-foreign)');
+    }
+
+    let bundleManifest;
+    try {
+      bundleManifest = await extractBundle(tarFile, bundle.size - SIGNED_TAIL_BYTES, extractDir);
+    } catch (error) {
+      if (error instanceof BackupBundleError) throw new RestoreRefusedError(error.message, undefined, 'BACKUP_DAMAGED');
+      throw error;
+    } finally {
+      await fs.rm(tarFile, { force: true });
+    }
+
+    // An older backup renamed as a newer one, say, is refused: the id is signed, the name isn't.
+    // Any name in a backup's form says when it was made (the list dates it by that), with or
+    // without the milliseconds: it must say the signed id's time.
+    const name = options.fileName !== undefined && options.fileName !== null ? path.basename(options.fileName) : null;
+    const named = name ? claimedBackupStamp(name) : null;
+    const signed = backupStampOfFileName(`${bundleManifest.backupId}.tar.age`);
+    if (named && (!signed || named.stamp !== signed.stamp || (named.millis !== null && named.millis !== signed.millis))) {
+      throw new RestoreRefusedError(
+        `This file is named as backup ${name?.replace(/\.(?:enc|tar\.age)$/, '')}, but it is backup ${bundleManifest.backupId} ` +
+          `(made ${bundleManifest.createdAt}): it was renamed. Restore it under its own name if it is the one you meant.`,
+        undefined,
+        'BACKUP_RENAMED'
+      );
+    }
+    const manifest: BackupManifest = {
+      manifestVersion: bundleManifest.manifestVersion,
+      appVersion: bundleManifest.appVersion,
+      schemaVersion: bundleManifest.schemaVersion,
+      createdAt: bundleManifest.createdAt,
+      backupId: bundleManifest.backupId,
+      recipients: bundleManifest.recipients,
+    };
+    return { manifest, signature: checked.signature, signer: checked.signer, format: 'age', dumpFile: path.join(extractDir, 'database.dump') };
   }
 
   /**
@@ -1713,6 +2212,8 @@ export class BackupService {
           removed.push(entry);
         }
       }
+      // An age backup cut short while it was written: it was never renamed into place.
+      for (const entry of await sweepPartialBackups(this.backupLocation)) removed.push(`backups/${entry}`);
       // Backups uploaded for a restore (routes/backup.ts).
       const uploads = path.join(this.tempDir, 'uploads');
       for (const entry of await fs.readdir(uploads).catch(() => [] as string[])) {
@@ -1745,13 +2246,14 @@ export class BackupService {
   /**
    * List available backups
    */
-  async listBackups(): Promise<Array<{ fileName: string; filePath: string; size: number; created: Date }>> {
+  async listBackups(): Promise<ListedBackup[]> {
     try {
-      // Regular files only: a symlink named *.enc would otherwise be listed, uploaded and
-      // restored as the file it points at, and a dangling one made the whole listing
-      // fail. A file deleted while this runs is skipped, not an error.
+      // Regular files only: a symlink named *.tar.age or *.enc would otherwise be listed,
+      // uploaded and restored as the file it points at, and a dangling one made the whole
+      // listing fail. A file deleted while this runs is skipped, not an error. A .partial
+      // file (a backup being written) isn't a backup's name.
       const entries = await fs.readdir(this.backupLocation, { withFileTypes: true });
-      const backupFiles = entries.filter((e) => e.isFile() && e.name.endsWith('.enc')).map((e) => e.name);
+      const backupFiles = entries.filter((e) => e.isFile() && isBackupFileName(e.name)).map((e) => e.name);
 
       const backups = await Promise.all(
         backupFiles.map(async (fileName) => {
@@ -1765,7 +2267,9 @@ export class BackupService {
             fileName,
             filePath,
             size: stats.size,
-            created: backupTimeFromFileName(fileName) ?? stats.mtime
+            created: backupTimeFromFileName(fileName) ?? stats.mtime,
+            // From its first bytes: which key it opens with.
+            format: await detectBackupFormat(filePath).catch((): BackupFileFormat => 'unknown'),
           };
         })
       );
@@ -1783,18 +2287,34 @@ export class BackupService {
   }
 
   /** A backup in the backup directory by its file name, or null (no paths, only listed files). */
-  async findBackup(fileName: string): Promise<{ fileName: string; filePath: string; size: number; created: Date } | null> {
+  async findBackup(fileName: string): Promise<ListedBackup | null> {
     return (await this.listBackups()).find((b) => b.fileName === fileName) ?? null;
   }
 
   /**
+   * The age header of a listed backup (at most MAX_AGE_HEADER_BYTES), for the browser to
+   * open with the owner's private key. Null when no backup has that name.
+   */
+  async readBackupHeader(fileName: string): Promise<Buffer | null> {
+    const backup = await this.findBackup(fileName);
+    if (!backup) return null;
+    if (backup.format !== 'age') throw notAnAgeBackup();
+    try {
+      return await readAgeHeader(backup.filePath);
+    } catch (error) {
+      if (error instanceof BackupBundleError) throw damagedBackupHeader(error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Delete a backup file. Defence in depth against path traversal: strip any
-   * directory component and require the `.enc` backup extension, so this can
+   * directory component and require a backup's extension (`.tar.age`, `.enc`), so this can
    * only ever unlink a file directly inside the backup directory.
    */
   async deleteBackup(fileName: string): Promise<void> {
     const safeName = path.basename(fileName);
-    if (safeName !== fileName || !safeName.endsWith('.enc')) {
+    if (safeName !== fileName || !isBackupFileName(safeName)) {
       throw new Error('Invalid backup file name');
     }
     const filePath = path.join(this.backupLocation, safeName);

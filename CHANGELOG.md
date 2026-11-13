@@ -4,6 +4,40 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
 
 ## Unreleased
 
+### Security
+
+- Backups are now encrypted with [age](https://age-encryption.org) to your own **public**
+  keys, and the private keys that open them stay with you: the server can't read the backups
+  it makes. Settings → Database Backup has a **Backup keys** card: make a key pair there (the
+  private key is offered as a file, and asked for back before the public key is sent), or
+  paste the public key from `age-keygen -pq` (age 1.3 or later; a classic `age-keygen` key
+  works with older age, such as Ubuntu 24.04's 1.1). Up to five keys, all of one kind;
+  post-quantum is the default. A backup is now `nuggets_backup_….tar.age`, a tar bundle that
+  opens with stock tools (`age -d -i key.txt FILE.tar.age | tar -x`), and is still signed by
+  the server that made it, now with an Ed25519 key derived from the data encryption key, so
+  the app still restores only its own backups.
+- Restoring or verifying an age backup in the web app asks for your private key file (or the
+  pasted key). It stays in the browser: the page opens the backup's header with it and sends
+  the server only that backup's 16-byte file key. A wrong key is refused before anything is
+  uploaded. **Verify** is new in the web app: it restores the backup into a scratch database,
+  checks it and drops it, while the app keeps running.
+- The restore command takes `--identity-file -` (the private key on standard input, never
+  written to the server's disk), `--decrypted` (a bundle you decrypted yourself with `age -d`,
+  for a hardware key, say), and `--signer <ed25519:…>`, which trusts that one signer's
+  backups (the Backup page shows this server's; `rewrap-secrets` prints the old one when it
+  rotates the data encryption key). `--key-file` still opens an older `.enc` backup.
+- Downloading the old backup key now asks you to confirm your password or passkey, as adding
+  or removing a backup key does. Generating a new old-style key is gone.
+
+  **Upgrading:** open Settings → Database Backup and set up a backup key (make one there, or
+  paste the public key from `age-keygen -pq`). Keep the private key file in a password
+  manager, and a second key offline: losing one then loses nothing, losing every one loses the
+  backups. Until you do, backups carry on with the old key, and the health check and the page
+  say so. Backups made before keep opening with the old key, which the server keeps; keep your
+  downloaded copy of it for the copies on OneDrive or elsewhere. A key change after the
+  upgrade (`rewrap-secrets`) prints the old signer: keep it to restore the backups made before
+  the change with `--signer`.
+
 ### Changed
 
 - Each GitHub Release's description lists what changed in it: its section of this changelog,

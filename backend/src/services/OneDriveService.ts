@@ -13,6 +13,7 @@ import { randomBytes } from 'crypto';
 import * as path from 'path';
 import { getDirname } from '../utils/esm-compat.js';
 import { config } from '../config.js';
+import { isBackupFileName } from '../utils/backupFormat.js';
 
 const __dirname = getDirname(import.meta.url);
 
@@ -581,8 +582,9 @@ export class OneDriveService {
         return;
       }
 
-      // Backups are written as encrypted .enc archives (see BackupService).
-      const files = readdirSync(backupsPath).filter(f => f.endsWith('.enc'));
+      // Backups are written as .tar.age files (older ones as .enc; see BackupService). A
+      // .partial file is one still being written.
+      const files = readdirSync(backupsPath).filter((f) => isBackupFileName(f));
       
       if (files.length === 0) {
         logger.info({ userId }, 'No backup files found to upload');

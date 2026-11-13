@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { execFileSync } from 'child_process';
 import { randomBytes } from 'crypto';
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'fs/promises';
+import { copyFile, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { Client, Pool, escapeIdentifier } from 'pg';
@@ -18,6 +18,9 @@ import { pgToolPath } from '../../utils/pgTools.js';
 import { BASELINE } from '../../db/baseline.js';
 import { V2_4_0_NEWEST_VERSION } from '../../db/v240Migrations.js';
 import { loadV240Install, schemaSnapshot } from '../../test/schemaSnapshot.js';
+import { EncryptionService } from '../../services/EncryptionService.js';
+import { decryptBundle, parseSignerId, readAgeHeader } from '../../utils/backupFormat.js';
+import { Decrypter, generateHybridIdentity, identityToRecipient } from 'age-encryption';
 
 /**
  * Backups and restores, end to end against Postgres: make data, back it up,
@@ -140,7 +143,26 @@ describe.skipIf(!runnable)(`backup and restore round trip (pg_dump ${tools}, ser
   /** A BackupService on the test database; a new one reads the data key afresh. */
   const service = () => new BackupService(servingPool, { location, owner, serving, migrationsDir, ...dirs });
 
+  /** The test's backup key: an age key pair made at run time (none is committed). */
+  let identity: string;
+  const addTestRecipient = async (backups: BackupService) =>
+    backups.addRecipient({ recipient: await identityToRecipient(identity), label: 'test key', checked: true, createdBy: null });
+  /** What the browser does: open the backup's header with the private key, and keep only the file key. */
+  const fileKeyOf = async (file: string) => {
+    const opener = new Decrypter();
+    opener.addIdentity(identity);
+    return Buffer.from(await opener.decryptHeader(await readAgeHeader(file)));
+  };
+  /** The old backup key K, as an install from before age backups has it. */
+  const seedLegacyKey = async (backups: BackupService) => {
+    const key = randomBytes(32).toString('base64');
+    await backups.saveBackupSetting('backup_data_key', await new EncryptionService().encryptString(key));
+    await backups.saveBackupSetting('backup_key_downloaded', 'false');
+    return key;
+  };
+
   beforeAll(async () => {
+    identity = await generateHybridIdentity();
     tmp = await mkdtemp(path.join(os.tmpdir(), 'backup-round-trip-'));
     dirs = { backupLocation: path.join(tmp, 'backups'), uploadsDir: path.join(tmp, 'uploads'), tempDir: path.join(tmp, 'temp') };
     for (const dir of Object.values(dirs)) await mkdir(dir, { recursive: true });
@@ -175,14 +197,13 @@ describe.skipIf(!runnable)(`backup and restore round trip (pg_dump ${tools}, ser
 
   it('refuses a backup before a backup key exists', async () => {
     await useDataKey('server-a');
-    await expect(service().createBackup()).rejects.toThrow(/No backup encryption key has been generated/);
+    await expect(service().createBackup()).rejects.toThrow(/No backup key has been set up/);
   });
 
   it('brings the data and the upload files back, and refuses what it must', async () => {
     await useDataKey('server-a');
     const backups = service();
-    await backups.generateBackupKey();
-    const key = (await backups.getBackupKeyForDownload())!;
+    await addTestRecipient(backups);
 
     // The data at backup time.
     await live("INSERT INTO tags (tenant_id, name) VALUES (1, 'kept-by-backup'), (1, 'changed-later')");
@@ -200,19 +221,24 @@ describe.skipIf(!runnable)(`backup and restore round trip (pg_dump ${tools}, ser
     expect(before.grants).toContain(`definer revoke_deployment_admin ${serving.user}`);
 
     const backup = await backups.createBackup();
+    expect(backup.fileName).toMatch(/^nuggets_backup_\d{8}_\d{6}_\d{3}\.tar\.age$/);
     const bytes = await readFile(backup.filePath);
-    // Encrypted (format 3), not the dump or any of its data in the clear.
-    expect(bytes[0]).toBe(0x03);
+    // age, not the dump or any of its data in the clear.
+    expect(bytes.subarray(0, 21).toString('latin1')).toBe('age-encryption.org/v1');
     expect(bytes.includes(Buffer.from('PGDMP'))).toBe(false);
     expect(bytes.includes(Buffer.from('kept-by-backup'))).toBe(false);
     expect(bytes.includes(Buffer.from('march statement'))).toBe(false);
-    // Nothing left in the clear in temp.
+    expect(backup.sha256).toMatch(/^[0-9a-f]{64}$/);
+    // Nothing left in the clear in temp, and no partial file.
     expect(await readdir(dirs.tempDir)).toEqual([]);
+    expect(await readdir(dirs.backupLocation)).toEqual([backup.fileName]);
+    const fileKey = await fileKeyOf(backup.filePath);
 
-    // A wrong key: refused, clearly, with nothing changed.
-    const wrong = backups.restoreBackupWithCustomKey(backup.filePath, randomBytes(32).toString('base64'));
+    // A wrong file key, and none: refused, clearly, with nothing changed.
+    const wrong = backups.restoreFromFile(backup.filePath, { fileKey: randomBytes(16) });
     await expect(wrong).rejects.toBeInstanceOf(RestoreFailedError);
-    await expect(wrong).rejects.toMatchObject({ databaseChanged: false, message: expect.stringMatching(/Invalid encryption key/) });
+    await expect(wrong).rejects.toMatchObject({ databaseChanged: false, message: expect.stringMatching(/doesn't open this backup/) });
+    await expect(backups.restoreBackup(backup.filePath)).rejects.toMatchObject({ databaseChanged: false, message: expect.stringMatching(/encrypted with age/) });
     expect(await tagNames()).toEqual(before.tags);
     expect(await databases()).toEqual([location.database]);
 
@@ -228,19 +254,21 @@ describe.skipIf(!runnable)(`backup and restore round trip (pg_dump ${tools}, ser
     const gate = new Promise<void>((resolve) => (release = resolve));
     const phases: string[] = [];
     const restoring = backups.restoreFromFile(backup.filePath, {
-      key,
+      fileKey,
+      fileName: backup.fileName,
       onPhase: (phase) => phases.push(phase),
       beforeSwap: () => gate,
     });
     await vi.waitFor(() => expect(phases).toContain('verifying'), { timeout: 120_000, interval: 100 });
-    await expect(service().restoreFromFile(backup.filePath, { key })).rejects.toBeInstanceOf(BackupInProgressError);
+    await expect(service().restoreFromFile(backup.filePath, { fileKey })).rejects.toBeInstanceOf(BackupInProgressError);
     await expect(service().createBackup()).rejects.toBeInstanceOf(BackupInProgressError);
     // Nothing is replaced until every check has passed: the data is still the changed one.
     expect(await tagNames()).toContain('made-after-backup');
     release();
     const result = await restoring;
 
-    expect(result.signature).toBe('valid');
+    expect(result).toMatchObject({ format: 'age', signature: 'valid', signer: await backups.signerPublicId() });
+    expect(result.manifest).toMatchObject({ manifestVersion: 4, backupId: backup.fileName.replace(/\.tar\.age$/, '') });
     // A backup at the baseline: no cutover.
     expect(result.cutover).toBeNull();
     expect(result.previousDatabase).toBe(`${location.database}_before_restore`);
@@ -290,22 +318,110 @@ describe.skipIf(!runnable)(`backup and restore round trip (pg_dump ${tools}, ser
     await useDataKey('server-a');
     const backups = service();
     const backup = await backups.createBackup();
-    const key = (await backups.getBackupKeyForDownload())!;
+    const fileKey = await fileKeyOf(backup.filePath);
+    const signerA = (await backups.signerPublicId())!;
+    expect(signerA).toMatch(/^ed25519:[A-Za-z0-9_-]{43}$/);
     await live("INSERT INTO tags (tenant_id, name) VALUES (1, 'only-on-server-b')");
 
     // Server B: another data encryption key, so the signature isn't its own.
     await useDataKey('server-b');
-    const refused = service().restoreFromFile(backup.filePath, { key });
+    expect(await service().signerPublicId()).not.toBe(signerA);
+    const refused = service().restoreFromFile(backup.filePath, { fileKey });
     await expect(refused).rejects.toMatchObject({ databaseChanged: false, cause: expect.any(ForeignBackupError) });
+    await expect(refused).rejects.toMatchObject({ cause: { signer: signerA, message: expect.stringContaining(`--signer ${signerA}`) } });
     expect(await tagNames()).toContain('only-on-server-b');
 
-    const result = await service().restoreFromFile(backup.filePath, { key, allowForeign: true, verifyOnly: true });
-    expect(result.signature).toBe('invalid');
+    const result = await service().restoreFromFile(backup.filePath, { fileKey, allowForeign: true, verifyOnly: true });
+    expect(result).toMatchObject({ signature: 'invalid', signer: signerA });
+    // The restore command's --signer trusts that one signer, and no other.
+    const trusted = await service().restoreFromFile(backup.filePath, { fileKey, signers: [parseSignerId(signerA)!], verifyOnly: true });
+    expect(trusted.signature).toBe('valid');
     expect(await tagNames()).toContain('only-on-server-b');
     expect(await databases()).toEqual([location.database, `${location.database}_before_restore`].sort());
 
-    await service().restoreFromFile(backup.filePath, { key, allowForeign: true });
+    await service().restoreFromFile(backup.filePath, { fileKey, allowForeign: true });
     expect(await tagNames()).not.toContain('only-on-server-b');
+  }, 300_000);
+
+  it('opens a backup with the private key, or decrypted by its owner, and refuses one renamed as another', async () => {
+    await useDataKey('server-a');
+    const backups = service();
+    const backup = await backups.createBackup();
+
+    // The restore command's --identity-file, and --decrypted (a bundle age -d made).
+    await expect(backups.restoreFromFile(backup.filePath, { identities: [identity], verifyOnly: true })).resolves.toMatchObject({ signature: 'valid' });
+    const tar = path.join(tmp, 'decrypted.tar');
+    await rm(tar, { force: true });
+    await decryptBundle(backup.filePath, { identities: [identity] }, tar);
+    await expect(backups.restoreFromFile(tar, { decrypted: true, verifyOnly: true })).resolves.toMatchObject({ format: 'age', signature: 'valid' });
+    await expect(backups.restoreFromFile(backup.filePath, { decrypted: true, verifyOnly: true })).rejects.toMatchObject({
+      message: expect.stringMatching(/still encrypted/),
+    });
+
+    // Copied under an older backup's name: its signed id says which backup it is.
+    const renamed = path.join(tmp, 'nuggets_backup_20250101_000000_000.tar.age');
+    await copyFile(backup.filePath, renamed);
+    const fileKey = await fileKeyOf(renamed);
+    await expect(backups.restoreFromFile(renamed, { fileKey, fileName: path.basename(renamed), verifyOnly: true })).rejects.toMatchObject({
+      databaseChanged: false,
+      message: expect.stringMatching(/named as backup nuggets_backup_20250101_000000_000, but it is backup nuggets_backup_/),
+    });
+    // Without the milliseconds the name still says when it was made, and is checked too.
+    const short = path.join(tmp, 'nuggets_backup_20250101_000000.tar.age');
+    await copyFile(backup.filePath, short);
+    await expect(backups.restoreFromFile(short, { fileKey, fileName: path.basename(short), verifyOnly: true })).rejects.toMatchObject({
+      message: expect.stringMatching(/named as backup nuggets_backup_20250101_000000, but it is backup/),
+    });
+    // Its own time, without the milliseconds: the same backup.
+    const own = path.join(tmp, `${backup.fileName.replace(/_\d{3}\.tar\.age$/, '')}.tar.age`);
+    await copyFile(backup.filePath, own);
+    await expect(backups.restoreFromFile(own, { fileKey, fileName: path.basename(own), verifyOnly: true })).resolves.toMatchObject({ signature: 'valid' });
+    // Near misses of a backup's name are read as one too: they'd be taken for that backup.
+    for (const near of ['Nuggets_backup_20250101_000000_000.tar.age', 'nuggets_backup_20250101_000000_000.age', 'nuggets_backup_20250101_000000_000 .tar.age']) {
+      const copy = path.join(tmp, near);
+      await copyFile(backup.filePath, copy);
+      await expect(backups.restoreFromFile(copy, { fileKey, fileName: near, verifyOnly: true }), near).rejects.toMatchObject({
+        message: expect.stringMatching(/it was renamed/),
+      });
+    }
+    // A name that isn't a backup's says nothing about which it is.
+    await expect(backups.restoreFromFile(renamed, { fileKey, fileName: 'copied-from-the-nas.tar.age', verifyOnly: true })).resolves.toMatchObject({
+      signature: 'valid',
+    });
+
+    // A verify is an operation of its own: no restore, so no maintenance mode, but no backup meanwhile.
+    const phases: string[] = [];
+    const verifying = backups.restoreFromFile(backup.filePath, { fileKey: await fileKeyOf(backup.filePath), verifyOnly: true, onPhase: (p) => phases.push(p) });
+    await vi.waitFor(() => expect(phases).toContain('restoring'), { timeout: 120_000, interval: 50 });
+    expect(BackupService.isVerifyInProgress()).toBe(true);
+    expect(BackupService.isRestoreInProgress()).toBe(false);
+    await expect(service().createBackup()).rejects.toMatchObject({ heldBy: 'verify' });
+    await verifying;
+    expect(BackupService.isVerifyInProgress()).toBe(false);
+  }, 300_000);
+
+  it('still restores an .enc backup made with the old key, which it makes until a backup key is set up', async () => {
+    await useDataKey('server-a');
+    const backups = service();
+    for (const recipient of await backups.listRecipients()) await backups.removeRecipient(recipient.uuid);
+    const key = await seedLegacyKey(backups);
+    const backup = await backups.createBackup();
+    expect(backup.fileName).toMatch(/\.enc$/);
+    expect((await readFile(backup.filePath))[0]).toBe(0x03);
+
+    await expect(backups.restoreBackupWithCustomKey(backup.filePath, randomBytes(32).toString('base64'))).rejects.toMatchObject({
+      databaseChanged: false,
+      message: expect.stringMatching(/Invalid encryption key/),
+    });
+    await live("INSERT INTO tags (tenant_id, name) VALUES (1, 'after-the-enc-backup')");
+    // With the key typed, or the server's own.
+    await expect(backups.restoreBackup(backup.filePath, { verifyOnly: true })).resolves.toMatchObject({ format: 'legacy', signature: 'valid', signer: null });
+    await expect(backups.restoreFromFile(backup.filePath, { key })).resolves.toMatchObject({ format: 'legacy', signature: 'valid' });
+    expect(await tagNames()).not.toContain('after-the-enc-backup');
+
+    // A backup key again: age from now on.
+    await addTestRecipient(backups);
+    expect((await backups.createBackup()).fileName).toMatch(/\.tar\.age$/);
   }, 300_000);
 
   it('refuses restored data whose row-level security differs, and changes nothing', async () => {
@@ -318,7 +434,7 @@ describe.skipIf(!runnable)(`backup and restore round trip (pg_dump ${tools}, ser
     await live(`ALTER POLICY ${escapeIdentifier(policy)} ON tags RENAME TO renamed_policy`);
     await live("INSERT INTO tags (tenant_id, name) VALUES (1, 'still-here')");
     try {
-      const refused = backups.restoreBackup(backup.filePath);
+      const refused = backups.restoreFromFile(backup.filePath, { fileKey: await fileKeyOf(backup.filePath) });
       await expect(refused).rejects.toMatchObject({
         databaseChanged: false,
         message: expect.stringMatching(/row-level security differs.*renamed_policy/),
@@ -332,7 +448,7 @@ describe.skipIf(!runnable)(`backup and restore round trip (pg_dump ${tools}, ser
     // database doesn't.
     await live('ALTER TABLE organization_price_sync_runs NO FORCE ROW LEVEL SECURITY');
     try {
-      await expect(backups.restoreBackup(backup.filePath)).rejects.toMatchObject({
+      await expect(backups.restoreFromFile(backup.filePath, { fileKey: await fileKeyOf(backup.filePath) })).rejects.toMatchObject({
         databaseChanged: false,
         message: expect.stringMatching(/row-level security differs.*rls organization_price_sync_runs/),
       });
@@ -352,7 +468,7 @@ describe.skipIf(!runnable)(`backup and restore round trip (pg_dump ${tools}, ser
       .spyOn(backups as unknown as { replaceUploads: (from: string) => Promise<unknown> }, 'replaceUploads')
       .mockRejectedValue(new Error('disk full'));
 
-    await expect(backups.restoreBackup(backup.filePath)).rejects.toMatchObject({
+    await expect(backups.restoreFromFile(backup.filePath, { fileKey: await fileKeyOf(backup.filePath) })).rejects.toMatchObject({
       databaseChanged: false,
       message: expect.stringMatching(/uploads failed, so the database was put back/),
     });
@@ -375,7 +491,7 @@ describe.skipIf(!runnable)(`backup and restore round trip (pg_dump ${tools}, ser
         throw new Error('pg_restore failed with signal SIGTERM');
       }
     );
-    await expect(backups.restoreBackup(backup.filePath)).rejects.toMatchObject({ databaseChanged: false });
+    await expect(backups.restoreFromFile(backup.filePath, { fileKey: await fileKeyOf(backup.filePath) })).rejects.toMatchObject({ databaseChanged: false });
     expect(await tagNames()).toContain('survives-failed-restore');
     expect(await databases()).toEqual([location.database]);
     expect(await restoreRole()).toEqual({ rolcanlogin: false });
@@ -477,9 +593,10 @@ describe.skipIf(!runnable)(`backup and restore round trip (pg_dump ${tools}, ser
       let backup: { filePath: string };
       let key: string;
       try {
+        // v2.4.0 made .enc backups with its backup key K, and has no backup_recipients table.
         const onV240 = new BackupService(v240Serving, { location: v240, owner, serving, migrationsDir, ...dirs });
-        await onV240.generateBackupKey();
-        key = (await onV240.getBackupKeyForDownload())!;
+        vi.spyOn(onV240, 'listRecipients').mockResolvedValue([]);
+        key = await seedLegacyKey(onV240);
         backup = await onV240.createBackup();
       } finally {
         await v240Serving.end();

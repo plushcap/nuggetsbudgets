@@ -14,8 +14,15 @@ vi.mock('../../services/OneDriveService.js', () => ({
   },
 }));
 
+// Step-up is the auth tests' (route-authorization, reauth); here the session counts as recent.
+vi.mock('../../middleware/auth.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../middleware/auth.js')>()),
+  requireRecentReauth: (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
+
 import { createBackupRoutes } from '../backup.js';
 import { BackupService } from '../../services/BackupService.js';
+import { generateHybridIdentity, identityToRecipient } from 'age-encryption';
 import { routeDependencies } from '../dependencies.js';
 
 /**
@@ -49,7 +56,7 @@ describe('backup routes and the scheduler', () => {
   let backupDir: string;
   const db = recordingPool();
   const lifecycle = {
-    getBackupSchedulerStatus: vi.fn(async () => ({ waitingForBackupKey: false })),
+    getBackupSchedulerStatus: vi.fn(async () => ({ waitingForBackupKey: false, usingOldBackupKey: false })),
     updateBackupSchedulerConfiguration: vi.fn(async () => undefined),
     startBackupScheduler: vi.fn(async () => undefined),
     stopBackupScheduler: vi.fn(async () => undefined),
@@ -78,21 +85,51 @@ describe('backup routes and the scheduler', () => {
     vi.clearAllMocks();
   });
 
-  describe('POST /key/generate', () => {
-    it('arms a scheduler that is waiting for a backup key', async () => {
-      const generate = vi.spyOn(BackupService.prototype, 'generateBackupKey').mockResolvedValue(undefined as never);
-      lifecycle.getBackupSchedulerStatus.mockResolvedValueOnce({ waitingForBackupKey: true });
-      await request(app).post('/api/backup/key/generate').expect(200);
-      expect(generate).toHaveBeenCalledTimes(1);
+  describe('POST /recipients', () => {
+    const added = async () => {
+      const recipient = await identityToRecipient(await generateHybridIdentity());
+      const add = vi.spyOn(BackupService.prototype, 'addRecipient').mockResolvedValue({
+        uuid: '019a0000-0000-7000-8000-000000000001',
+        recipient,
+        label: 'Password manager',
+        kind: 'post-quantum',
+        hardware: false,
+        fingerprint: 'abcd abcd abcd abcd',
+        checkedAt: null,
+        createdAt: new Date().toISOString(),
+        createdBy: 'Admin',
+      });
+      return { recipient, add };
+    };
+
+    it.each([
+      ['waiting for a backup key', { waitingForBackupKey: true, usingOldBackupKey: false }],
+      ['making backups with the old key', { waitingForBackupKey: false, usingOldBackupKey: true }],
+    ])('arms a scheduler that is %s', async (_what, status) => {
+      const { recipient, add } = await added();
+      lifecycle.getBackupSchedulerStatus.mockResolvedValueOnce(status as never);
+      await request(app).post('/api/backup/recipients').send({ recipient, label: 'Password manager', checked: true }).expect(201);
+      expect(add).toHaveBeenCalledWith({ recipient, label: 'Password manager', checked: true, createdBy: 1 });
       expect(lifecycle.updateBackupSchedulerConfiguration).toHaveBeenCalledTimes(1);
     });
 
     // Restarting an armed scheduler while its catch-up backup runs queued another
     // backup an hour later.
-    it('leaves an armed scheduler alone when the key is rotated', async () => {
-      vi.spyOn(BackupService.prototype, 'generateBackupKey').mockResolvedValue(undefined as never);
-      await request(app).post('/api/backup/key/generate').expect(200);
+    it('leaves an armed scheduler alone when another key is added', async () => {
+      const { recipient } = await added();
+      await request(app).post('/api/backup/recipients').send({ recipient, label: 'Spare' }).expect(201);
       expect(lifecycle.updateBackupSchedulerConfiguration).not.toHaveBeenCalled();
+    });
+
+    it('refuses a private key, or a key cut short, before it reaches the service, and never repeats it', async () => {
+      const add = vi.spyOn(BackupService.prototype, 'addRecipient');
+      const identity = await generateHybridIdentity();
+      const recipient = await identityToRecipient(identity);
+      for (const bad of [identity, recipient.slice(0, -40)]) {
+        const res = await request(app).post('/api/backup/recipients').send({ recipient: bad, label: 'Key' }).expect(400);
+        expect(JSON.stringify(res.body)).not.toContain(bad.slice(10, 60));
+      }
+      expect(add).not.toHaveBeenCalled();
     });
   });
 

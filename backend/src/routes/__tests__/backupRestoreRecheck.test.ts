@@ -22,6 +22,7 @@ vi.mock('../../services/BackupService.js', async (importOriginal) => {
     BackupService: class {
       static isBackupInProgress = () => false;
       static isRestoreInProgress = () => false;
+      static isVerifyInProgress = () => false;
       static isRefusingNewOperations = () => shutdown.begun;
       restoreFromFile = restoreFromFile;
       findBackup = findBackup;

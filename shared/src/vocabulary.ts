@@ -218,12 +218,20 @@ export const TENANT_VOCABULARIES = {
 } as const satisfies Record<string, readonly string[]>;
 
 /**
+ * backup_recipients.kind: a backup key's kind, classic (X25519) or post-quantum (ML-KEM-768
+ * + X25519, age 1.3's -pq). All of a server's keys are of one kind.
+ */
+export const BACKUP_KEY_KINDS = ['post-quantum', 'classic'] as const;
+export type BackupKeyKind = (typeof BACKUP_KEY_KINDS)[number];
+
+/**
  * The control-plane columns with a list CHECK, as TENANT_VOCABULARIES has the tenant's.
  * (tenant_settings.setting_key's list is the backend's TENANT_SETTING_KEYS.)
  */
 export const CONTROL_PLANE_VOCABULARIES = {
   'personal_access_tokens.scope': PERSONAL_ACCESS_TOKEN_SCOPES,
   'webauthn_challenges.purpose': WEBAUTHN_CHALLENGE_PURPOSES,
+  'backup_recipients.kind': BACKUP_KEY_KINDS,
 } as const satisfies Record<string, readonly string[]>;
 
 // What people see for a value. A page builds a list's options from its constant above and
@@ -395,4 +403,9 @@ export const TAG_REPORT_FLOW_MEASURE_LABELS: VocabularyLabels<typeof TAG_REPORT_
 export const PERSONAL_ACCESS_TOKEN_SCOPE_LABELS: VocabularyLabels<typeof PERSONAL_ACCESS_TOKEN_SCOPES> = {
   read: 'Read only',
   read_write: 'Read and write',
+};
+
+export const BACKUP_KEY_KIND_LABELS: VocabularyLabels<typeof BACKUP_KEY_KINDS> = {
+  'post-quantum': 'Post-quantum',
+  classic: 'Classic',
 };

@@ -157,6 +157,7 @@ const lifecycle = {
     lastRunFinishedAt: null,
     lastRunOutcome: null,
     waitingForBackupKey: false,
+    usingOldBackupKey: false,
   }),
 } satisfies Partial<{ [K in keyof ApplicationLifecycleService]: ApplicationLifecycleService[K] }>;
 const lifecycleService = new Proxy(lifecycle as Record<string, unknown>, {
@@ -346,7 +347,7 @@ describeDb('People, sign-in, settings, import and notification answers', () => {
     it('answers the backup pages, the restore status and OneDrive', async () => {
       const created = new Date('2026-11-01T03:00:00.000Z');
       vi.spyOn(backupService, 'listBackups').mockResolvedValue([
-        { fileName: 'nuggets_backup_2026-11-01.enc', filePath: '/backups/nuggets_backup_2026-11-01.enc', size: 2048, created },
+        { fileName: 'nuggets_backup_2026-11-01.enc', filePath: '/backups/nuggets_backup_2026-11-01.enc', size: 2048, created, format: 'legacy' },
       ]);
       // The schedulers' start and stop save backup_enabled, a deployment setting: left as it is.
       vi.spyOn(backupService, 'saveBackupSetting').mockResolvedValue(undefined);
