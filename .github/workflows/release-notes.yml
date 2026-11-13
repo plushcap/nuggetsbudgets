@@ -48,27 +48,42 @@ jobs:
           echo "::error::'$TAG' is not a release tag (vX.Y.Z)"
           exit 1
         fi
-        if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > description.md; then
+        if ! release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .id); then
           echo "::error::$TAG has no GitHub Release to rewrite"
           exit 1
         fi
+        gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" --jq .body > description.md
+        # main's CHANGELOG.md must have the release's own heading: its Unreleased entries came
+        # after the release, so they can't stand in as the release job lets them at the tag.
+        if ! node scripts/release-notes.mjs block "${TAG#v}" CHANGELOG.md --strict > /dev/null; then
+          echo "::error::main's CHANGELOG.md has no '## ${TAG#v} (YYYY-MM-DD)' heading. Add it, with the release's entries, then run this again."
+          exit 1
+        fi
         release_tag='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
-        # The newest release tag before this one; none for the first, or for a pre-release
-        # (GitHub then picks the starting point itself).
+        # The newest release tag before this one (all the tags read, so sort never sees a closed pipe).
         previous=$( (git tag --list 'v*' | grep -E "$release_tag" || true) | sort -V \
-          | awk -v tag="$TAG" '$0 == tag { print before; exit } { before = $0 }')
-        args=(-f tag_name="$TAG")
-        if [ -n "$previous" ]; then args+=(-f previous_tag_name="$previous"); fi
-        if ! gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" "${args[@]}" --jq .body > prs.md; then
+          | awk -v tag="$TAG" '$0 == tag { found = before } { before = $0 } END { print found }')
+        # The first release, or a pre-release, lists no pull requests: GitHub would pick where to
+        # start counting from itself.
+        : > prs.md
+        if [ -n "$previous" ] && ! gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$TAG" -f previous_tag_name="$previous" --jq .body > prs.md; then
           echo "::warning::GitHub didn't list the pull requests in $TAG: the notes have the changelog's entries only."
           : > prs.md
         fi
-        node scripts/release-notes.mjs block "${TAG#v}" CHANGELOG.md prs.md > block.md
+        node scripts/release-notes.mjs block "${TAG#v}" CHANGELOG.md prs.md --strict > block.md
         node scripts/release-notes.mjs merge description.md block.md > new-description.md
-        gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file new-description.md > /dev/null
+        # Never save a description that lost the part (or everything).
+        if ! grep -qF '<!-- release-notes:start -->' new-description.md || ! grep -qF '<!-- release-notes:end -->' new-description.md; then
+          echo "::error::the new description has no release notes in it; nothing was changed"
+          exit 1
+        fi
+        # The body only: an immutable release's tag can't change, so don't send it.
+        jq -n --rawfile body new-description.md '{body: $body}' \
+          | gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" --input - > /dev/null
         {
           echo "### Release notes for $TAG"
           echo
-          echo "- From main's CHANGELOG.md, and the pull requests since ${previous:-the start}."
+          echo "- From main's CHANGELOG.md, and the pull requests since ${previous:-(none: the first release)}."
           echo "- The release: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG"
         } >> "$GITHUB_STEP_SUMMARY"

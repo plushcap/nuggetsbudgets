@@ -9,7 +9,8 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
 - Each GitHub Release's description lists what changed in it: its section of this changelog,
   then the pull requests merged since the release before it. A release made before this has
   only a link to the changelog: run **Rewrite release notes** from the Actions tab on `main`,
-  with its tag, to add the list (the release's images and attached file stay as they are).
+  with its tag, to add the list (the rest of its description and its attached compose file stay
+  as they are).
 - A bank transaction is linked to one entered by hand of the same amount dated up to 7 days
   before it; it was 4. A transfer entered the day it is sent can post five business days later,
   over a weekend, and was added beside the manual entry instead of being linked to it. An entry

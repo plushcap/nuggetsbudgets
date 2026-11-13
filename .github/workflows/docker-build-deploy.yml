@@ -359,13 +359,14 @@ jobs:
         VERSION: ${{ needs.build-backend.outputs.version }}
       run: |
         release_tag='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
-        # The newest release tag before this one; none for the first, or for a pre-release
-        # (GitHub then picks the starting point itself).
+        # The newest release tag before this one (all the tags read, so sort never sees a closed pipe).
         previous=$( (git tag --list 'v*' | grep -E "$release_tag" || true) | sort -V \
-          | awk -v tag="$TAG" '$0 == tag { print before; exit } { before = $0 }')
-        args=(-f tag_name="$TAG")
-        if [ -n "$previous" ]; then args+=(-f previous_tag_name="$previous"); fi
-        if ! gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" "${args[@]}" --jq .body > prs.md; then
+          | awk -v tag="$TAG" '$0 == tag { found = before } { before = $0 } END { print found }')
+        # The first release, or a pre-release, lists no pull requests: GitHub would pick where to
+        # start counting from itself.
+        : > prs.md
+        if [ -n "$previous" ] && ! gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$TAG" -f previous_tag_name="$previous" --jq .body > prs.md; then
           echo "::warning::GitHub didn't list the pull requests in $TAG: the notes have the changelog's entries only."
           : > prs.md
         fi
