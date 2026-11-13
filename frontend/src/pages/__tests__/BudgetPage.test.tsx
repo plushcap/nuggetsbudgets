@@ -253,6 +253,46 @@ describe('BudgetPage', () => {
     expect(api.unhandled).toEqual([]);
   });
 
+  // The envelopes count what is filed under the period and those before it; the accounts'
+  // balances today made a past period's comparison disagree by everything since.
+  describe("the envelope comparison uses the envelope accounts' money through the period", () => {
+    const savings = account({ id: 21, name: 'Envelope savings', account_type: 'savings', is_envelope_account: true, calculated_balance: '200.00' });
+    beforeEach(() => {
+      items = [
+        budgetPeriodItem(october, {
+          id: 14, budget_item_name: 'Vacation', expense_type: 'Expense', type: 'Envelope', subtype: 'Flexible',
+          calculated_budget: '250.00', calculated_actual: '0.00', calculated_remaining: '250.00',
+        }),
+      ];
+    });
+
+    it("not their balances today", async () => {
+      // Today the account has $200.00; through October, $250.00, which is what the envelope holds.
+      api = mockApi(routes({
+        'GET /accounts': accountsResponse([savings]),
+        'GET /budgets/periods/:uuid/envelope-balance': { success: true, data: { accounts: [{ uuid: savings.uuid, balance: 250 }] } },
+      }));
+      renderPage();
+
+      expect(await screen.findByText('Envelope Comparison')).toBeInTheDocument();
+      expect(summaryLine('Difference:')).toBe('Difference:$0.00');
+      expect(summaryLine(`Actual Envelope Account Total, through ${october.name}:`)).toBe(`Actual Envelope Account Total, through ${october.name}:-$250.00`);
+      expect(api.calls('GET /budgets/periods/:uuid/envelope-balance').map((call) => call.params.uuid)).toContain(october.uuid);
+    });
+
+    it("shows them as unavailable, never today's balance, when they don't load", async () => {
+      api = mockApi(routes({
+        'GET /accounts': accountsResponse([savings]),
+        'GET /budgets/periods/:uuid/envelope-balance': apiError(500, 'Internal error', 'INTERNAL'),
+      }));
+      renderPage();
+
+      expect(await screen.findByText('Envelope Comparison')).toBeInTheDocument();
+      expect(summaryLine('Difference:')).toBe('Difference:Unavailable');
+      expect(screen.queryByText('$200.00')).toBeNull();
+    });
+  });
+
   // Each was a literal "-" before the amount, so nothing showed as -$0.00 and an amount
   // below zero as --$5.00. Each now shows the signed amount it adds to the total.
   it('shows a figure taken off the total as the signed amount it adds, never -$0.00 or --$5.00', async () => {
@@ -281,7 +321,7 @@ describe('BudgetPage', () => {
     expect(summaryLine('Calculation:')).toBe('Calculation:$105.00');
     expect(summaryLine('Planned (Envelopes):')).toBe('Planned (Envelopes):$0.00');
     expect(summaryLine('Saved (Goals):')).toBe('Saved (Goals):$5.00');
-    expect(summaryLine('Actual Envelope Account Total:')).toBe('Actual Envelope Account Total:$0.00');
+    expect(summaryLine(`Actual Envelope Account Total, through ${october.name}:`)).toBe(`Actual Envelope Account Total, through ${october.name}:$0.00`);
   });
 
   it("says the items didn't load rather than showing an empty budget, and Try again reloads them", async () => {

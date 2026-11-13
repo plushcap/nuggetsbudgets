@@ -53,7 +53,8 @@ describe('GET /api/budgets/periods/:uuid/envelope-balance', () => {
     november = nov.uuid;
     const acct = await account('Envelopes', { envelope: true });
     envelope = acct.uuid;
-    // The opening balance, dated after October and filed under no period: it counts in every one.
+    // The opening balance, dated in November and filed under no period: by its date, as an
+    // envelope's starting balance is filed under the period of the day it was set.
     await tx(acct.id, 1000, '2026-11-13', null, 'starting balance');
     await tx(acct.id, 500, '2026-10-02', oct.id);
     // October's close-out withdrawal, made on November 2 and filed under October.
@@ -83,10 +84,11 @@ describe('GET /api/budgets/periods/:uuid/envelope-balance', () => {
     await tenant?.cleanup();
   });
 
-  it("counts what is filed under the period and those before it, what is filed under none by its date, and the opening balance", async () => {
-    // 1000 opening + 500 - 200 (filed under October, dated November) + 50 (no period, October) - 40 (the split, once).
-    expect(await balances(october)).toEqual([{ uuid: envelope, balance: 1310 }]);
-    // November adds 70 (no period, November) and 30 (filed under November, dated October).
+  it('counts what is filed under the period and those before it, and what is filed under none by its date', async () => {
+    // 500 - 200 (filed under October, dated November) + 50 (no period, October) - 40 (the split, once).
+    expect(await balances(october)).toEqual([{ uuid: envelope, balance: 310 }]);
+    // November adds the opening balance (1000, no period, November), 70 (no period, November) and
+    // 30 (filed under November, dated October).
     expect(await balances(november)).toEqual([{ uuid: envelope, balance: 1410 }]);
   });
 

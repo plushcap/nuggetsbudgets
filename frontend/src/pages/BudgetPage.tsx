@@ -228,7 +228,7 @@ const BudgetPage: React.FC = () => {
                 <BudgetPlanCard income={subtotals.income.budget} expenses={subtotals.expense.budget} savings={subtotals.savings.budget} />
                 <BudgetActualCard items={budgetPeriodItems} />
                 {accounts.length > 0 && !envelopeBalanceQuery.isLoading && (
-                  <EnvelopeComparisonCard items={budgetPeriodItems} accounts={periodAccounts} />
+                  <EnvelopeComparisonCard items={budgetPeriodItems} accounts={periodAccounts} through={currentPeriod.name} />
                 )}
               </>
             )}

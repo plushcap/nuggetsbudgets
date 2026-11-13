@@ -159,9 +159,10 @@ export async function envelopeTransfers(periodUuid: string) {
 
 /**
  * Each envelope account's money through a period, counted as its envelopes are: what is filed
- * under that period or an earlier one (by start date), what is filed under none and dated by
- * the period's last day, and the opening balance ('starting balance', from before any period).
- * The envelope accounts are the Accounts list's (not hidden, not closed).
+ * under that period or an earlier one (by start date), and what is filed under none and dated by
+ * the period's last day (the opening balance among them: it is dated the day the account was
+ * set up, as an envelope's starting balance is filed under that day's period). The envelope
+ * accounts are the Accounts list's (not hidden, not closed).
  *
  * The envelopes' remaining (calculate_remaining_for_period_item) counts what is filed under
  * each period, so a balance by date disagreed with them over whatever was filed across a
@@ -178,8 +179,7 @@ export async function envelopeBalanceThroughPeriod(periodUuid: string) {
     SELECT a.uuid,
            COALESCE(SUM(t.amount) FILTER (
              WHERE t.parent_transaction_id IS NULL
-               AND (t.type = 'starting balance'
-                    OR t.budget_period_id IN (SELECT id FROM through)
+               AND (t.budget_period_id IN (SELECT id FROM through)
                     OR (t.budget_period_id IS NULL AND t.transaction_date <= (SELECT end_date FROM period)))
            ), 0)::text AS balance
       FROM accounts a
