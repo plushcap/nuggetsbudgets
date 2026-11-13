@@ -1,5 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { randomBytes } from 'node:crypto';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { loadSecrets, secretWeakness } from '../docker-secrets.js';
 
 /**
@@ -8,20 +11,35 @@ import { loadSecrets, secretWeakness } from '../docker-secrets.js';
  */
 describe('weak secrets', () => {
   const saved = { ...process.env };
+  const dirs: string[] = [];
   afterEach(() => {
     process.env = { ...saved };
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
   });
 
   const strong = () => randomBytes(32).toString('base64');
+  /**
+   * The secrets, overrides applied: Docker secret files in production, which reads nothing
+   * else; the variables elsewhere, as development and the tests set them.
+   */
   const useSecrets = (overrides: Record<string, string> = {}) => {
-    Object.assign(process.env, {
+    const secrets: Record<string, string> = {
       DB_PASSWORD: strong(),
       APP_DB_PASSWORD: strong(),
       JWT_SECRET: randomBytes(64).toString('base64'),
       SESSION_SECRET: strong(),
       CSRF_SECRET: strong(),
       ...overrides,
-    });
+    };
+    for (const name of Object.keys(secrets)) delete process.env[name];
+    if (process.env.NODE_ENV !== 'production') {
+      Object.assign(process.env, secrets);
+      return;
+    }
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'weak-secrets-'));
+    dirs.push(dir);
+    for (const [name, value] of Object.entries(secrets)) writeFileSync(path.join(dir, name.toLowerCase()), value);
+    process.env.SECRETS_PATH = dir;
   };
 
   it('starts in production with generated secrets', () => {

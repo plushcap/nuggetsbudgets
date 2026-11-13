@@ -5,7 +5,8 @@
 #   - a fresh database, migrated by the migration runner as the container entrypoint does it
 #     (it loads backend/init.sql into the empty database, then the migrations);
 #   - the backend from backend/dist, NODE_ENV=production, serving as the RLS-bound
-#     nuggets_app role, with strong throwaway secrets generated for the run;
+#     nuggets_app role, with strong throwaway secrets generated for the run (in Docker secret
+#     files under e2e/.run, as production reads them);
 #   - the frontend build served by its production static server (frontend/static-server,
 #     with the build's serve.json and so its Content-Security-Policy);
 #   - e2e/proxy.mjs in front, one origin for both, as a deployment's reverse proxy;
@@ -84,17 +85,25 @@ psql "$maintenance" -Xq -v ON_ERROR_STOP=1 \
   -c "CREATE DATABASE \"$DB_NAME\" OWNER \"$OWNER\""
 
 # The backend's settings, as the deployment manifest gives them: the owner migrates, the
-# serving role is nuggets_app. Secrets are new for every run.
+# serving role is nuggets_app. Secrets are new for every run, in Docker secret files as a
+# deployment has them: production refuses a secret in the environment.
 # Outside test-results/, which Playwright empties when it starts.
 RUN_DIR="$ROOT/e2e/.run"
 rm -rf "$RUN_DIR"
 mkdir -p "$RUN_DIR"
 export DB_HOST DB_PORT DB_NAME
-export MIGRATION_DB_USER="$OWNER" MIGRATION_DB_PASSWORD="$OWNER_PASSWORD" DB_PASSWORD="$OWNER_PASSWORD"
-export APP_DB_PASSWORD
-export JWT_SECRET; JWT_SECRET="$(openssl rand -base64 48)"
-export SESSION_SECRET; SESSION_SECRET="$(openssl rand -base64 32)"
-export CSRF_SECRET; CSRF_SECRET="$(openssl rand -base64 32)"
+export MIGRATION_DB_USER="$OWNER"
+export SECRETS_PATH="$RUN_DIR/secrets"
+mkdir -m 700 "$SECRETS_PATH"
+secret_file() { (umask 077 && printf '%s' "$2" > "$SECRETS_PATH/$1"); }
+secret_file db_password "$OWNER_PASSWORD"
+secret_file app_db_password "$APP_DB_PASSWORD"
+secret_file jwt_secret "$(openssl rand -base64 48)"
+secret_file session_secret "$(openssl rand -base64 32)"
+secret_file csrf_secret "$(openssl rand -base64 32)"
+# Any secret variable from the caller's shell (APP_DB_PASSWORD is this script's own input)
+# would make migrate and the backend refuse to start, as production does.
+unset DB_PASSWORD APP_DB_PASSWORD JWT_SECRET SESSION_SECRET CSRF_SECRET MIGRATION_DB_PASSWORD BACKUP_DB_PASSWORD BACKUP_DB_USER
 export DATA_ENCRYPTION_KEY_FILE="$RUN_DIR/data_encryption_key"
 openssl rand -base64 32 | tr -d '\n' > "$DATA_ENCRYPTION_KEY_FILE"
 chmod 600 "$DATA_ENCRYPTION_KEY_FILE"

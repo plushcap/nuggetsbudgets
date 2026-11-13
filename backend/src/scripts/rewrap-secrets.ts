@@ -13,8 +13,8 @@
  *                   secret, /run/secrets/data_encryption_key)
  *   --dry-run       report what would change, and change nothing
  *
- * Connects as the schema owner, like the migration runner (MIGRATION_DB_USER /
- * MIGRATION_DB_PASSWORD, else DB_USER and the db_password secret), and rewraps in one
+ * Connects as the schema owner, like the migration runner (MIGRATION_DB_USER, else DB_USER,
+ * with the db_password secret), and rewraps in one
  * transaction: all of it or none. Run again, it finds everything current and changes
  * nothing. Exits 1 if some value opens with neither key (it is listed by table and id).
  * Prints counts and ids, never a value or a key.
@@ -29,6 +29,7 @@ const { createMigrationPool } = await import('../db/migrationPool.js');
 const { rewrapSecrets } = await import('../services/secretRewrap.js');
 const { keyIdOf } = await import('../utils/crypto-envelope.js');
 const { DATA_ENCRYPTION_SECRET_PATH } = await import('../utils/data-encryption-secret.js');
+const { secretsInEnvironment } = await import('../utils/docker-secrets.js');
 
 function argument(name: string): string | undefined {
   const at = process.argv.indexOf(name);
@@ -53,6 +54,13 @@ const newPath = argument('--new-key-file') ?? DATA_ENCRYPTION_SECRET_PATH;
 if (!oldPath) {
   process.stderr.write('Usage: rewrap-secrets --old-key-file <path> [--new-key-file <path>] [--dry-run]\n');
   process.exit(2);
+}
+
+// As the server and the migration runner do, refuse a secret in the environment in production.
+const refused = secretsInEnvironment();
+if (refused.length > 0) {
+  process.stderr.write(`Fix the configuration first:\n${refused.map((p) => `  - ${p}`).join('\n')}\n`);
+  process.exit(1);
 }
 
 const pool = createMigrationPool();

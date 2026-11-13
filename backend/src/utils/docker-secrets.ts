@@ -1,14 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { createLogger } from './logger.js';
-import { config, configFor } from '../config.js';
+import { config, configFor, SETTINGS } from '../config.js';
 
 const logger = createLogger({ service: 'DockerSecrets' });
 
 /**
- * Docker Secrets Utility
- * Provides functions to read Docker secrets from the filesystem
- * Falls back to environment variables if secrets are not available
+ * Docker secrets: files in SECRETS_PATH (/run/secrets in a container). Outside production a
+ * secret may also come from its environment variable, for development and the tests;
+ * production reads only the files, and refuses to start with one in the environment
+ * (secretsInEnvironment), so the stack's settings never hold a secret.
  */
 
 export interface SecretsConfig {
@@ -29,7 +30,7 @@ const unusableSecretFiles = new Map<string, string>();
 /**
  * Read a Docker secret from the filesystem
  * @param secretName - Name of the secret (matches the secret key in docker-compose.yml)
- * @param fallbackEnvVar - Environment variable to use as fallback
+ * @param fallbackEnvVar - Environment variable to use as fallback, outside production only
  * @returns The secret value or undefined if not found
  */
 export const readDockerSecret = (secretName: string, fallbackEnvVar?: string): string | undefined => {
@@ -53,8 +54,8 @@ export const readDockerSecret = (secretName: string, fallbackEnvVar?: string): s
     logger.warn({ err: error, secretName }, 'Failed to read Docker secret');
   }
 
-  // Fallback to environment variable
-  if (fallbackEnvVar && process.env[fallbackEnvVar]) {
+  // Fallback to environment variable, outside production (production refuses one at startup)
+  if (fallbackEnvVar && process.env[fallbackEnvVar] && config().NODE_ENV !== 'production') {
     logger.warn({ secretName, fallbackEnvVar }, 'Using environment variable fallback for secret');
     return process.env[fallbackEnvVar];
   }
@@ -65,13 +66,89 @@ export const readDockerSecret = (secretName: string, fallbackEnvVar?: string): s
 /**
  * A secret as the environment holds it, or undefined when it is unset or empty: one
  * index.ts copied there from its Docker secret at startup (JWT_SECRET, DB_PASSWORD,
- * SESSION_SECRET, CSRF_SECRET), or an override of the owner's password for one task
- * (MIGRATION_DB_PASSWORD, BACKUP_DB_PASSWORD). config() leaves secrets out, so code reads them here or with
+ * SESSION_SECRET, CSRF_SECRET), or, outside production, one set as a variable.
+ * config() leaves secrets out, so code reads them here or with
  * readDockerSecret, never from process.env itself (eslint.config.mjs). A function
  * that takes an environment to read (its tests pass another) passes it as `env`.
  */
 export function envSecret(name: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
   return env[name] || undefined;
+}
+
+/**
+ * What startup copied into the environment from the files (copySecretsIntoEnvironment), by
+ * variable: a variable still holding that value is the server's own, not a stack's.
+ */
+const copiedFromFiles = new Map<string, string>();
+
+/**
+ * Copy the secrets read from their files into the environment, where envSecret's readers
+ * (the security checks, the CSRF token) find them; once, at startup (index.ts). Remembered,
+ * so a variable set this way is never taken for one a stack set (refusedVariable).
+ */
+export function copySecretsIntoEnvironment(secrets: SecretsConfig): void {
+  const copies = {
+    JWT_SECRET: secrets.jwtSecret,
+    DB_PASSWORD: secrets.dbPassword,
+    SESSION_SECRET: secrets.sessionSecret,
+    CSRF_SECRET: secrets.csrfSecret,
+  };
+  for (const [name, value] of Object.entries(copies)) {
+    process.env[name] = value;
+    copiedFromFiles.set(name, value);
+  }
+}
+
+/**
+ * In production, why a secret's variable is no use: it is set in the environment, which
+ * production never reads a secret from (startup copies aside). Undefined otherwise.
+ */
+export function refusedVariable(variable: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const value = envSecret(variable, env);
+  if (configFor(env).NODE_ENV !== 'production' || !value || copiedFromFiles.get(variable) === value) return undefined;
+  return `${variable} is set in the environment, which production never reads a secret from`;
+}
+
+/** The variables config.ts lists as secrets (DB_PASSWORD, JWT_SECRET, …). */
+export const SECRET_VARIABLES: readonly string[] = Object.entries(SETTINGS)
+  .filter(([, spec]) => (spec as { secret?: boolean }).secret === true)
+  .map(([name]) => name);
+
+/** The Docker secret file a secret variable stands in for: its name in lower case. */
+export const secretFileName = (variable: string): string => variable.toLowerCase();
+
+/**
+ * Settings that are gone, with why: the database owner (MIGRATION_DB_USER) signs in with the
+ * db_password secret, the password Postgres gave it, for migrations, backups and restores
+ * alike, so a second password, or a second role for backups (which had to be a superuser
+ * too), added a way to get it wrong and nothing else.
+ */
+export const RETIRED_VARIABLES: Readonly<Record<string, string>> = {
+  MIGRATION_DB_PASSWORD: "the database owner's password is the db_password Docker secret file",
+  BACKUP_DB_PASSWORD: "backups sign in as the database owner, with the db_password Docker secret file",
+  BACKUP_DB_USER: 'backups run as the database owner, MIGRATION_DB_USER',
+};
+
+/**
+ * In production, a problem for each secret set in the environment `env` (as it was before
+ * index.ts copied the Docker secrets into it): production reads secrets only from their
+ * files, so one in a stack's settings is a mistake to fix, not a value to use. And one for
+ * each retired setting still set (RETIRED_VARIABLES), so a stack doesn't keep a password
+ * nothing reads. None outside production, where the variables are how development and the
+ * tests set the secrets, and a retired one is simply not read.
+ */
+export function secretsInEnvironment(env: NodeJS.ProcessEnv = process.env): string[] {
+  const inEnvironment = SECRET_VARIABLES.flatMap((name) => {
+    const refused = refusedVariable(name, env);
+    return refused ? [`${refused}: put it in the ${secretFileName(name)} Docker secret file (in SECRETS_PATH) and remove the variable`] : [];
+  });
+  const retired =
+    configFor(env).NODE_ENV === 'production'
+      ? Object.entries(RETIRED_VARIABLES)
+          .filter(([name]) => envSecret(name, env))
+          .map(([name, why]) => `${name} is no longer used (${why}): remove the variable`)
+      : [];
+  return [...inEnvironment, ...retired];
 }
 
 /**
@@ -169,12 +246,20 @@ export const loadSecrets = (): SecretsConfig => {
   if (!secrets.csrfSecret) missingSecrets.push('csrf_secret');
 
   if (missingSecrets.length > 0) {
+    const production = config().NODE_ENV === 'production';
     const described = missingSecrets.map((name) => {
-      const why = unusableSecretFiles.get(name);
-      return why ? `${name} (${why})` : name;
+      // In production a variable left where the file should be is the likeliest cause: name it.
+      const refused = refusedVariable(name.toUpperCase());
+      const reasons = [
+        unusableSecretFiles.get(name),
+        refused ? `${refused}: put it in this file and remove the variable` : undefined,
+      ].filter(Boolean);
+      return reasons.length > 0 ? `${name} (${reasons.join('; ')})` : name;
     });
     throw new Error(`Missing required secrets: ${described.join(', ')}. ` +
-      'Ensure Docker secrets are configured or environment variables are set.');
+      (production
+        ? 'Mount each as a Docker secret file (production reads no secret from the environment).'
+        : 'Ensure Docker secrets are configured or environment variables are set.'));
   }
 
   // Weak secrets stop a production server; in development they're a warning.

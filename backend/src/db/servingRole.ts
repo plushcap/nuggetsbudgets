@@ -5,7 +5,7 @@ import { ControlPlaneError } from '../services/controlPlaneErrors.js';
 import { createLogger } from '../utils/logger.js';
 import { oneRow } from '../utils/present.js';
 import { configFor } from '../config.js';
-import { envSecret } from '../utils/docker-secrets.js';
+import { refusedVariable } from '../utils/docker-secrets.js';
 
 const logger = createLogger({ service: 'ServingRole' });
 
@@ -14,7 +14,7 @@ type Queryable = Pool | ClientBase;
 /**
  * The password for the role the app serves as (DB_USER). When DB_USER is also the
  * migration role (a single-role setup) that's the owner's password, as migrationPool uses:
- * MIGRATION_DB_PASSWORD or db_password. Otherwise a separate serving role (nuggets_app)
+ * db_password. Otherwise a separate serving role (nuggets_app)
  * has the app_db_password secret; without MIGRATION_DB_USER, a present app_db_password is
  * taken to mean DB_USER is that serving role. Falling back to the owner's password for a
  * separate serving role could only "work" by connecting as the wrong role, so that's an error.
@@ -26,13 +26,16 @@ export function servingRolePassword(
   const settings = configFor(env);
   const servingRole = settings.DB_USER;
   const migrationRole = settings.MIGRATION_DB_USER;
-  const ownerPassword = envSecret('MIGRATION_DB_PASSWORD', env) || secrets.dbPassword;
+  const ownerPassword = secrets.dbPassword;
   if (migrationRole && migrationRole === servingRole) return ownerPassword;
   if (secrets.appDbPassword) return secrets.appDbPassword;
   if (!migrationRole) return ownerPassword;
+  const refused = refusedVariable('APP_DB_PASSWORD', env);
   throw new Error(
     `DB_USER "${servingRole}" is not the migration role "${migrationRole}", so it needs its own password: ` +
-      'set the app_db_password Docker secret (or APP_DB_PASSWORD).'
+      (refused
+        ? `${refused}: put it in the app_db_password Docker secret file and remove the variable.`
+        : 'set the app_db_password Docker secret (or, outside production, APP_DB_PASSWORD).')
   );
 }
 

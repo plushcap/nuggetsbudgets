@@ -295,7 +295,10 @@ These are the patterns most likely to be violated. Treat them as hard rules.
   password is checked before the account's state).
   Password sign-in is throttled per account (`LoginThrottleService`): charge before
   checking, refund on a correct password.
-- Secrets come from Docker secrets / env — never commit them. CI's `repository-checks.yml` (every
+- Secrets come from Docker secret files (in `SECRETS_PATH`); production refuses one set in the
+  environment (`secretsInEnvironment`: the server at startup, and each command in
+  `backend/src/scripts/` before it reads one), where the variables stand in for the files only in
+  development and the tests — never commit them. CI's `repository-checks.yml` (every
   PR, a Markdown-only one too) runs gitleaks on the tree and on a PR's commits (`.gitleaks.toml`; a
   made-up test value carries `gitleaks:allow`, and each new one is listed for the reviewer) and
   `scripts/check-tracked-files.sh`, which refuses tracked uploads, dumps, exports, local settings,
@@ -315,7 +318,7 @@ These are the patterns most likely to be violated. Treat them as hard rules.
   credential-domain AES key is HKDF-derived from the `data_encryption_key` Docker secret).
   **Never** drop a secret into `system_settings.setting_value` (or any column) in the
   clear — that key/value store is for non-secret config only. Secrets that don't need to
-  live in the DB stay Docker secrets / env. A new encrypted column or setting goes in
+  live in the DB stay Docker secret files. A new encrypted column or setting goes in
   `REWRAP_TARGETS` / `ENCRYPTED_SETTINGS` (`services/secretRewrap.ts`), or rotating the key
   (`rewrap-secrets`) leaves it unreadable. Stored credentials are sealed
   with the key's id (`seal(…, keyId)`, envelope v3); backup files stay v2.

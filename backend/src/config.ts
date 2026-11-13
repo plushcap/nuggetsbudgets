@@ -14,7 +14,7 @@
  * - `loadConfig(env)` parses any environment, for checks and tests.
  * - Secrets (`secret: true`) are listed so they're documented, but aren't in `config()`:
  *   they're read from Docker secrets through utils/docker-secrets.ts, with the variable as
- *   the fallback, and never logged.
+ *   the fallback outside production (production refuses one), and never logged.
  *
  * Imports nothing from the app: the logger reads its level from here.
  */
@@ -69,7 +69,7 @@ export type SettingGroup =
   | 'Data retention'
   | 'Shutdown'
   | 'Logging and build'
-  | 'Secrets (fallbacks for Docker secrets)';
+  | 'Secrets (development and tests only: production reads the Docker secret files and refuses these)';
 
 const blank = (raw: string | undefined): boolean => raw === undefined || raw.trim() === '';
 
@@ -136,7 +136,7 @@ const oneOf = <const V extends readonly [string, ...string[]]>(values: V, fallba
 const setting = <T>(spec: SettingSpec<T>): SettingSpec<T> => spec;
 const secret = (description: string): SettingSpec<undefined> =>
   setting({
-    group: 'Secrets (fallbacks for Docker secrets)',
+    group: 'Secrets (development and tests only: production reads the Docker secret files and refuses these)',
     description,
     defaultText: 'unset',
     secret: true,
@@ -216,7 +216,7 @@ export const SETTINGS = {
   }),
   USE_DOCKER_SECRETS: setting({
     group: 'Server',
-    description: '`true` checks the secrets read from `/run/secrets` at startup with the rest of the configuration',
+    description: '`true` checks the secrets read from `/run/secrets` at startup with the rest of the configuration. Production always does',
     defaultText: '`false`',
     parse: exactFlag(),
   }),
@@ -362,12 +362,6 @@ export const SETTINGS = {
     group: 'Database',
     description: 'Role used for **migrations/DDL and backups**: the schema owner, with the `db_password` secret',
     defaultText: '`DB_USER`',
-    parse: optionalText(),
-  }),
-  BACKUP_DB_USER: setting({
-    group: 'Database',
-    description: 'Overrides `MIGRATION_DB_USER` for backups, restores and the schema download (Settings → Utilities) only',
-    defaultText: '`MIGRATION_DB_USER`',
     parse: optionalText(),
   }),
   DB_MAINTENANCE_NAME: setting({
@@ -561,14 +555,12 @@ export const SETTINGS = {
     parse: optionalText(),
   }),
 
-  // ---- Secrets: Docker secrets first, these variables only as the fallback ----
+  // ---- Secrets: the Docker secret files; these variables stand in for them outside production ----
   DB_PASSWORD: secret('The owner\'s database password (secret `db_password`)'),
   APP_DB_PASSWORD: secret('The serving role\'s database password (secret `app_db_password`)'),
   JWT_SECRET: secret('Signs tokens (secret `jwt_secret`)'),
   SESSION_SECRET: secret('Session signing (secret `session_secret`)'),
   CSRF_SECRET: secret('Keys the CSRF token (secret `csrf_secret`)'),
-  MIGRATION_DB_PASSWORD: secret('The owner\'s password, over the `db_password` secret, for migrations, backups and restores'),
-  BACKUP_DB_PASSWORD: secret('Overrides the owner\'s password for backups, restores and the schema download only'),
 } as const satisfies Record<string, SettingSpec<unknown>>;
 
 export type SettingName = keyof typeof SETTINGS;
