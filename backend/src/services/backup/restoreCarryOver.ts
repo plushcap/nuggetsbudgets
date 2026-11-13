@@ -25,8 +25,9 @@ import { readSystemSettings, writeSystemSetting } from '../systemSettings.js';
  *   This is the one place `is_locked` and `login_disabled` change outside
  *   applyUserAccountFlags, in data not yet served.
  * - **Kept from the running server, on any server:** its backup keys (when it has any), its
- *   OneDrive app registration (when set) and connections (by person), and its record of
- *   backups (when it has any); automatic backups stay on when they are on here.
+ *   OneDrive app registration (when set) and connections (by person: on this deployment
+ *   always, on another server when it has some), and its record of backups (when it has any);
+ *   automatic backups stay on when they are on here.
  * - **Reported, not changed:** organization and tenant memberships, and admin flags, the
  *   running server removed since: the organization's own data, for an admin to remove again.
  * - **Then refused** when no one could manage the deployment afterwards: a web restore unless
@@ -63,7 +64,8 @@ const NOT_SENT = 'Not sent: the data was restored from a backup';
 /** The running server's state a restore takes, read in one snapshot. */
 export interface RunningState {
   deploymentUuid: string | null;
-  /** The person restoring through the web app: their email in the running data. */
+  /** The person restoring through the web app: their uuid and email in the running data. */
+  restorerUuid: string | null;
   restorerEmail: string | null;
   users: Array<{
     uuid: string;
@@ -113,7 +115,11 @@ export async function readRunningState(client: ClientBase, options: Pick<CarryOv
     await client.query('SET LOCAL row_security = off');
     const rows = async <T>(text: string, values: unknown[] = []): Promise<T[]> => (await client.query(text, values)).rows as T[];
     const deployment = await rows<{ uuid: string }>('SELECT uuid FROM deployment ORDER BY id LIMIT 1');
-    const restorer = options.restorerId === null ? [] : await rows<{ email: string }>('SELECT email FROM users WHERE id = $1', [options.restorerId]);
+    const restorer =
+      options.restorerId === null ? [] : await rows<{ uuid: string; email: string }>('SELECT uuid, email FROM users WHERE id = $1', [options.restorerId]);
+    // The newest tables may not be there yet: the restore command run from a newer image before
+    // its migrations. Read as none (the backup's own are kept); a core table missing still refuses.
+    const has = async (table: string) => (await rows<{ found: boolean }>('SELECT to_regclass($1) IS NOT NULL AS found', [`public.${table}`]))[0]?.found === true;
     const users = (
       await rows<RunningState['users'][number] & { password_changed_at: unknown }>(
         'SELECT uuid, is_locked, login_disabled, password_hash, password_changed_at, must_change_password FROM users'
@@ -126,6 +132,7 @@ export async function readRunningState(client: ClientBase, options: Pick<CarryOv
       : null;
     const state: RunningState = {
       deploymentUuid: deployment[0]?.uuid ?? null,
+      restorerUuid: restorer[0]?.uuid ?? null,
       restorerEmail: restorer[0]?.email ?? null,
       users,
       passkeys: await rows('SELECT uuid, counter FROM passkey_credentials'),
@@ -150,21 +157,26 @@ export async function readRunningState(client: ClientBase, options: Pick<CarryOv
         `SELECT u.uuid AS user_uuid, t.uuid AS tenant_uuid, m.is_admin
            FROM tenant_users m JOIN users u ON u.id = m.user_id JOIN tenants t ON t.id = m.tenant_id`
       ),
-      backupRecipients: await rows(
-        `SELECT r.uuid, r.recipient, r.label, r.kind, r.checked_at, r.created_at, u.uuid AS created_by_uuid
-           FROM backup_recipients r LEFT JOIN users u ON u.id = r.created_by`
-      ),
+      backupRecipients: !(await has('backup_recipients'))
+        ? []
+        : await rows(
+            `SELECT r.uuid, r.recipient, r.label, r.kind, r.checked_at, r.created_at, u.uuid AS created_by_uuid
+               FROM backup_recipients r LEFT JOIN users u ON u.id = r.created_by`
+          ),
       oneDriveRegistration: registration,
       oneDriveTokens: await rows(
         `SELECT t.uuid, u.uuid AS user_uuid, t.access_token, t.refresh_token, t.expires_at, t.folder_path,
                 t.auto_sync_enabled, t.created_at, t.updated_at
            FROM onedrive_tokens t JOIN users u ON u.id = t.user_id`
       ),
-      backupRuns: await rows(
-        `SELECT r.uuid, r.started_at, r.finished_at, r.trigger, r.outcome, r.message, r.file_name, r.file_size, r.sha256,
-                r.recipients, s.uuid AS started_by_uuid, r.verified_at, v.uuid AS verified_by_uuid, r.verify_outcome, r.verify_message
-           FROM backup_runs r LEFT JOIN users s ON s.id = r.started_by LEFT JOIN users v ON v.id = r.verified_by`
-      ),
+      backupRuns: !(await has('backup_runs'))
+        ? []
+        : await rows(
+            `SELECT r.uuid, r.started_at, r.finished_at, r.trigger, r.outcome, r.message, r.file_name, r.file_size, r.sha256,
+                    r.recipients, s.uuid AS started_by_uuid, r.verified_at, v.uuid AS verified_by_uuid, r.verify_outcome,
+                    r.verify_message, r.passed_verify_at, r.file_gone_at
+               FROM backup_runs r LEFT JOIN users s ON s.id = r.started_by LEFT JOIN users v ON v.id = r.verified_by`
+          ),
       automaticBackupsOn: setting('backup_enabled') === 'true',
     };
     await client.query('COMMIT');
@@ -185,7 +197,7 @@ export async function applyCarryOver(client: ClientBase, running: RunningState |
   try {
     await client.query('SET LOCAL row_security = off');
     const report = await carryOver(client, running);
-    await assertSomeoneCanManage(client, running, options);
+    await assertSomeoneCanManage(client, running, options, report.sameDeployment);
     await client.query('COMMIT');
     return report;
   } catch (error) {
@@ -312,27 +324,32 @@ async function carryOver(client: ClientBase, running: RunningState | null): Prom
     report.kept.oneDriveRegistration = true;
   }
   // Its OneDrive connections, by person; a connection whose person isn't in the restored data
-  // is dropped (they connect again). Sealed with this server's key, which the backup's aren't.
-  await client.query('DELETE FROM onedrive_tokens');
-  report.kept.oneDriveConnections = await count(
+  // is dropped (they connect again). On this deployment always (one disconnected since stays
+  // disconnected); on another server only when it has some: a new server has none, and with
+  // the same data key the backup's still open.
+  if (report.sameDeployment || running.oneDriveTokens.length > 0) {
+    await client.query('DELETE FROM onedrive_tokens');
+    report.kept.oneDriveConnections = await count(
     `INSERT INTO onedrive_tokens (uuid, user_id, access_token, refresh_token, expires_at, folder_path, auto_sync_enabled, created_at, updated_at)
      SELECT l.uuid, u.id, l.access_token, l.refresh_token, l.expires_at, l.folder_path, l.auto_sync_enabled, l.created_at, l.updated_at
        FROM jsonb_to_recordset($1::jsonb) AS l(uuid uuid, user_uuid uuid, access_token text, refresh_token text, expires_at timestamptz,
                                                folder_path text, auto_sync_enabled boolean, created_at timestamptz, updated_at timestamptz)
        JOIN users u ON u.uuid = l.user_uuid`,
-    [json(running.oneDriveTokens)]
-  );
+      [json(running.oneDriveTokens)]
+    );
+  }
   if (running.backupRuns.length > 0) {
     await client.query('DELETE FROM backup_runs');
     await client.query(
       `INSERT INTO backup_runs (uuid, started_at, finished_at, trigger, outcome, message, file_name, file_size, sha256, recipients,
-                                started_by, verified_at, verified_by, verify_outcome, verify_message)
+                                started_by, verified_at, verified_by, verify_outcome, verify_message, passed_verify_at, file_gone_at)
        SELECT l.uuid, l.started_at, l.finished_at, l.trigger, l.outcome, l.message, l.file_name, l.file_size, l.sha256, l.recipients,
-              s.id, l.verified_at, v.id, l.verify_outcome, l.verify_message
+              s.id, l.verified_at, v.id, l.verify_outcome, l.verify_message, l.passed_verify_at, l.file_gone_at
          FROM jsonb_to_recordset($1::jsonb) AS l(uuid uuid, started_at timestamptz, finished_at timestamptz, trigger text, outcome text,
                                                  message text, file_name text, file_size bigint, sha256 text, recipients text[],
                                                  started_by_uuid uuid, verified_at timestamptz, verified_by_uuid uuid,
-                                                 verify_outcome text, verify_message text)
+                                                 verify_outcome text, verify_message text, passed_verify_at timestamptz,
+                                                 file_gone_at timestamptz)
          LEFT JOIN users s ON s.uuid = l.started_by_uuid
          LEFT JOIN users v ON v.uuid = l.verified_by_uuid`,
       [json(running.backupRuns)]
@@ -380,20 +397,33 @@ const CAN_MANAGE = `EXISTS (SELECT 1 FROM deployment_users d WHERE d.user_id = u
 
 /**
  * Refuses a restore after which no one could manage the deployment: the web restore unless
- * the person restoring is, in the restored data, a deployment admin who can sign in (the same
- * email); the restore command when there is no such admin at all. Nothing on the host makes
- * one: setup-token works only while there are no users, and no command resets a password.
+ * the person restoring is, in the restored data, a deployment admin who can sign in (on this
+ * deployment the same person, by uuid, so an email changed since doesn't matter; on another
+ * server the same email); the restore command when there is no such admin at all. Nothing on
+ * the host makes one: setup-token works only while there are no users, and no command resets
+ * a password.
  */
-async function assertSomeoneCanManage(client: ClientBase, running: RunningState | null, options: CarryOverOptions): Promise<void> {
+async function assertSomeoneCanManage(
+  client: ClientBase,
+  running: RunningState | null,
+  options: CarryOverOptions,
+  sameDeployment: boolean
+): Promise<void> {
   if (options.restorerId !== null) {
+    const byUuid = sameDeployment && running?.restorerUuid ? running.restorerUuid : null;
     const email = running?.restorerEmail ?? null;
-    const found = email === null ? 0 : (await client.query(`SELECT 1 FROM users u WHERE ${SAME_EMAIL} AND ${CAN_MANAGE}`, [email])).rowCount;
+    const found = byUuid
+      ? (await client.query(`SELECT 1 FROM users u WHERE u.uuid = $1 AND ${CAN_MANAGE}`, [byUuid])).rowCount
+      : email === null
+        ? 0
+        : (await client.query(`SELECT 1 FROM users u WHERE ${SAME_EMAIL} AND ${CAN_MANAGE}`, [email])).rowCount;
     if (!found) {
+      // No email in the message: it is logged with the failure.
       throw new RestoreCarryOverRefusal(
         'RESTORE_WOULD_LOCK_OUT',
-        `In this backup's data, ${email ?? 'you'} ${email ? 'is' : 'are'} not a deployment admin who can sign in (an admin, ` +
-          'not locked, sign-in not disabled), so the restore would leave you unable to manage this server. Nothing was changed. ' +
-          'Restore it as a deployment admin the backup has, or with the restore command on the server.'
+        "In this backup's data you aren't a deployment admin who can sign in (an admin, not locked, sign-in not " +
+          'disabled), so the restore would leave you unable to manage this server. Nothing was changed. Restore it as a ' +
+          'deployment admin the backup has, or with the restore command on the server.'
       );
     }
     return;

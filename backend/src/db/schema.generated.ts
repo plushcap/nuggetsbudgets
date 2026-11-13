@@ -236,6 +236,10 @@ export interface BackupRecipients {
 }
 
 export interface BackupRuns {
+  /**
+   * When the retention job first found the file gone from the backup directory (cleared if it is back); the row goes a year later.
+   */
+  file_gone_at: Timestamp | null;
   file_name: string | null;
   file_size: Int8 | null;
   finished_at: Timestamp;
@@ -245,6 +249,10 @@ export interface BackupRuns {
    */
   message: string | null;
   outcome: string;
+  /**
+   * When the backup last passed a verify: a later verify that failed leaves it.
+   */
+  passed_verify_at: Timestamp | null;
   /**
    * The fingerprints of the backup keys an age backup was encrypted to; empty for an .enc one.
    */
@@ -258,7 +266,7 @@ export interface BackupRuns {
   trigger: string;
   uuid: Generated<string>;
   /**
-   * When the backup was last verified (restored into a scratch database and checked), in the web app or with the restore command.
+   * When the backup was last verified (restored into a scratch database and checked), in the web app or with the restore command; verify_outcome says how that went.
    */
   verified_at: Timestamp | null;
   verified_by: number | null;

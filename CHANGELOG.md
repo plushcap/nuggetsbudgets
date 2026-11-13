@@ -28,6 +28,15 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
   rotates the data encryption key). `--key-file` still opens an older `.enc` backup.
 - Downloading the old backup key now asks you to confirm your password or passkey, as adding
   or removing a backup key does. Generating a new old-style key is gone.
+
+  **Upgrading:** open Settings → Database Backup and set up a backup key (make one there, or
+  paste the public key from `age-keygen -pq`). Keep the private key file in a password
+  manager, and a second key offline: losing one then loses nothing, losing every one loses the
+  backups. Until you do, backups carry on with the old key, and the health check and the page
+  say so. Backups made before keep opening with the old key, which the server keeps; keep your
+  downloaded copy of it for the copies on OneDrive or elsewhere. A key change after the
+  upgrade (`rewrap-secrets`) prints the old signer: keep it to restore the backups made before
+  the change with `--signer`.
 - **Restoring a backup asks you to confirm your password or passkey** (unless you did in the
   last few minutes), before anything is uploaded: a stolen session alone can't start one.
   Verifying needs no confirmation: it changes nothing.
@@ -41,9 +50,10 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
   to remove again. A restore keeps this server's backup keys, OneDrive connection and record
   of backups, and never turns automatic backups off.
 - **A restore can't lock everyone out.** The web app restores a backup only when you are, in
-  its data, a deployment admin who can sign in (the same email); the restore command refuses
-  data with no such admin at all. Its new `--ignore-current-database` takes nothing from the
-  database being replaced, for when that can't be read or trusted.
+  its data, a deployment admin who can sign in (the same person on this server; the same email
+  on another); the restore command refuses data with no such admin at all. Its new
+  `--ignore-current-database` takes nothing from the database being replaced, for when that
+  can't be read or trusted.
 
   **After a restore**, everyone signs in again, you too: the page says so, and then shows what
   the restore did.
@@ -51,23 +61,14 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
   backup still restores), and a verify or restore refuses data whose rows differ: a backup cut
   short or damaged.
 
-  **Upgrading:** open Settings → Database Backup and set up a backup key (make one there, or
-  paste the public key from `age-keygen -pq`). Keep the private key file in a password
-  manager, and a second key offline: losing one then loses nothing, losing every one loses the
-  backups. Until you do, backups carry on with the old key, and the health check and the page
-  say so. Backups made before keep opening with the old key, which the server keeps; keep your
-  downloaded copy of it for the copies on OneDrive or elsewhere. A key change after the
-  upgrade (`rewrap-secrets`) prints the old signer: keep it to restore the backups made before
-  the change with `--signer`.
-
 ### Changed
 
 - Settings → Database Backup keeps a **record of backups**: every run, failures included, what
   started it, the file it made, and when it was last verified (in the web app or with the
   restore command's `--verify`), by whom. Each listed backup shows its last verify, and the
   page says so when no backup has been verified in 90 days. The health check's "last
-  automatic backup failed" now survives a restart. Records over a year old whose file is gone
-  are deleted by the daily retention job.
+  automatic backup failed" now survives a restart. A record is deleted by the daily retention
+  job a year after its file is gone.
 - Each GitHub Release's description lists what changed in it: its section of this changelog,
   then the pull requests merged since the release before it. A release made before this has
   only a link to the changelog: run **Rewrite release notes** from the Actions tab on `main`,

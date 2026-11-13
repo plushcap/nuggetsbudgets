@@ -1,8 +1,12 @@
 import React from 'react';
-import { Callout, Flex, Text } from '@radix-ui/themes';
-import { Info } from 'lucide-react';
+import { Box, Callout, Flex, Text } from '@radix-ui/themes';
+import { AlertTriangle, Info } from 'lucide-react';
 import type { RestoreCarryOver, RestoreStatus } from '@nuggets/shared';
 import { useLastRestoreQuery } from '../../hooks/queries';
+import { shownInstant } from './BackupRunsCard';
+
+/** How long a failed restore is shown for. */
+const FAILED_SHOWN_MS = 24 * 60 * 60 * 1000;
 
 /** Where a membership was removed: an organization, or a ledger. */
 const placeOf = (removed: RestoreCarryOver['removedSince'][number]) =>
@@ -28,13 +32,32 @@ export function carryOverSentences(carryOver: RestoreCarryOver): string[] {
 }
 
 /**
- * After a restore, what it did: shown on the Backup page once its admin has signed in again
- * (a restore ends every sign-in), while the server keeps the last restore's outcome. Lists the
- * memberships removed since the backup that the restored data still has, to remove again.
+ * After a restore, how it went: shown on the Backup page once its admin has signed in again
+ * (a restore ends every sign-in, so the page that started it can only say to sign in), while
+ * the server keeps the last restore's outcome. A finished one says what it did and lists the
+ * memberships removed since the backup that the restored data still has, to remove again; a
+ * failed one says why, and whether the data was replaced.
  */
 const LastRestoreCallout: React.FC = () => {
-  const { data } = useLastRestoreQuery({ meta: { suppressErrorToast: true } });
+  const { data, dataUpdatedAt } = useLastRestoreQuery({ meta: { suppressErrorToast: true } });
   const restore: RestoreStatus | undefined = data;
+  const named = restore?.fileName ? ` (${restore.fileName})` : '';
+  const when = restore?.finishedAt ? ` ${shownInstant(restore.finishedAt)}` : '';
+  // A failure for a day after it (by when the status was read): the page that started it may
+  // only have said to sign in.
+  if (restore?.status === 'failed' && restore.finishedAt && dataUpdatedAt - Date.parse(restore.finishedAt) < FAILED_SHOWN_MS) {
+    return (
+      <Callout.Root mb="6" color="red" role="status">
+        <Callout.Icon>
+          <AlertTriangle size={16} />
+        </Callout.Icon>
+        <Callout.Text>
+          The last restore{named} failed{when}: {(restore.error ?? 'the server log says why').replace(/\.$/, '')}.{' '}
+          {restore.databaseChanged ? 'The data was replaced: see the server log.' : 'The data is as it was before it.'}
+        </Callout.Text>
+      </Callout.Root>
+    );
+  }
   if (restore?.status !== 'completed' || !restore.carryOver) return null;
   const { carryOver } = restore;
   return (
@@ -44,9 +67,7 @@ const LastRestoreCallout: React.FC = () => {
       </Callout.Icon>
       <Flex direction="column" gap="2">
         <Callout.Text>
-          The last restore{restore.fileName ? ` (${restore.fileName})` : ''}
-          {restore.finishedAt ? ` finished ${new Date(restore.finishedAt).toLocaleString()}` : ' finished'}.{' '}
-          {carryOverSentences(carryOver).join(' ')}
+          The last restore{named} finished{when}. {carryOverSentences(carryOver).join(' ')}
         </Callout.Text>
         {carryOver.removedSince.length > 0 && (
           <>
@@ -54,15 +75,17 @@ const LastRestoreCallout: React.FC = () => {
               Removed since the backup, but still there in the restored data. Remove them again in the organization’s or
               ledger’s members:
             </Callout.Text>
-            <ul aria-label="Memberships to remove again" className="m-0 pl-5">
-              {carryOver.removedSince.map((removed) => (
-                <li key={`${removed.person} ${removed.kind} ${removed.name} ${removed.change}`}>
-                  <Text size="2">
-                    {removed.person}: {removed.change === 'admin' ? 'admin of' : 'member of'} {placeOf(removed)}
-                  </Text>
-                </li>
-              ))}
-            </ul>
+            <Box asChild m="0" pl="5">
+              <ul aria-label="Memberships to remove again">
+                {carryOver.removedSince.map((removed) => (
+                  <li key={`${removed.person} ${removed.kind} ${removed.name} ${removed.change}`}>
+                    <Text size="2">
+                      {removed.person}: {removed.change === 'admin' ? 'admin of' : 'member of'} {placeOf(removed)}
+                    </Text>
+                  </li>
+                ))}
+              </ul>
+            </Box>
           </>
         )}
       </Flex>

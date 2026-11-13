@@ -71,6 +71,8 @@ export async function recordVerify(
       verified_by: verify.verifiedBy,
       verify_outcome: verify.outcome,
       verify_message: clip(verify.message),
+      // A failed verify leaves the last pass: one failure doesn't make a backup unverified.
+      ...(verify.outcome === backupVerifyOutcome.enum.passed && { passed_verify_at: sql<string>`now()` }),
     })
     .where('file_name', '=', verify.fileName)
     .executeTakeFirst();
@@ -92,7 +94,7 @@ export async function listBackupRuns(
     .leftJoin('users as v', 'v.id', 'r.verified_by')
     .select([
       'r.uuid', 'r.started_at', 'r.finished_at', 'r.trigger', 'r.outcome', 'r.message', 'r.file_name', 'r.file_size', 'r.sha256',
-      'r.recipients', 'r.verified_at', 'r.verify_outcome', 'r.verify_message',
+      'r.recipients', 'r.verified_at', 'r.verify_outcome', 'r.verify_message', 'r.passed_verify_at',
       's.first_name as started_first', 's.last_name as started_last', 's.email as started_email',
       'v.first_name as verified_first', 'v.last_name as verified_last', 'v.email as verified_email',
     ])
@@ -100,13 +102,17 @@ export async function listBackupRuns(
     .orderBy('r.id', 'desc')
     .limit(limit)
     .execute();
-  const passed = sql.lit(backupVerifyOutcome.enum.passed);
+  const cutoff = sql`now() - make_interval(days => ${VERIFY_OVERDUE_DAYS})`;
   const summary = await db
     .selectFrom('backup_runs')
     .select([
-      sql<Date | null>`max(verified_at) FILTER (WHERE verify_outcome = ${passed})`.as('last_verified_at'),
-      sql<boolean>`bool_or(outcome = ${sql.lit(backupRunOutcome.enum.succeeded)})`.as('any_backup'),
-      sql<boolean>`coalesce(max(verified_at) FILTER (WHERE verify_outcome = ${passed}) < now() - make_interval(days => ${VERIFY_OVERDUE_DAYS}), true)`.as('overdue'),
+      sql<Date | null>`max(passed_verify_at)`.as('last_verified_at'),
+      // Overdue: the last pass is older than the cutoff, or there has been none while backups
+      // have been made for that long (a new server's first backups aren't overdue).
+      sql<boolean>`coalesce(
+        CASE WHEN max(passed_verify_at) IS NOT NULL THEN max(passed_verify_at) < ${cutoff}
+             ELSE min(started_at) FILTER (WHERE outcome = ${sql.lit(backupRunOutcome.enum.succeeded)}) < ${cutoff} END,
+        false)`.as('overdue'),
     ])
     .executeTakeFirst();
   return {
@@ -126,10 +132,10 @@ export async function listBackupRuns(
       verifiedBy: r.verified_at === null ? null : personName(r.verified_first, r.verified_last, r.verified_email),
       verifyOutcome: (r.verify_outcome as BackupVerifyOutcome | null) ?? null,
       verifyMessage: r.verify_message,
+      passedVerifyAt: r.passed_verify_at?.toISOString() ?? null,
     })),
     lastVerifiedAt: summary?.last_verified_at?.toISOString() ?? null,
-    // Said only once there is a backup to verify.
-    verifyOverdue: summary?.any_backup === true && summary.overdue,
+    verifyOverdue: summary?.overdue === true,
   };
 }
 

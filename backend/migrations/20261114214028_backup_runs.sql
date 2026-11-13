@@ -6,8 +6,8 @@
 -- (name, size, SHA-256) and the fingerprints of the keys it was encrypted to, and when it
 -- was last verified, by whom, and how that went. The Backup page shows it, and the backup
 -- health check reads the last scheduled run from it after a restart. A restore keeps the
--- running server's rows. The daily retention job deletes rows over a year old whose file
--- is gone.
+-- running server's rows. The daily retention job notes when a run's file is gone from the
+-- backup directory, and deletes the row a year later (a failed run's, a year after it ran).
 
 CREATE TABLE public.backup_runs (
     id serial PRIMARY KEY,
@@ -26,6 +26,8 @@ CREATE TABLE public.backup_runs (
     verified_by integer,
     verify_outcome text,
     verify_message text,
+    passed_verify_at timestamp with time zone,
+    file_gone_at timestamp with time zone,
     CONSTRAINT backup_runs_uuid_key UNIQUE (uuid),
     CONSTRAINT backup_runs_trigger_check CHECK (trigger IN ('manual', 'scheduled', 'before-deletion')),
     CONSTRAINT backup_runs_outcome_check CHECK (outcome IN ('succeeded', 'failed')),
@@ -46,7 +48,9 @@ COMMENT ON TABLE public.backup_runs IS 'Every backup run, failures included (con
 COMMENT ON COLUMN public.backup_runs.trigger IS 'What started it: manual (the Backup page), scheduled, or before-deletion (Data Management''s "Back up first").';
 COMMENT ON COLUMN public.backup_runs.message IS 'Why it failed, written for people (never an internal error''s text); NULL when it succeeded.';
 COMMENT ON COLUMN public.backup_runs.recipients IS 'The fingerprints of the backup keys an age backup was encrypted to; empty for an .enc one.';
-COMMENT ON COLUMN public.backup_runs.verified_at IS 'When the backup was last verified (restored into a scratch database and checked), in the web app or with the restore command.';
+COMMENT ON COLUMN public.backup_runs.verified_at IS 'When the backup was last verified (restored into a scratch database and checked), in the web app or with the restore command; verify_outcome says how that went.';
+COMMENT ON COLUMN public.backup_runs.passed_verify_at IS 'When the backup last passed a verify: a later verify that failed leaves it.';
+COMMENT ON COLUMN public.backup_runs.file_gone_at IS 'When the retention job first found the file gone from the backup directory (cleared if it is back); the row goes a year later.';
 
 -- === DOWN ===
 

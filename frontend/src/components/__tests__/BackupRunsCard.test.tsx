@@ -29,6 +29,7 @@ const run = (overrides: Partial<BackupRun> = {}): BackupRun => ({
   verifiedBy: null,
   verifyOutcome: null,
   verifyMessage: null,
+  passedVerifyAt: null,
   ...overrides,
 });
 
@@ -51,7 +52,7 @@ describe('BackupRunsCard', () => {
       runs: [
         run({ trigger: 'manual', startedBy: 'Ada Admin', verifiedAt: '2026-11-11T10:00:00.000Z', verifiedBy: 'Ada Admin', verifyOutcome: 'passed' }),
         run({ outcome: 'failed', message: 'No backup key has been set up.', fileName: null, fileSize: null }),
-        run({ verifiedAt: '2026-11-11T10:00:00.000Z', verifyOutcome: 'failed', verifyMessage: 'The backup is damaged' }),
+        run({ verifiedAt: '2026-11-11T10:00:00.000Z', verifyOutcome: 'failed', verifyMessage: 'The backup is damaged', passedVerifyAt: '2026-10-01T10:00:00.000Z' }),
       ],
       lastVerifiedAt: '2026-11-11T10:00:00.000Z',
       verifyOverdue: false,
@@ -65,7 +66,9 @@ describe('BackupRunsCard', () => {
     expect(items[1]).toHaveTextContent(/Failed.*Automatic/);
     expect(items[1]).toHaveTextContent('No backup key has been set up.');
     expect(items[1]).not.toHaveTextContent(/verified/i);
-    expect(items[2]).toHaveTextContent(/Verify failed .* with the restore command/);
+    // The restore command's (or someone since deleted): no one named. The last pass still shows.
+    expect(items[2]).toHaveTextContent(/Verify failed [^(]*\(last passed /);
+    expect(items[2]).not.toHaveTextContent(/ by /);
     expect(items[2]).toHaveTextContent('The backup is damaged');
     expect(screen.queryByText(/No backup has been verified/)).not.toBeInTheDocument();
   });
@@ -111,8 +114,21 @@ describe('LastRestoreCallout', () => {
     ]);
   });
 
-  it('shows nothing before a restore, while one runs, or after one failed', async () => {
-    for (const status of [{ status: 'idle' }, { status: 'running', phase: 'migrating' }, { status: 'failed', error: 'refused' }] as RestoreStatus[]) {
+  it('says a restore failed, for a day, and whether the data was replaced', async () => {
+    api.restoreStatus.mockResolvedValue({
+      status: 'failed',
+      fileName: 'nuggets_backup_20261101_030000_000.tar.age',
+      finishedAt: new Date(Date.now() - 60_000).toISOString(),
+      error: 'Restoring the uploads failed, so the database was put back as it was.',
+      databaseChanged: false,
+    });
+    renderWithProviders(<Theme><LastRestoreCallout /></Theme>);
+    expect(await screen.findByText(/The last restore \(nuggets_backup_20261101_030000_000\.tar\.age\) failed .*: Restoring the uploads failed, so the database was put back as it was\. The data is as it was before it\./)).toBeInTheDocument();
+  });
+
+  it('shows nothing before a restore, while one runs, or a day after one failed', async () => {
+    const dayAgo = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    for (const status of [{ status: 'idle' }, { status: 'running', phase: 'migrating' }, { status: 'failed', error: 'refused', finishedAt: dayAgo }] as RestoreStatus[]) {
       api.restoreStatus.mockResolvedValue(status);
       const { unmount } = renderWithProviders(<Theme><LastRestoreCallout /></Theme>);
       await vi.waitFor(() => expect(api.restoreStatus).toHaveBeenCalled());

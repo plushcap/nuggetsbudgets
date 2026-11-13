@@ -62,6 +62,7 @@ const __dirname = getDirname(import.meta.url);
 const USAGE =
   'Usage: node dist/scripts/restore.js <backup> (--verify | --yes)\n' +
   '         [--identity-file <file|->] [--decrypted] [--key-file <file>] [--signer <ed25519:…>]... [--allow-foreign]\n' +
+  '         [--ignore-current-database] (with --yes)\n' +
   '  --verify         restore into a scratch database, check it and drop it (changes nothing)\n' +
   "  --yes            replace the app's data with the backup's (stop the backend first)\n" +
   '  --identity-file  a .tar.age backup: your private key file (- reads it from standard input)\n' +

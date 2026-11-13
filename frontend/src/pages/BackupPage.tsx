@@ -480,7 +480,8 @@ const BackupPage: React.FC = () => {
       setTimeout(() => window.location.reload(), 3000);
     } catch (error) {
       if (error instanceof SignInReplacedError) {
-        toast.success('The restore finished: sign in again. This page then shows what it did.', { duration: 10000 });
+        // Signed out by the swap: how the restore ended (the uploads come after it) shows once signed in.
+        toast.success('The restore signed everyone out: sign in again, and this page shows how it went.', { duration: 10000 });
         return;
       }
       // The confirmation lapsed as the restore was sent, and the user closed the prompt.

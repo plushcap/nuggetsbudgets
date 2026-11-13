@@ -480,7 +480,6 @@ export const backupOneDriveStatusResponseSchema = z.object({
 export const RESTORE_PHASES = ['decrypting', 'checking', 'restoring', 'migrating', 'verifying', 'swapping', 'restoring-uploads'] as const;
 export type RestorePhase = (typeof RESTORE_PHASES)[number];
 
-/** GET /api/backup/restore-status: the restore running, or the last one, and how it ended. */
 /**
  * What a restore did to signing in and the deployment's settings before it swapped the data
  * in (BackupService's carry-over): ended, taken from the running server, kept, and the
@@ -530,6 +529,7 @@ export const restoreCarryOverSchema = z.object({
 });
 export type RestoreCarryOver = z.infer<typeof restoreCarryOverSchema>;
 
+/** GET /api/backup/restore-status: the restore running, or the last one, and how it ended. */
 export const restoreStatusResponseSchema = z.object({
   status: z.enum(['idle', 'running', 'completed', 'failed']),
   phase: z.enum(RESTORE_PHASES).optional(),
@@ -574,12 +574,14 @@ export const backupRunSchema = z.object({
   verifiedBy: z.string().nullable(),
   verifyOutcome: z.enum(BACKUP_VERIFY_OUTCOMES).nullable(),
   verifyMessage: z.string().nullable(),
+  /** When it last passed a verify (a later failed one leaves this). */
+  passedVerifyAt: instant.nullable(),
 });
 export type BackupRun = z.infer<typeof backupRunSchema>;
 
 /**
  * GET /api/backup/runs: the newest backup runs, when a backup last passed a verify, and
- * whether none has for 90 days (said only once there is a backup).
+ * whether none has for 90 days (said only once backups have been made for that long).
  */
 export const backupRunsResponseSchema = z.object({
   runs: z.array(backupRunSchema),

@@ -281,8 +281,10 @@ async function runVerify(backupService: BackupService, input: StartRestoreInput,
   } catch (error) {
     verifyStatus = { status: 'failed', fileName, startedAt, finishedAt: new Date().toISOString(), error: shownVerifyError(error) };
     const cause = error instanceof RestoreFailedError ? error.cause : error;
-    // A verify that ran and failed; not one held up by another operation or the shutdown.
-    if (!(error instanceof BackupInProgressError) && !(cause instanceof ShuttingDownError)) {
+    // A verify that ran and failed, of a backup on the server: an uploaded file's name proves
+    // nothing (a renamed or damaged copy would mark the real backup failed). Not one held up by
+    // another operation or the shutdown.
+    if (!input.deleteAfter && !(error instanceof BackupInProgressError) && !(cause instanceof ShuttingDownError)) {
       await backupService.recordVerify(fileName, userId, 'failed', verifyStatus.error ?? null);
     }
     if (error instanceof BackupInProgressError) logger.warn({ err: error, userId, fileName }, 'Verify refused: a backup or restore is running');

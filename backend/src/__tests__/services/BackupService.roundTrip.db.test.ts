@@ -559,6 +559,8 @@ describe.skipIf(!runnable)(`backup and restore round trip (pg_dump ${tools}, ser
       for (const restorerId of [member.id, lockedAdmin.id]) {
         const refused = backups.restoreFromFile(backup.filePath, { fileKey: await fileKeyOf(backup.filePath), restorerId });
         await expect(refused).rejects.toMatchObject({ databaseChanged: false, cause: { code: 'RESTORE_WOULD_LOCK_OUT' } });
+        // The refusal is logged with the failure: it names no one.
+        await expect(refused).rejects.toSatisfy((error: Error) => !/@carry\.test/.test(`${error.message} ${(error.cause as Error).message}`));
       }
       expect(await tagNames()).toContain('kept-by-the-lock-out-refusal');
       // The admin it has can restore it.
@@ -567,10 +569,27 @@ describe.skipIf(!runnable)(`backup and restore round trip (pg_dump ${tools}, ser
       });
     }, 300_000);
 
+    it('lets an admin whose email changed since restore on this deployment, and reads a database without the newest tables as having none', async () => {
+      await useDataKey('server-a');
+      const backups = await withBackupKey(service());
+      const renamed = await person('before-rename@carry.test');
+      await live("INSERT INTO deployment_users (user_id, deployment_id, role) SELECT $1, id, 'admin' FROM deployment ORDER BY id LIMIT 1", [renamed.id]);
+      const backup = await backups.createBackup();
+      await live("UPDATE users SET email = 'after-rename@carry.test' WHERE id = $1", [renamed.id]);
+      // The restore command run from a newer image before its migrations: a table it reads isn't there yet.
+      await live('ALTER TABLE backup_runs RENAME TO backup_runs_not_yet');
+      const restored = await backups.restoreFromFile(backup.filePath, { fileKey: await fileKeyOf(backup.filePath), restorerId: renamed.id });
+      expect(restored.carryOver).toMatchObject({ sameDeployment: true, kept: { backupRuns: false } });
+      // The restored data has the table (it is migrated), with the backup's rows.
+      expect(await one('SELECT count(*)::int >= 0 AS there FROM backup_runs')).toEqual({ there: true });
+    }, 300_000);
+
     it("takes nothing from the running server when told to ignore it, or when the backup is another deployment's", async () => {
       await useDataKey('server-a');
       const backups = await withBackupKey(service());
       const changed = await person('changed@carry.test');
+      await live('DELETE FROM onedrive_tokens');
+      await live("INSERT INTO onedrive_tokens (user_id, access_token, refresh_token, expires_at) VALUES ($1, 'backup-access', 'backup-refresh', now() + interval '1 hour')", [adminId]);
       const backup = await backups.createBackup();
       await live("UPDATE users SET password_hash = 'hash-now', password_changed_at = now() WHERE id = $1", [changed.id]);
       await live(`INSERT INTO sessions (session_token_hash, user_id, expires_at) VALUES (${hex('ignored-session')}, $1, now() + interval '1 day')`, [adminId]);
@@ -585,11 +604,41 @@ describe.skipIf(!runnable)(`backup and restore round trip (pg_dump ${tools}, ser
       // but this server's backup keys are kept.
       await live("UPDATE users SET password_hash = 'hash-now', password_changed_at = now() WHERE id = $1", [changed.id]);
       await live('UPDATE deployment SET uuid = uuidv7()');
+      // A new server with no OneDrive connection of its own: the backup's stays (same data key, still opens).
+      await live('DELETE FROM onedrive_tokens');
       const other = await backups.restoreFromFile(backup.filePath, { fileKey: await fileKeyOf(backup.filePath), restorerId: adminId });
-      expect(other.carryOver).toMatchObject({ tookFromRunningServer: true, sameDeployment: false, lockedDeletedSince: 0, kept: { backupKeys: true } });
+      expect(other.carryOver).toMatchObject({
+        tookFromRunningServer: true,
+        sameDeployment: false,
+        lockedDeletedSince: 0,
+        kept: { backupKeys: true, oneDriveConnections: 0 },
+      });
       expect(await one('SELECT password_hash FROM users WHERE id = $1', [changed.id])).toEqual({ password_hash: 'hash-at-backup' });
+      expect(await live('SELECT access_token FROM onedrive_tokens')).toEqual([{ access_token: 'backup-access' }]);
     }, 300_000);
   });
+
+  it("makes a backup whose dump outlasts the server's idle-in-transaction timeout", async () => {
+    await useDataKey('server-a');
+    const backups = service();
+    if ((await backups.listRecipients()).length === 0) await addTestRecipient(backups);
+    // The compose files set 10 minutes; here 1 s, and a dump that takes longer. The transaction
+    // holding the snapshot sits idle all the while.
+    await live(`ALTER DATABASE ${escapeIdentifier(location.database)} SET idle_in_transaction_session_timeout = '1s'`);
+    type Dump = (file: string, owner: unknown, snapshot: string) => Promise<void>;
+    const steps = backups as unknown as { runPgDump: Dump };
+    const dump = steps.runPgDump.bind(backups);
+    vi.spyOn(steps, 'runPgDump').mockImplementation(async (...args) => {
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      return dump(...args);
+    });
+    try {
+      await expect(backups.createBackup()).resolves.toMatchObject({ fileName: expect.stringMatching(/\.tar\.age$/) });
+    } finally {
+      vi.restoreAllMocks();
+      await live(`ALTER DATABASE ${escapeIdentifier(location.database)} RESET idle_in_transaction_session_timeout`);
+    }
+  }, 300_000);
 
   it("refuses restored data whose rows differ from the backup's counts, and changes nothing", async () => {
     await useDataKey('server-a');

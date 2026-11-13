@@ -174,8 +174,8 @@ describe('BackupPage', () => {
     it('says to sign in again when the restored data no longer has this sign-in', async () => {
       api.restoreStatus.mockRejectedValue(new SessionExpiredError());
       await restoreListed();
-      // Every restore ends every sign-in: the page says the restore finished, and to sign in.
-      await waitFor(() => expect(toast.success).toHaveBeenCalledWith(expect.stringMatching(/^The restore finished: sign in again/), expect.anything()), { timeout: 6000 });
+      // Every restore ends every sign-in: the page says to sign in, and that it then shows how the restore went.
+      await waitFor(() => expect(toast.success).toHaveBeenCalledWith(expect.stringMatching(/^The restore signed everyone out: sign in again/), expect.anything()), { timeout: 6000 });
       expect(toast.error).not.toHaveBeenCalled();
     });
   });

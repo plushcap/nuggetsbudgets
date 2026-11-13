@@ -102,15 +102,17 @@ describeDb('backup runs', () => {
     expect(listed).toMatchObject({ verifyOutcome: 'failed', verifiedBy: null, verifyMessage: 'The backup is damaged' });
   });
 
-  it(`says when no backup has passed a verify for ${VERIFY_OVERDUE_DAYS} days, once there is one`, async () => {
+  it(`says when no backup has passed a verify for ${VERIFY_OVERDUE_DAYS} days, once backups have been made that long`, async () => {
     expect(await listBackupRuns(db)).toMatchObject({ runs: [], lastVerifiedAt: null, verifyOverdue: false });
 
-    // A failed run made nothing to verify.
-    await recordBackupRun(db, run({ outcome: 'failed', message: 'no key', fileName: null, fileSize: null, sha256: null }));
-    expect((await listBackupRuns(db)).verifyOverdue).toBe(false);
-
+    // A new server's first backups aren't overdue, verified or not.
     const made = run();
     await recordBackupRun(db, made);
+    expect(await listBackupRuns(db)).toMatchObject({ lastVerifiedAt: null, verifyOverdue: false });
+    // Backups made for longer than that, none verified: overdue. A failed run counts for nothing.
+    await recordBackupRun(db, run({ outcome: 'failed', message: 'no key', fileName: null, fileSize: null, sha256: null, startedAt: new Date(Date.now() - 400 * 86_400_000) }));
+    expect((await listBackupRuns(db)).verifyOverdue).toBe(false);
+    await owner.query(`UPDATE ${schema}.backup_runs SET started_at = now() - make_interval(days => $1) WHERE file_name = $2`, [VERIFY_OVERDUE_DAYS + 1, made.fileName]);
     expect(await listBackupRuns(db)).toMatchObject({ lastVerifiedAt: null, verifyOverdue: true });
 
     // A failed verify isn't a verified backup.
@@ -118,13 +120,19 @@ describeDb('backup runs', () => {
     expect(await listBackupRuns(db)).toMatchObject({ lastVerifiedAt: null, verifyOverdue: true });
 
     await recordVerify(db, { fileName: made.fileName!, verifiedBy: admin, outcome: 'passed', message: null });
-    const fresh = await listBackupRuns(db);
-    expect(fresh.verifyOverdue).toBe(false);
-    expect(fresh.lastVerifiedAt).toBe(fresh.runs[0]!.verifiedAt);
+    const passed = await listBackupRuns(db);
+    expect(passed.verifyOverdue).toBe(false);
+    expect(passed.lastVerifiedAt).toBe(passed.runs.find((r) => r.fileName === made.fileName)!.passedVerifyAt);
 
-    await owner.query(`UPDATE ${schema}.backup_runs SET verified_at = now() - make_interval(days => $1) WHERE verified_at IS NOT NULL`, [VERIFY_OVERDUE_DAYS - 1]);
+    // A failed verify after it leaves the pass: the backup was verified, and still counts.
+    await recordVerify(db, { fileName: made.fileName!, verifiedBy: admin, outcome: 'failed', message: 'the server shut down' });
+    const after = await listBackupRuns(db);
+    expect(after.runs.find((r) => r.fileName === made.fileName)).toMatchObject({ verifyOutcome: 'failed', passedVerifyAt: passed.lastVerifiedAt });
+    expect(after).toMatchObject({ lastVerifiedAt: passed.lastVerifiedAt, verifyOverdue: false });
+
+    await owner.query(`UPDATE ${schema}.backup_runs SET passed_verify_at = now() - make_interval(days => $1) WHERE passed_verify_at IS NOT NULL`, [VERIFY_OVERDUE_DAYS - 1]);
     expect((await listBackupRuns(db)).verifyOverdue).toBe(false);
-    await owner.query(`UPDATE ${schema}.backup_runs SET verified_at = now() - make_interval(days => $1) WHERE verified_at IS NOT NULL`, [VERIFY_OVERDUE_DAYS + 1]);
+    await owner.query(`UPDATE ${schema}.backup_runs SET passed_verify_at = now() - make_interval(days => $1) WHERE passed_verify_at IS NOT NULL`, [VERIFY_OVERDUE_DAYS + 1]);
     expect((await listBackupRuns(db)).verifyOverdue).toBe(true);
   });
 

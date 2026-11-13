@@ -1219,6 +1219,12 @@ export class BackupService {
     try {
       await snapshotHolder.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
       await snapshotHolder.query('SET LOCAL row_security = off');
+      // It sits idle in its transaction for as long as pg_dump runs: a server's
+      // idle_in_transaction_session_timeout (the compose files set 10 minutes) would end it,
+      // and the backup, part way through a large dump. pg_dump turns them off for itself.
+      await snapshotHolder.query('SET LOCAL idle_in_transaction_session_timeout = 0');
+      await snapshotHolder.query('SET LOCAL transaction_timeout = 0');
+      await snapshotHolder.query('SET LOCAL statement_timeout = 0');
       const { rows } = await snapshotHolder.query<{ snapshot: string }>('SELECT pg_export_snapshot() AS snapshot');
       const snapshot = oneRow(rows, 'pg_export_snapshot()').snapshot;
       const rowCounts = await countPublicTables(snapshotHolder);

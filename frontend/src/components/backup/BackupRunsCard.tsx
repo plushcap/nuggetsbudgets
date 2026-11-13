@@ -4,6 +4,7 @@ import { AlertTriangle, History, ShieldCheck } from 'lucide-react';
 import { backupRunOutcome, backupVerifyOutcome } from '@nuggets/shared';
 import type { BackupRun } from '../../services/api';
 import { useBackupRunsQuery } from '../../hooks/queries';
+import { formatInstantDate } from '../../utils/dateUtils';
 
 /** What started a run, as the record says it. */
 const TRIGGERS: Record<BackupRun['trigger'], string> = {
@@ -25,14 +26,21 @@ function sizeOf(bytes: number): string {
   return `${size.toFixed(size < 10 ? 1 : 0)} ${units[unit]}`;
 }
 
-/** An instant, in this browser's time and way of writing it. */
-const shown = (instant: string) => new Date(instant).toLocaleString();
+/** An instant, its day and time in this browser's zone and way of writing them. */
+export const shownInstant = (instant: string) =>
+  formatInstantDate(instant, undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-/** When a backup was last verified, and how it went: "Verified …", "Verify failed …", "Never verified". */
-export function verifiedText(run: Pick<BackupRun, 'verifiedAt' | 'verifiedBy' | 'verifyOutcome'>): string {
+/**
+ * When a backup was last verified, and how it went: "Verified …", "Verify failed … (last
+ * passed …)", "Never verified". Who, when the record says (the restore command's, or someone
+ * since deleted, names no one).
+ */
+export function verifiedText(run: Pick<BackupRun, 'verifiedAt' | 'verifiedBy' | 'verifyOutcome' | 'passedVerifyAt'>): string {
   if (!run.verifiedAt) return 'Never verified';
-  const by = run.verifiedBy ? ` by ${run.verifiedBy}` : ' with the restore command';
-  return `${run.verifyOutcome === backupVerifyOutcome.enum.passed ? 'Verified' : 'Verify failed'} ${shown(run.verifiedAt)}${by}`;
+  const by = run.verifiedBy ? ` by ${run.verifiedBy}` : '';
+  if (run.verifyOutcome === backupVerifyOutcome.enum.passed) return `Verified ${shownInstant(run.verifiedAt)}${by}`;
+  const lastPassed = run.passedVerifyAt ? ` (last passed ${shownInstant(run.passedVerifyAt)})` : '';
+  return `Verify failed ${shownInstant(run.verifiedAt)}${by}${lastPassed}`;
 }
 
 /** A listed backup's last verify, from the record (nothing for a file the record doesn't have). */
@@ -103,7 +111,7 @@ const BackupRunsCard: React.FC = () => {
                             </Badge>
                           )}
                           <Text size="2" weight="medium">
-                            {shown(run.startedAt)}
+                            {shownInstant(run.startedAt)}
                           </Text>
                           <Text size="2" color="gray">
                             {TRIGGERS[run.trigger]}
