@@ -74,6 +74,7 @@ user            DELETE /api/auth/mcp-tokens/:uuid
 user            GET    /api/auth/me
 public          GET    /api/auth/password-policy
 user            PUT    /api/auth/profile
+user            GET    /api/auth/reauthenticate
 user            POST   /api/auth/reauthenticate
 user            GET    /api/auth/sessions
 user            DELETE /api/auth/sessions/:uuid

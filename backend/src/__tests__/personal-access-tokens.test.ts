@@ -14,6 +14,7 @@ vi.mock('../services/BackupService.js', async () => {
     BackupService: class {
       static isBackupInProgress = () => false;
       static isRestoreInProgress = () => false;
+      static isRefusingNewOperations = () => false;
       constructor() {
         return new Proxy(this, {
           get: (_target, prop) => (prop === 'then' ? undefined : prop === 'getTempDir' ? () => tmpdir() : async () => undefined),
@@ -501,6 +502,7 @@ describeDb('Personal access tokens: reach, scopes, verification and step-up', ()
         ['put', '/api/auth/profile'],
         ['post', '/api/auth/active-tenant'],
         ['post', '/api/auth/reauthenticate'],
+        ['get', '/api/auth/reauthenticate'],
         // passkeys
         ['get', '/api/passkeys'],
         ['post', '/api/passkeys/register/options'],
@@ -509,6 +511,7 @@ describeDb('Personal access tokens: reach, scopes, verification and step-up', ()
         ['get', '/api/admin/users'],
         ['get', '/api/backup/list'],
         ['get', '/api/backup/key/download'],
+        ['post', '/api/backup/restore/nuggets_backup_20261101_030000_000.tar.age'],
         ['get', '/api/health/detailed'],
         ['post', '/api/settings/general'],
         ['post', '/api/admin/notifications/scheduler/restart'],
@@ -635,6 +638,41 @@ describeDb('Personal access tokens: reach, scopes, verification and step-up', ()
       expect(ok.status, JSON.stringify(ok.body)).toBe(200);
       expect(ok.body.validForSeconds).toBe(300);
       expect((await mintRequest(session, { tenantUuid: aUuid })).status).toBe(201);
+    });
+
+    it('tells the page whether the session has one, so it can ask before a restore', async () => {
+      const session = await signIn(stepUser.id, a.tenantId);
+      const status = async () => {
+        const res = await withCookie(request(server).get('/api/auth/reauthenticate'), session);
+        expect(res.status, JSON.stringify(res.body)).toBe(200);
+        return res.body as { reauthenticated: boolean };
+      };
+      await setReauthenticatedAt(session, 'NULL');
+      expect(await status()).toEqual({ reauthenticated: false });
+      expect((await withCookie(request(server).post('/api/auth/reauthenticate'), session).send({ password: PASSWORD })).status).toBe(200);
+      expect(await status()).toEqual({ reauthenticated: true });
+      await setReauthenticatedAt(session, `NOW() - interval '4 minutes 50 seconds'`);
+      expect(await status()).toEqual({ reauthenticated: true });
+      await setReauthenticatedAt(session, `NOW() - interval '5 minutes 10 seconds'`);
+      expect(await status()).toEqual({ reauthenticated: false });
+      // Reading it changes nothing.
+      expect(await status()).toEqual({ reauthenticated: false });
+      expect((await mintRequest(session, { tenantUuid: aUuid })).body.code).toBe('REAUTH_REQUIRED');
+    });
+
+    it("refuses a deployment admin's restore without one, and lets a verify through", async () => {
+      const session = await signIn(adminId, a.tenantId);
+      await setReauthenticatedAt(session, `NOW() - interval '10 minutes'`);
+      const name = 'nuggets_backup_20261101_030000_000.tar.age';
+      const restore = await withCookie(request(server).post(`/api/backup/restore/${name}`), session).send({});
+      expect(restore.status).toBe(403);
+      expect(restore.body.code).toBe('REAUTH_REQUIRED');
+      const upload = await withCookie(request(server).post('/api/backup/restore'), session).attach('backup', Buffer.from('x'), name);
+      expect(upload.status).toBe(403);
+      expect(upload.body.code).toBe('REAUTH_REQUIRED');
+      // The stand-in BackupService finds nothing: a verify gets as far as that.
+      const verify = await withCookie(request(server).post(`/api/backup/verify/${name}`), session).send({});
+      expect(verify.status, JSON.stringify(verify.body)).toBe(404);
     });
 
     it('lasts five minutes', async () => {

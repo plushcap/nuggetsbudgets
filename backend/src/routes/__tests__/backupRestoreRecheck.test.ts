@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import { existsSync } from 'fs';
@@ -39,6 +39,7 @@ import { restoreMaintenanceGate } from '../../middleware/restoreMaintenance.js';
 import { restoreJobSettled } from '../../services/restoreJob.js';
 import { RlsBypassRoleError } from '../../db/servingRole.js';
 import { BackupService, RestoreFailedError, RestoreRefusedError, ShuttingDownError } from '../../services/BackupService.js';
+import { sessionService } from '../../middleware/auth.js';
 
 /**
  * A restore through the app runs in the background: POST answers 202, the page polls
@@ -54,8 +55,10 @@ describe('restoring a backup through the app', () => {
   beforeAll(() => {
     app = express();
     app.use(express.json());
+    // A browser session that confirmed its password just now: a restore takes step-up
+    // (backupRestoreStepUp.test.ts).
     app.use((req, _res, next) => {
-      (req as express.Request & { user: unknown }).user = { userId: 1, email: 'admin@test.local' };
+      Object.assign(req, { user: { userId: 1, email: 'admin@test.local' }, session: { id: 7 } });
       next();
     });
     app.use('/api', restoreMaintenanceGate);
@@ -64,6 +67,10 @@ describe('restoring a backup through the app', () => {
     });
     const lifecycleService = schedulers as unknown as ApplicationLifecycleService;
     app.use('/api/backup', createBackupRoutes(routeDependencies({ lifecycleService, backupService: new BackupService(appPool) })));
+  });
+
+  beforeEach(() => {
+    vi.spyOn(sessionService, 'isRecentlyReauthenticated').mockResolvedValue(true);
   });
 
   afterEach(async () => {

@@ -13,7 +13,9 @@ import { logger } from '../utils/logger';
 import { useSeededState } from '../hooks/useSeededState';
 import { errorMessage, errorDetailsText, apiErrorMessage } from '../utils/errors';
 import { useConfirmation } from '../hooks/useConfirmation';
+import { isReauthCancelledError, useReauth } from '../hooks/useReauth';
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import ReauthDialog from '../components/ReauthDialog';
 import SettingsPageHeader from '../components/SettingsPageHeader';
 import OneDriveSync from '../components/OneDriveSync';
 import DeploymentTimeZoneCard from '../components/DeploymentTimeZoneCard';
@@ -136,6 +138,7 @@ async function waitForRestore(onProgress: (status: RestoreStatus) => void): Prom
 
 const BackupPage: React.FC = () => {
   const { confirmAsync, dialogProps } = useConfirmation();
+  const { withReauth, ensureReauthenticated, dialogProps: reauthDialogProps } = useReauth();
   const [backups, setBackups] = useState<Backup[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
@@ -439,6 +442,22 @@ const BackupPage: React.FC = () => {
       ],
     });
 
+  /**
+   * A restore takes step-up: the password or a passkey, unless confirmed in the last few
+   * minutes. Asked here, before anything is sent: the server checks it before it reads an
+   * upload, but a browser may send the whole file before it reads the refusal. False when the
+   * user closed the prompt, or the check failed (said).
+   */
+  const confirmIdentity = async (): Promise<boolean> => {
+    try {
+      await ensureReauthenticated();
+      return true;
+    } catch (error) {
+      if (!isReauthCancelledError(error)) toast.error(apiErrorMessage(error, 'Couldn’t check that it’s you'));
+      return false;
+    }
+  };
+
   /** Start a restore with `start`, then follow it until it is done. */
   const runRestore = async (start: () => Promise<unknown>) => {
     setRestoring(true);
@@ -455,6 +474,8 @@ const BackupPage: React.FC = () => {
         toast.success('Backup restored. The restored data has its own sign-ins: sign in again.');
         return;
       }
+      // The confirmation lapsed as the restore was sent, and the user closed the prompt.
+      if (isReauthCancelledError(error)) return;
       // The status's reason, or the API's for a refused start (409 running, 404, 413 too large).
       const detail = error instanceof RestoreOutcomeError ? error.message : apiErrorMessage(error, 'the server log has the details');
       toast.error(`Failed to restore backup: ${detail}`);
@@ -472,14 +493,14 @@ const BackupPage: React.FC = () => {
     }
     // The key first: a wrong one is said before a large upload, and before the confirmation.
     const keys = await keysForUpload(selectedFile, 'restore');
-    if (!keys || !(await confirmRestore(selectedFile.name))) return;
-    await runRestore(() => apiRestoreBackup(backupForm(selectedFile, keys)));
+    if (!keys || !(await confirmRestore(selectedFile.name)) || !(await confirmIdentity())) return;
+    await runRestore(() => withReauth(() => apiRestoreBackup(backupForm(selectedFile, keys))));
   };
 
   const restoreFromServer = async (backup: Backup) => {
     const keys = await keysForServer(backup, 'restore');
-    if (!keys || !(await confirmRestore(backup.fileName))) return;
-    await runRestore(() => restoreBackupFromServer(backup.fileName, keys));
+    if (!keys || !(await confirmRestore(backup.fileName)) || !(await confirmIdentity())) return;
+    await runRestore(() => withReauth(() => restoreBackupFromServer(backup.fileName, keys)));
   };
 
   /** Start a verify with `start`, then follow it: the data stays as it is, and the app keeps serving. */
@@ -893,7 +914,8 @@ const BackupPage: React.FC = () => {
               <Text id="backup-file-hint" size="1" color="gray">
                 Restore and Verify ask for the private key of one of the backup keys it was made for (an older .enc backup:
                 the old backup key). The key stays in this browser. Verify restores it into a scratch database, checks it and
-                drops it, while the app keeps running. Here, the app restores only backups this server made; another server’s
+                drops it, while the app keeps running. A restore also asks for your password or a passkey, unless you
+                confirmed one in the last few minutes. Here, the app restores only backups this server made; another server’s
                 goes through the restore command on the server.
               </Text>
             </Flex>
@@ -1113,6 +1135,7 @@ const BackupPage: React.FC = () => {
 
       {/* Confirmation Dialog */}
       <ConfirmationDialog {...dialogProps} />
+      <ReauthDialog {...reauthDialogProps} />
       <BackupKeyPrompt {...promptProps} />
     </PageContainer>
   );
