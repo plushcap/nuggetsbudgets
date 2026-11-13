@@ -215,7 +215,7 @@ services:
       # the app_db_password secret.
       DB_USER: ${DB_USER:-nuggets_app}
       # Migrations (DDL) and backups (whole-DB pg_dump/restore) run as the schema OWNER,
-      # which bypasses RLS; password falls back to the db_password secret. Defaults to the
+      # which bypasses RLS, with the db_password secret as its password. Defaults to the
       # bootstrap owner; set explicitly if you customized POSTGRES_USER.
       MIGRATION_DB_USER: ${MIGRATION_DB_USER:-nuggetsApp_user}
       DB_MAINTENANCE_NAME: ${DB_MAINTENANCE_NAME:-postgres}

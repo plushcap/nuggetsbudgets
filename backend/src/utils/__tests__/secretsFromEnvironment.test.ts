@@ -71,7 +71,16 @@ describe('secrets and the environment', () => {
   });
 
   it("signs the owner in, for migrations and backups alike, with db_password, whatever the retired variables say", () => {
-    writeFileSync(path.join(dir, 'migration_db_password'), 'a-file-nothing-reads');
+    // The secrets are read from the process's own SECRETS_PATH, here this test's directory.
+    process.env.SECRETS_PATH = dir;
+    for (const [name, value] of Object.entries({
+      db_password: 'the-db-password',
+      jwt_secret: 'made-up',
+      session_secret: 'made-up',
+      csrf_secret: 'made-up',
+    })) {
+      writeFileSync(path.join(dir, name), value);
+    }
     const env = {
       NODE_ENV: 'development',
       SECRETS_PATH: dir,
@@ -81,7 +90,6 @@ describe('secrets and the environment', () => {
       BACKUP_DB_PASSWORD: 'made-up',
       BACKUP_DB_USER: 'backups',
     };
-    process.env.DB_PASSWORD = 'the-db-password';
     expect(getOwnerCredentials(env)).toEqual({ user: 'owner', password: 'the-db-password' });
     expect(servingRolePassword({ dbPassword: 'the-db-password', appDbPassword: '' }, env)).toBe('the-db-password');
   });

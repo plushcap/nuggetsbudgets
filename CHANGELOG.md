@@ -37,15 +37,19 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
   one, wins).
 - `MIGRATION_DB_PASSWORD`, `BACKUP_DB_PASSWORD` and `BACKUP_DB_USER` are gone. The database
   owner signs in with `db_password`, the password Postgres gave it, for migrations, backups
-  and restores alike, so a second password or a second backup role (a superuser too) only
-  added a way to get it wrong. Production refuses to start while one is still set.
+  and restores alike: a second owner password could only repeat it. A separate backup role
+  served one case, an external Postgres whose owner isn't a superuser: restoring a backup
+  now needs the owner to be one (grant it for the restore there). Production refuses to start
+  while one of the three reaches the backend: 3.0.0's compose files pass `BACKUP_DB_USER`
+  through, the new ones don't pass it at all.
 
   **Upgrading:** nothing to do with the provided compose files, which pass no secret in the
   environment. If your stack or `.env` sets one of the five secret variables, put its value
   in the secret file named after it (`jwt_secret` for `JWT_SECRET`) and remove the variable.
   If it sets `MIGRATION_DB_PASSWORD`, `BACKUP_DB_PASSWORD` or `BACKUP_DB_USER`, remove it
   (`db_password` must hold the owner's password, as it does with the provided compose files).
-  The server won't start until you do.
+  The server won't start until you do, except for a `BACKUP_DB_USER` that the new compose
+  files no longer pass, which is ignored (backups run as the owner).
 
 ### Fixed
 
