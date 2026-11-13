@@ -53,6 +53,10 @@ Notable changes to Nuggets, newest first. Each release is a git tag `vX.Y.Z`.
 
 ### Changed
 
+- The main menu is reordered: Home, Budgets, Tasks, Close-Out, Goals, Bills, Accounts,
+  Transactions, Agent Activity, Tags, Investments, then Reports, set apart. Dashboard is now
+  **Home** and Activity **Agent Activity** in the menu, and Investments carries a small
+  **Beta** tag.
 - A budget period with transactions can no longer be deleted, which left its transactions
   without a period. **Settings → Budget Periods** offers to archive it instead: an archived
   period leaves the period pickers (the Budget and Close-Out pages, a transaction's period,
