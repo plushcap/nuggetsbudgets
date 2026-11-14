@@ -26,6 +26,7 @@ import { logger } from '../utils/logger';
 import { EMPTY_LIST } from '../utils/emptyList';
 import { useSeededState } from '../hooks/useSeededState';
 import { usePageInRange } from '../hooks/usePageInRange';
+import { SMALLEST_TRANSACTION_PAGE_SIZE, TRANSACTION_PAGE_SIZES, useTransactionPageSize } from '../hooks/useTransactionPageSize';
 import { websiteHref } from '../utils/safeUrls';
 import { formatCalendarMonth } from '../utils/dateUtils';
 import { apiErrorMessage, errorStatus } from '../utils/errors';
@@ -93,7 +94,7 @@ const ViewMerchantPage: React.FC = () => {
   // Pagination for the merchant transactions table: back to the first page when
   // switching merchants.
   const [transactionPage, setTransactionPage] = useSeededState(() => 1, [merchantUuid]);
-  const transactionsPerPage = 25;
+  const [transactionsPerPage, setTransactionsPerPage] = useTransactionPageSize();
   const transactionsQuery = usePaginatedTransactionsQuery(
     transactionPage,
     transactionsPerPage,
@@ -499,8 +500,8 @@ const ViewMerchantPage: React.FC = () => {
                   }
                 />
 
-                {/* Pagination Controls */}
-                {totalTransactions > transactionsPerPage && (
+                {/* Pagination Controls: whenever the size could change what shows, so a choice can be taken back. */}
+                {totalTransactions > SMALLEST_TRANSACTION_PAGE_SIZE && (
                   <Box mt="4">
                     <SharedPagination
                       currentPage={transactionPage}
@@ -509,6 +510,8 @@ const ViewMerchantPage: React.FC = () => {
                       itemsPerPage={transactionsPerPage}
                       onPageChange={setTransactionPage}
                       itemLabel="transactions"
+                      pageSizeOptions={TRANSACTION_PAGE_SIZES}
+                      onItemsPerPageChange={setTransactionsPerPage}
                     />
                   </Box>
                 )}

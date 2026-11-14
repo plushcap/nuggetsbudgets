@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -79,6 +79,8 @@ const page = () => (
 );
 const renderPage = () => render(page());
 
+afterEach(() => localStorage.removeItem('transaction-page-size'));
+
 describe('ViewBudgetItemPage transactions', () => {
   it('lists the spending newest first, without split parents', async () => {
     scoped.data = [
@@ -94,32 +96,65 @@ describe('ViewBudgetItemPage transactions', () => {
   });
 
   it('goes back to the first page of the list when the window changes', async () => {
-    scoped.data = Array.from({ length: 30 }, (_, i) => tx(i + 1, `2026-09-${String(i + 1).padStart(2, '0')}`));
+    // Two pages of 50, the default size.
+    scoped.data = Array.from({ length: 60 }, (_, i) => tx(i + 1, `2026-09-${String((i % 30) + 1).padStart(2, '0')}`));
     renderPage();
     const pages = await screen.findByRole('button', { name: 'Page 2' });
     await userEvent.click(pages);
     expect(screen.getByRole('button', { name: 'Page 2' })).toHaveAttribute('aria-current', 'page');
 
     await userEvent.click(screen.getByRole('button', { name: '3 months' }));
-    expect(await screen.findByText('30 transactions in the last 3 months')).toBeInTheDocument();
+    expect(await screen.findByText('60 transactions in the last 3 months')).toBeInTheDocument();
     const pagination = screen.getByRole('button', { name: 'Page 1' });
     expect(pagination).toHaveAttribute('aria-current', 'page');
-    expect(within(document.body).queryAllByText('purchase 30').length).toBeGreaterThan(0);
+    expect(within(document.body).queryAllByText('purchase 60').length).toBeGreaterThan(0);
   });
 
   // After transactions were moved or deleted while a later page was open, the
   // list showed an empty page.
   it('goes back to the last page when the list shrinks under the page shown', async () => {
-    scoped.data = Array.from({ length: 60 }, (_, i) => tx(i + 1, `2026-10-${String((i % 28) + 1).padStart(2, '0')}`));
+    // Three pages of 50, the default size.
+    scoped.data = Array.from({ length: 120 }, (_, i) => tx(i + 1, `2026-10-${String((i % 28) + 1).padStart(2, '0')}`));
     const { rerender } = renderPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Page 3' }));
     expect(screen.getByRole('button', { name: 'Page 3' })).toHaveAttribute('aria-current', 'page');
 
-    scoped.data = scoped.data.slice(0, 40); // two pages of 25 now
+    scoped.data = scoped.data.slice(0, 80); // two pages now
     rerender(page());
-    expect(await screen.findByText('40 transactions in the last 1 month')).toBeInTheDocument();
+    expect(await screen.findByText('80 transactions in the last 1 month')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Page 2' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getAllByText(/^purchase \d+$/).length).toBeGreaterThan(0);
+  });
+
+  it('shows pages of the rows-per-page size chosen in its footer, from the page holding the first row shown', async () => {
+    // jsdom lacks the pointer-capture APIs Radix Select calls.
+    Object.assign(window.HTMLElement.prototype, { hasPointerCapture: () => false, releasePointerCapture: () => {}, scrollIntoView: () => {} });
+    scoped.data = Array.from({ length: 120 }, (_, i) => tx(i + 1, `2026-10-${String((i % 28) + 1).padStart(2, '0')}`));
+    renderPage();
+    expect(await screen.findByText('Showing 1 to 50 of 120 transactions')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Page 2' }));
+
+    // Page 2 of 50 starts at row 51, which is on page 3 of 25.
+    await userEvent.click(screen.getByRole('combobox', { name: 'Rows per page' }));
+    await userEvent.click(await screen.findByRole('option', { name: '25' }));
+    expect(await screen.findByText('Showing 51 to 75 of 120 transactions')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Page 3' })).toHaveAttribute('aria-current', 'page');
+    expect(localStorage.getItem('transaction-page-size')).toBe('25');
+  });
+
+  // The footer holds the picker: shown while a size could change what shows, so someone who
+  // chose 200 can choose again with every row on one page.
+  it('shows the footer for more rows than the smallest size, on one page too, and not for fewer', async () => {
+    scoped.data = Array.from({ length: 40 }, (_, i) => tx(i + 1, `2026-10-${String((i % 28) + 1).padStart(2, '0')}`));
+    const { unmount } = renderPage();
+    expect(await screen.findByText('Showing 1 to 40 of 40 transactions')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Rows per page' })).toHaveTextContent('50');
+    unmount();
+
+    scoped.data = scoped.data.slice(0, 25);
+    renderPage();
+    expect(await screen.findByText('25 transactions in the last 1 month')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Rows per page' })).not.toBeInTheDocument();
   });
 
   it('charts the net of an income and an expense on the same item, not their sum', async () => {

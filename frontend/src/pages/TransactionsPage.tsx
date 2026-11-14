@@ -17,6 +17,7 @@ import { Button, Box } from '@radix-ui/themes';
 import PageHeader from '../components/PageHeader';
 import { useSeededState } from '../hooks/useSeededState';
 import { usePageInRange } from '../hooks/usePageInRange';
+import { TRANSACTION_PAGE_SIZES, useTransactionPageSize } from '../hooks/useTransactionPageSize';
 import PageContainer from '../components/PageContainer';
 
 const TransactionsPage: React.FC = () => {
@@ -55,7 +56,8 @@ const TransactionsPage: React.FC = () => {
 
   // Paginated transactions, keyed on the filters + page.
   const filterParams = useMemo(() => buildTransactionFilterParams(filters), [filters]);
-  const transactionsQuery = usePaginatedTransactionsQuery(currentPage, 30, filterParams);
+  const [pageSize, setPageSize] = useTransactionPageSize();
+  const transactionsQuery = usePaginatedTransactionsQuery(currentPage, pageSize, filterParams);
 
   // Back to the last page when the list shrinks under the one shown: after deletes, or
   // when the last transactions on the last page are moved out of the filter. An answer still being fetched (the
@@ -185,9 +187,11 @@ const TransactionsPage: React.FC = () => {
             currentPage={pagination.currentPage}
             totalPages={pagination.totalPages}
             totalItems={pagination.totalTransactions}
-            itemsPerPage={30}
+            itemsPerPage={pageSize}
             onPageChange={handlePageChange}
             itemLabel="transactions"
+            pageSizeOptions={TRANSACTION_PAGE_SIZES}
+            onItemsPerPageChange={setPageSize}
           />
         </Box>
       )}

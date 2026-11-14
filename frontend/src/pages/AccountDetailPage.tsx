@@ -29,6 +29,7 @@ import { formatMoney } from '@nuggets/shared';
 import { textColorProps } from '../utils/textColor';
 import PageLoader from '../components/PageLoader';
 import { usePageInRange } from '../hooks/usePageInRange';
+import { TRANSACTION_PAGE_SIZES, useTransactionPageSize } from '../hooks/useTransactionPageSize';
 import PageContainer from '../components/PageContainer';
 
 const AccountDetailPage: React.FC = () => {
@@ -73,9 +74,10 @@ const AccountDetailPage: React.FC = () => {
   // Account transactions. Uses the global React Query defaults
   // (refetchOnWindowFocus: false); mutation invalidation already refreshes this
   // list after in-app edits, so the per-focus refetch override was redundant.
+  const [pageSize, setPageSize] = useTransactionPageSize();
   const transactionParams = useMemo(
-    () => ({ page: currentPage, limit: 20, ...buildAccountTransactionFilterParams(filters) }),
-    [currentPage, filters],
+    () => ({ page: currentPage, limit: pageSize, ...buildAccountTransactionFilterParams(filters) }),
+    [currentPage, pageSize, filters],
   );
   const transactionsQuery = useAccountTransactionsQuery(uuid, transactionParams);
 
@@ -379,9 +381,11 @@ const AccountDetailPage: React.FC = () => {
               currentPage={pagination.currentPage}
               totalPages={pagination.totalPages}
               totalItems={pagination.totalTransactions}
-              itemsPerPage={20}
+              itemsPerPage={pageSize}
               onPageChange={handlePageChange}
               itemLabel="transactions"
+              pageSizeOptions={TRANSACTION_PAGE_SIZES}
+              onItemsPerPageChange={setPageSize}
             />
           )}
       </Flex>
