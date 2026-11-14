@@ -86,6 +86,8 @@ describe.skipIf(!runnable)('a shutdown while a backup is restored', () => {
   let backupFile: { filePath: string; fileName: string };
   /** The backup's file key, as the browser sends it: each restore job gets a copy (it zeroes its own). */
   let fileKey: Buffer;
+  /** The deployment admin restoring. */
+  let restorerId: number;
   const clients: Client[] = [];
 
   const ownerQuery = async <T extends object = Record<string, unknown>>(database: string, sql: string, params: unknown[] = []) => {
@@ -273,7 +275,7 @@ describe.skipIf(!runnable)('a shutdown while a backup is restored', () => {
     const restore = () =>
       job.startRestoreJob(
         { pool, backupService, schedulers: lifecycle },
-        { filePath: backupFile.filePath, fileName: backupFile.fileName, key: null, fileKey: Buffer.from(fileKey), deleteAfter: false, userId: 1 }
+        { filePath: backupFile.filePath, fileName: backupFile.fileName, key: null, fileKey: Buffer.from(fileKey), deleteAfter: false, userId: restorerId }
       );
     return { lifecycle, backupService, Backups, ShuttingDownError, job, restore, exits };
   }
@@ -293,6 +295,12 @@ describe.skipIf(!runnable)('a shutdown while a backup is restored', () => {
     } finally {
       await migrationPool.end();
     }
+
+    // The person restoring: a deployment admin who can sign in, in the backup's data too (a
+    // restore refuses one that would leave them unable to manage the server).
+    const [admin] = await ownerQuery<{ id: number }>(location.database, "INSERT INTO users (email, password_hash) VALUES ('restorer@shutdown.test', 'not-a-hash') RETURNING id");
+    restorerId = admin!.id;
+    await ownerQuery(location.database, "INSERT INTO deployment_users (user_id, deployment_id, role) SELECT $1, id, 'admin' FROM deployment ORDER BY id LIMIT 1", [restorerId]);
 
     // The backup every test restores; the marker row is made after it, so a restore that
     // replaced the data removes it.

@@ -4,6 +4,7 @@ import { Pool } from 'pg';
 import { createTestTenant, type TestTenant } from '../../test/testTenant.js';
 import {
   purgeEndedSessions,
+  purgeOldBackupRuns,
   purgeTenant,
   purgeOldPriceSyncRuns,
   retentionPolicy,
@@ -78,6 +79,50 @@ describe('Retention', () => {
     // The live session it was rotated from is gone; the foreign key let it go.
     const { rows } = await owner.query('SELECT rotated_from_session_id FROM sessions WHERE id = $1', [live]);
     expect(rows[0].rotated_from_session_id).toBeNull();
+  });
+
+  it('deletes the record of a backup a year after its file went, and keeps one whose file is there', async () => {
+    const tag = randomBytes(4).toString('hex');
+    const name = (what: string) => `nuggets_backup_${what}_${tag}.tar.age`;
+    const backupRun = async (days: number, fileName: string | null, goneDays: number | null = null) =>
+      (
+        await owner.query<{ id: number }>(
+          `INSERT INTO backup_runs (started_at, finished_at, trigger, outcome, message, file_name, file_gone_at)
+           VALUES (now() - make_interval(days => $1), now() - make_interval(days => $1), 'scheduled', $2, $3, $4,
+                   CASE WHEN $5::int IS NULL THEN NULL ELSE now() - make_interval(days => $5::int) END) RETURNING id`,
+          [days, fileName ? 'succeeded' : 'failed', fileName ? null : 'no key', fileName, goneDays]
+        )
+      ).rows[0].id;
+    const goneJustNow = await backupRun(800, name('gone-now'));
+    const goneAYearAgo = await backupRun(800, name('gone-long'), 400);
+    const goneRecently = await backupRun(800, name('gone-recently'), 30);
+    const backAgain = await backupRun(800, name('back'), 400);
+    const stillThere = await backupRun(4000, name('kept'));
+    const failedLongAgo = await backupRun(400, null);
+    const failedRecently = await backupRun(30, null);
+    const all = [goneJustNow, goneAYearAgo, goneRecently, backAgain, stillThere, failedLongAgo, failedRecently];
+    const goneAt = async (id: number) => (await owner.query('SELECT file_gone_at FROM backup_runs WHERE id = $1', [id])).rows[0].file_gone_at;
+
+    expect(await purgeOldBackupRuns([name('kept'), name('back'), 'nuggets_backup_other.tar.age'])).toBeGreaterThanOrEqual(2);
+    // A file gone today is noted, not deleted; one gone a year ago goes; one back is kept and cleared.
+    expect(await idsIn('backup_runs', all)).toEqual([goneJustNow, goneRecently, backAgain, stillThere, failedRecently]);
+    expect(await goneAt(goneJustNow)).not.toBeNull();
+    expect(await goneAt(backAgain)).toBeNull();
+    expect(await goneAt(stillThere)).toBeNull();
+
+    // A backup directory that can't be read notes nothing and deletes nothing: the job fails, and says so.
+    const unreadable = await backupRun(800, name('unread'), 400);
+    await expect(
+      runRetention(policy, {
+        tenantIds: [],
+        organizationIds: [],
+        backupFileNames: async () => {
+          throw new Error('EACCES');
+        },
+      })
+    ).rejects.toThrow(/backup_runs/);
+    expect(await idsIn('backup_runs', [unreadable, goneJustNow])).toEqual([goneJustNow, unreadable]);
+    await owner.query('DELETE FROM backup_runs WHERE id = ANY($1)', [[goneJustNow, goneRecently, backAgain, stillThere, failedRecently, unreadable]]);
   });
 
   it("deletes price-sync runs older than RETENTION_SYNC_LOG_DAYS, keeping each organization's newest", async () => {

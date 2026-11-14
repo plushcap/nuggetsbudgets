@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { BACKUP_SETTING_KEYS, type BackupFile, type StoredSetting } from '@nuggets/shared';
 import {
@@ -13,7 +14,9 @@ import { logger } from '../utils/logger';
 import { useSeededState } from '../hooks/useSeededState';
 import { errorMessage, errorDetailsText, apiErrorMessage } from '../utils/errors';
 import { useConfirmation } from '../hooks/useConfirmation';
+import { isReauthCancelledError, useReauth } from '../hooks/useReauth';
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import ReauthDialog from '../components/ReauthDialog';
 import SettingsPageHeader from '../components/SettingsPageHeader';
 import OneDriveSync from '../components/OneDriveSync';
 import DeploymentTimeZoneCard from '../components/DeploymentTimeZoneCard';
@@ -35,8 +38,10 @@ import {
 } from '../services/api';
 import type { BackupKeyAnswer, RestoreStatus, VerifyStatus } from '../services/api/backup';
 import { SessionExpiredError } from '../services/api/base';
-import { useBackupKeysQuery, useBackupSchedulerStatusQuery, useBackupSettingsQuery } from '../hooks/queries';
+import { backupRunsQueryKey, useBackupKeysQuery, useBackupRunsQuery, useBackupSchedulerStatusQuery, useBackupSettingsQuery } from '../hooks/queries';
 import BackupKeysCard from '../components/backup/BackupKeysCard';
+import BackupRunsCard, { VerifiedLine } from '../components/backup/BackupRunsCard';
+import LastRestoreCallout from '../components/backup/LastRestoreCallout';
 import BackupKeyPrompt, { useBackupKeyPrompt } from '../components/backup/BackupKeyPrompt';
 import { backupFormatOf, headerOfFile } from '../utils/ageKeys';
 import { formatInstantDate } from '../utils/dateUtils';
@@ -108,8 +113,8 @@ async function waitForVerify(onProgress: (status: VerifyStatus) => void): Promis
 /**
  * Wait for the restore the server started to finish: it runs in the background (it can
  * take longer than a proxy waits for an answer). Resolves when it completed; throws with
- * the server's reason when it failed, or SignInReplacedError when the restored data no
- * longer has this sign-in, which only happens once the data has been replaced.
+ * the server's reason when it failed, or SignInReplacedError once the data has been replaced:
+ * a restore ends every sign-in, this one too.
  */
 async function waitForRestore(onProgress: (status: RestoreStatus) => void): Promise<RestoreStatus> {
   const deadline = Date.now() + RESTORE_WAIT_MS;
@@ -136,6 +141,12 @@ async function waitForRestore(onProgress: (status: RestoreStatus) => void): Prom
 
 const BackupPage: React.FC = () => {
   const { confirmAsync, dialogProps } = useConfirmation();
+  const { withReauth, ensureReauthenticated, dialogProps: reauthDialogProps } = useReauth();
+  const queryClient = useQueryClient();
+  // The record of backups: each listed file's last verify.
+  const runsQuery = useBackupRunsQuery();
+  const runByFile = useMemo(() => new Map((runsQuery.data?.runs ?? []).map((run) => [run.fileName, run])), [runsQuery.data]);
+  const refreshRuns = useCallback(() => void queryClient.invalidateQueries({ queryKey: backupRunsQueryKey }), [queryClient]);
   const [backups, setBackups] = useState<Backup[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
@@ -250,6 +261,7 @@ const BackupPage: React.FC = () => {
 
   const reloadBackups = () => {
     setLoading(true);
+    refreshRuns();
     return fetchBackups();
   };
 
@@ -434,10 +446,27 @@ const BackupPage: React.FC = () => {
       details: [
         'All current financial data, user accounts and settings are replaced by the backup\'s',
         'All uploaded files and attachments are replaced',
-        'Nothing can be changed while it runs, and you may have to sign in again afterwards',
+        'Nothing can be changed while it runs',
+        'Everyone is signed out afterwards, you too: sign in with the email you had when the backup was made (a password changed since still works)',
         'The data from before is kept on the server until the next restore',
       ],
     });
+
+  /**
+   * A restore takes step-up: the password or a passkey, unless confirmed in the last few
+   * minutes. Asked here, before anything is sent: the server checks it before it reads an
+   * upload, but a browser may send the whole file before it reads the refusal. False when the
+   * user closed the prompt, or the check failed (said).
+   */
+  const confirmIdentity = async (): Promise<boolean> => {
+    try {
+      await ensureReauthenticated();
+      return true;
+    } catch (error) {
+      if (!isReauthCancelledError(error)) toast.error(apiErrorMessage(error, 'Couldn’t check that it’s you'));
+      return false;
+    }
+  };
 
   /** Start a restore with `start`, then follow it until it is done. */
   const runRestore = async (start: () => Promise<unknown>) => {
@@ -452,9 +481,12 @@ const BackupPage: React.FC = () => {
       setTimeout(() => window.location.reload(), 3000);
     } catch (error) {
       if (error instanceof SignInReplacedError) {
-        toast.success('Backup restored. The restored data has its own sign-ins: sign in again.');
+        // Signed out by the swap: how the restore ended (the uploads come after it) shows once signed in.
+        toast.success('The restore signed everyone out: sign in again, and this page shows how it went.', { duration: 10000 });
         return;
       }
+      // The confirmation lapsed as the restore was sent, and the user closed the prompt.
+      if (isReauthCancelledError(error)) return;
       // The status's reason, or the API's for a refused start (409 running, 404, 413 too large).
       const detail = error instanceof RestoreOutcomeError ? error.message : apiErrorMessage(error, 'the server log has the details');
       toast.error(`Failed to restore backup: ${detail}`);
@@ -472,14 +504,14 @@ const BackupPage: React.FC = () => {
     }
     // The key first: a wrong one is said before a large upload, and before the confirmation.
     const keys = await keysForUpload(selectedFile, 'restore');
-    if (!keys || !(await confirmRestore(selectedFile.name))) return;
-    await runRestore(() => apiRestoreBackup(backupForm(selectedFile, keys)));
+    if (!keys || !(await confirmRestore(selectedFile.name)) || !(await confirmIdentity())) return;
+    await runRestore(() => withReauth(() => apiRestoreBackup(backupForm(selectedFile, keys))));
   };
 
   const restoreFromServer = async (backup: Backup) => {
     const keys = await keysForServer(backup, 'restore');
-    if (!keys || !(await confirmRestore(backup.fileName))) return;
-    await runRestore(() => restoreBackupFromServer(backup.fileName, keys));
+    if (!keys || !(await confirmRestore(backup.fileName)) || !(await confirmIdentity())) return;
+    await runRestore(() => withReauth(() => restoreBackupFromServer(backup.fileName, keys)));
   };
 
   /** Start a verify with `start`, then follow it: the data stays as it is, and the app keeps serving. */
@@ -498,6 +530,8 @@ const BackupPage: React.FC = () => {
       toast.error(`The backup did not verify: ${detail}`);
       logger.error({ err: error }, 'Failed to verify backup');
     } finally {
+      // The record shows the verify, passed or failed.
+      refreshRuns();
       setVerifying(false);
       setVerifyPhase(null);
     }
@@ -608,6 +642,9 @@ const BackupPage: React.FC = () => {
         iconBackground="bg-[var(--accent-3)]"
         backPath="/settings"
       />
+
+      {/* What the last restore did, once its admin has signed in again */}
+      <LastRestoreCallout />
 
       {/* The deployment's time zone: the backup schedule's, and every ledger's without its own */}
       <DeploymentTimeZoneCard />
@@ -893,7 +930,8 @@ const BackupPage: React.FC = () => {
               <Text id="backup-file-hint" size="1" color="gray">
                 Restore and Verify ask for the private key of one of the backup keys it was made for (an older .enc backup:
                 the old backup key). The key stays in this browser. Verify restores it into a scratch database, checks it and
-                drops it, while the app keeps running. Here, the app restores only backups this server made; another server’s
+                drops it, while the app keeps running. A restore also asks for your password or a passkey, unless you
+                confirmed one in the last few minutes. Here, the app restores only backups this server made; another server’s
                 goes through the restore command on the server.
               </Text>
             </Flex>
@@ -1012,6 +1050,7 @@ const BackupPage: React.FC = () => {
                             </Text>
                           </Flex>
                         ) : null}
+                        <VerifiedLine run={runByFile.get(backup.fileName)} />
                       </Flex>
                     </Flex>
 
@@ -1111,8 +1150,12 @@ const BackupPage: React.FC = () => {
         </Flex>
       </Card>
 
+      {/* Every run, failures too, and each one's last verify */}
+      <BackupRunsCard />
+
       {/* Confirmation Dialog */}
       <ConfirmationDialog {...dialogProps} />
+      <ReauthDialog {...reauthDialogProps} />
       <BackupKeyPrompt {...promptProps} />
     </PageContainer>
   );

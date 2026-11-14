@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  getBackupSettings, getBackupSchedulerStatus, getBackupKeys,
+  getBackupSettings, getBackupSchedulerStatus, getBackupKeys, getBackupRuns, getRestoreStatus,
   getDeploymentSettings, updateDeploymentSettings,
   getOneDriveStatus,
   getUserPasskeys, getAdminUserPasskeys, getSimpleFinAccounts, getSimpleFinAccountTransactions,
@@ -100,6 +100,16 @@ export function useBackupSchedulerStatusQuery(options?: QueryOverrides) {
 export const backupKeysQueryKey = ['backups', 'keys'] as const;
 export function useBackupKeysQuery(options?: QueryOverrides) {
   return useQuery({ queryKey: backupKeysQueryKey, queryFn: getBackupKeys, ...options });
+}
+
+/** The record of backups (runs, failures too, and their verifies). */
+export const backupRunsQueryKey = ['backups', 'runs'] as const;
+export function useBackupRunsQuery(options?: QueryOverrides) {
+  return useQuery({ queryKey: backupRunsQueryKey, queryFn: getBackupRuns, ...options });
+}
+/** The restore running, or the last one since the server started: after a restore, what it did. */
+export function useLastRestoreQuery(options?: QueryOverrides) {
+  return useQuery({ queryKey: ['backups', 'restore-status'], queryFn: getRestoreStatus, ...options });
 }
 
 // ------------------------------------------------------ deployment settings

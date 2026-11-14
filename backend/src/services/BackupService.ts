@@ -67,6 +67,10 @@ import {
   tooManyBackupKeys,
 } from './backup/errors.js';
 import { runPgTool, terminatePgTools } from '../utils/pgTools.js';
+import { countPublicTables, rowCountMismatch } from './backup/rowCounts.js';
+import { listBackupRuns, recordBackupRun, recordVerify, type BackupRunTrigger, type BackupVerifyOutcome } from './backup/backupRuns.js';
+import { publicErrorMessage } from '../utils/apiError.js';
+import { applyCarryOver, readRunningState, RestoreCarryOverRefusal, type CarryOverReport, type RunningState } from './backup/restoreCarryOver.js';
 import { ZipArchive } from 'archiver';
 import { sql } from 'kysely';
 import { config } from '../config.js';
@@ -90,6 +94,8 @@ export interface BackupManifest {
   backupId?: string;
   /** The fingerprints of the keys an age backup was encrypted to. */
   recipients?: string[];
+  /** The rows in each table of the dump, as it was made (an age backup's; format 5). */
+  rowCounts?: Record<string, number>;
 }
 
 /** What holds the backup lock: this process's backup, restore or verify, or another process. */
@@ -269,6 +275,17 @@ export interface RestoreOptions {
   onPhase?: (phase: RestorePhase) => void;
   /** Runs after every check has passed, just before the data is replaced: may still refuse. */
   beforeSwap?: () => Promise<void>;
+  /**
+   * The web restore's person, by their id in the running data: refused unless they are a
+   * deployment admin who can sign in in the restored data. Null (the restore command):
+   * refused only when the restored data has no such admin at all.
+   */
+  restorerId?: number | null;
+  /**
+   * Take nothing from the running database (the restore command's --ignore-current-database,
+   * for when it can't be trusted or read): sessions and tokens are still ended.
+   */
+  ignoreCurrentDatabase?: boolean;
 }
 
 export interface RestoreResult {
@@ -291,6 +308,11 @@ export interface RestoreResult {
    * why). Null when there was no cutover.
    */
   cutover: { drift: SchemaDrift | null } | null;
+  /**
+   * What the restore ended, took from the running server and kept before the swap
+   * (restoreCarryOver.ts); null for a verify.
+   */
+  carryOver: CarryOverReport | null;
 }
 
 /** A backup in the backup directory, as listBackups lists it. */
@@ -310,6 +332,14 @@ export interface CreatedBackup {
   fileSize: number;
   /** The SHA-256 of the file as written (an age backup's), or null (an .enc one). */
   sha256: string | null;
+  /** The fingerprints of the keys it was encrypted to (none for an .enc one). */
+  recipients: string[];
+}
+
+/** What started a backup, and who (the Backup page's, or Data Management's, person). */
+export interface CreateBackupOptions {
+  trigger?: BackupRunTrigger;
+  startedBy?: number | null;
 }
 
 export interface BackupServiceOptions {
@@ -914,15 +944,68 @@ export class BackupService {
    * Two that ran together could share a temp directory, and one's cleanup deleted the
    * other's dump.
    */
-  async createBackup(): Promise<CreatedBackup> {
+  async createBackup(options: CreateBackupOptions = {}): Promise<CreatedBackup> {
     // Claimed before the first await, so two calls in this process can't both get past it.
     // Refused (ShuttingDownError) once a shutdown has begun.
     const { release } = claimOperation('backup', this.location.database);
+    const startedAt = new Date();
+    const run = { startedAt, trigger: options.trigger ?? 'manual', startedBy: options.startedBy ?? null };
     try {
-      return await this.withBackupLock(() => this.createBackupLocked());
+      const created = await this.withBackupLock(() => this.createBackupLocked());
+      await this.recordRun({
+        ...run,
+        outcome: 'succeeded',
+        message: null,
+        fileName: created.fileName,
+        fileSize: created.fileSize,
+        sha256: created.sha256,
+        recipients: created.recipients,
+      });
+      return created;
+    } catch (error) {
+      // Held up by another backup or restore, or the shutdown: no run, nothing failed.
+      if (!(error instanceof BackupInProgressError) && !(error instanceof ShuttingDownError)) {
+        await this.recordRun({
+          ...run,
+          outcome: 'failed',
+          message: publicErrorMessage(error, 'The backup failed; the server log says why.'),
+          fileName: null,
+          fileSize: null,
+          sha256: null,
+          recipients: [],
+        });
+      }
+      throw error;
     } finally {
       release();
     }
+  }
+
+  /** Records a run in backup_runs; a failure to is logged, never the backup's outcome. */
+  private async recordRun(run: Omit<Parameters<typeof recordBackupRun>[1], 'finishedAt'>): Promise<void> {
+    try {
+      await recordBackupRun(this.settingsDb(), { ...run, finishedAt: new Date() });
+    } catch (error) {
+      logger.error({ err: error, fileName: run.fileName, outcome: run.outcome }, 'Could not record the backup run');
+    }
+  }
+
+  /**
+   * Record a verify of a backup (the web app's, or the restore command's: verifiedBy null).
+   * Logged, never thrown: the verify's outcome is what it is either way.
+   */
+  async recordVerify(fileName: string, verifiedBy: number | null, outcome: BackupVerifyOutcome, message: string | null): Promise<void> {
+    try {
+      const recorded = await recordVerify(this.settingsDb(), { fileName, verifiedBy, outcome, message });
+      if (!recorded) logger.info({ fileName, outcome }, 'Verified a backup this server has no run of');
+    } catch (error) {
+      logger.error({ err: error, fileName, outcome }, 'Could not record the verify');
+    }
+  }
+
+  /** The newest backup runs, for the Backup page. */
+  async listRuns(): Promise<Awaited<ReturnType<typeof listBackupRuns>>> {
+    return listBackupRuns(this.settingsDb());
   }
 
   /**
@@ -1040,7 +1123,7 @@ export class BackupService {
     try {
       tempDir = await this.makeWorkDir(backupId);
       logger.info({ backupId }, 'Creating database dump');
-      const dumpFile = await this.createDatabaseDump(tempDir, backupId);
+      const { dumpFile, rowCounts } = await this.createDatabaseDump(tempDir, backupId);
 
       await fs.mkdir(this.backupLocation, { recursive: true });
       const signer = await this.encryptionService.getBackupSigner();
@@ -1056,6 +1139,7 @@ export class BackupService {
             appVersion: appVersion(),
             schemaVersion: await this.readSchemaVersion(),
             recipients: recipients.map(recipientFingerprint),
+            rowCounts,
           },
           signer,
           onUploadsListed: ({ files, bytes, skipped }) => {
@@ -1079,7 +1163,7 @@ export class BackupService {
       await fs.rm(tempDir, { recursive: true, force: true });
       tempDir = null;
       logger.info({ fileName, sizeMB: (written.size / 1024 / 1024).toFixed(2), sha256: written.sha256 }, 'Backup created successfully');
-      return { filePath: finalPath, fileName, fileSize: written.size, sha256: written.sha256 };
+      return { filePath: finalPath, fileName, fileSize: written.size, sha256: written.sha256, recipients: recipients.map(recipientFingerprint) };
     } catch (error) {
       if (tempDir) await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
       if (partialWritten) await fs.rm(partialPath, { force: true }).catch(() => {});
@@ -1097,7 +1181,8 @@ export class BackupService {
       tempDir = await this.makeWorkDir(backupId);
 
       logger.info({ backupId }, 'Creating database dump');
-      const dumpFile = await this.createDatabaseDump(tempDir, backupId);
+      // The older format has no row counts.
+      const { dumpFile } = await this.createDatabaseDump(tempDir, backupId);
 
       // The version manifest (lets restore check compatibility before touching the database).
       const manifestFile = await this.writeManifest(tempDir);
@@ -1112,7 +1197,7 @@ export class BackupService {
       await fs.rm(tempDir, { recursive: true, force: true });
       const stats = await fs.stat(finalPath);
       logger.info({ fileName: path.basename(finalPath), sizeMB: (stats.size / 1024 / 1024).toFixed(2) }, 'Backup created successfully');
-      return { filePath: finalPath, fileName: path.basename(finalPath), fileSize: stats.size, sha256: null };
+      return { filePath: finalPath, fileName: path.basename(finalPath), fileSize: stats.size, sha256: null, recipients: [] };
     } catch (error) {
       if (tempDir) await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
       throw new Error(`Backup creation failed: ${errorMessage(error)}`, { cause: error });
@@ -1122,16 +1207,45 @@ export class BackupService {
   /**
    * Create a PostgreSQL dump of the app's database (DB_NAME), as the schema owner.
    */
-  private async createDatabaseDump(tempDir: string, backupId: string): Promise<string> {
+  private async createDatabaseDump(tempDir: string, backupId: string): Promise<{ dumpFile: string; rowCounts: Record<string, number> }> {
     const dumpFile = path.join(tempDir, `${backupId}.dump`);
     const owner = this.owner();
     logger.info({ dbHost: this.location.host, dbPort: this.location.port, database: this.location.database }, 'Creating database dump using pg_dump');
 
+    // The rows are counted in the snapshot pg_dump dumps: exported by a read-only
+    // transaction that stays open until pg_dump is done. Row security off: a table it would
+    // filter errors (as pg_dump's own queries do) rather than undercounts.
+    const snapshotHolder = await this.connect(this.location.database);
+    try {
+      await snapshotHolder.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      await snapshotHolder.query('SET LOCAL row_security = off');
+      // It sits idle in its transaction for as long as pg_dump runs: a server's
+      // idle_in_transaction_session_timeout (the compose files set 10 minutes) would end it,
+      // and the backup, part way through a large dump. pg_dump turns them off for itself.
+      await snapshotHolder.query('SET LOCAL idle_in_transaction_session_timeout = 0');
+      await snapshotHolder.query('SET LOCAL transaction_timeout = 0');
+      await snapshotHolder.query('SET LOCAL statement_timeout = 0');
+      const { rows } = await snapshotHolder.query<{ snapshot: string }>('SELECT pg_export_snapshot() AS snapshot');
+      const snapshot = oneRow(rows, 'pg_export_snapshot()').snapshot;
+      const rowCounts = await countPublicTables(snapshotHolder);
+      await this.runPgDump(dumpFile, owner, snapshot);
+      await snapshotHolder.query('COMMIT');
+      return { dumpFile, rowCounts };
+    } finally {
+      await snapshotHolder.end().catch(() => {});
+    }
+  }
+
+  /** pg_dump of the app's database into `dumpFile`, as the owner, of the exported `snapshot`. */
+  private async runPgDump(dumpFile: string, owner: DbCredentials, snapshot: string): Promise<void> {
     const result = await runPgTool('pg_dump', [
       '-h', this.location.host,
       '-p', String(this.location.port),
       '-U', owner.user,
       '-d', this.location.database,
+      `--snapshot=${snapshot}`,
+      // A lock it can't get in that time fails the backup rather than waiting for ever.
+      '--lock-wait-timeout=30s',
       // Ownership is stripped (--no-owner) for portability across installs. GRANTs stay in
       // the dump, though a restore re-applies the serving role's from the code instead.
       '--no-owner',
@@ -1150,7 +1264,6 @@ export class BackupService {
       logger.error({ errorOutput: result.stderr, code: result.code, signal: result.signal }, 'pg_dump failed');
       throw new Error(`pg_dump failed with ${result.signal ? `signal ${result.signal}` : `code ${result.code}`}: ${result.stderr}`);
     }
-    return dumpFile;
   }
 
   /** The newest applied migration (schema_migrations, which isn't tenant-scoped), or null. */
@@ -1498,6 +1611,9 @@ export class BackupService {
         await roleLock.end().catch(() => {});
       }
       await this.handOverToOwner(scratch);
+      // What pg_restore put back, before the migrations change any rows: the rows the backup
+      // counted as it was made (format 5; an older backup has no counts).
+      if (manifest?.rowCounts) await this.assertRowCountsMatch(scratch, manifest.rowCounts);
 
       phase('migrating');
       const cutover = await this.migrateDatabase(scratch);
@@ -1513,8 +1629,14 @@ export class BackupService {
 
       if (options.verifyOnly) {
         await this.dropDatabase(scratch);
-        return { manifest, format, signature, signer, rowCounts, previousDatabase: null, previousUploads: null, uploadedFilesRestored: 0, cutover };
+        return { manifest, format, signature, signer, rowCounts, previousDatabase: null, previousUploads: null, uploadedFilesRestored: 0, cutover, carryOver: null };
       }
+
+      // Sign-ins ended, the running server's state taken over, and a restore that would leave
+      // no one able to manage the server refused, all in the scratch database (a verify skips it).
+      // Signed with this server's own key: its sealed secrets open here.
+      const signedHere = signature === 'valid' && signer !== null && signer === (await this.signerPublicId().catch(() => null));
+      const carryOver = await this.carryOver(live, scratch, manifest, options, signedHere);
 
       await options.beforeSwap?.();
 
@@ -1564,6 +1686,7 @@ export class BackupService {
         previousUploads: uploads.previous,
         uploadedFilesRestored: uploads.restored,
         cutover,
+        carryOver,
       };
     } catch (error) {
       if (scratchCreated) {
@@ -1715,6 +1838,7 @@ export class BackupService {
       createdAt: bundleManifest.createdAt,
       backupId: bundleManifest.backupId,
       recipients: bundleManifest.recipients,
+      ...('rowCounts' in bundleManifest ? { rowCounts: bundleManifest.rowCounts } : {}),
     };
     return { manifest, signature: checked.signature, signer: checked.signer, format: 'age', dumpFile: path.join(extractDir, 'database.dump') };
   }
@@ -2041,6 +2165,75 @@ export class BackupService {
     }
   }
 
+  /**
+   * What a restore takes from the running server (`live`) and ends, applied to the restored
+   * data (`scratch`) before the swap, and the check that someone can still manage the server
+   * (restoreCarryOver.ts). The running database is read as the owner, in one snapshot; one
+   * that can't be read refuses the restore, unless the restore command was told to ignore it.
+   */
+  private async carryOver(
+    live: string,
+    scratch: string,
+    manifest: BackupManifest | null,
+    options: RestoreOptions,
+    backupSignedHere: boolean
+  ): Promise<CarryOverReport> {
+    const restorerId = options.restorerId ?? null;
+    const backupCreatedAt = manifest?.createdAt ?? null;
+    let running: RunningState | null = null;
+    if (!options.ignoreCurrentDatabase) {
+      try {
+        running = await this.withConnection(live, (client) => readRunningState(client, { restorerId, backupCreatedAt }));
+      } catch (error) {
+        logger.error({ err: error }, "Could not read the running database's sign-ins for the restore");
+        throw new RestoreCarryOverRefusal(
+          'RUNNING_DATABASE_UNREADABLE',
+          "This server's current database couldn't be read, and a restore takes its sign-ins, backup keys and OneDrive " +
+            'connection from it. Nothing was changed. The restore command can restore without it: --ignore-current-database.'
+        );
+      }
+    }
+    const report = await this.withConnection(scratch, (client) => applyCarryOver(client, running, { restorerId, backupCreatedAt, backupSignedHere }));
+    logger.info(
+      {
+        sameDeployment: report.sameDeployment,
+        tookFromRunningServer: report.tookFromRunningServer,
+        ended: report.ended,
+        taken: report.taken,
+        lockedDeletedSince: report.lockedDeletedSince,
+        kept: report.kept,
+        removedSince: report.removedSince.length,
+      },
+      'Restore: sign-ins ended, and what the running server holds carried over'
+    );
+    return report;
+  }
+
+  /**
+   * Refuses restored data whose tables and row counts differ from those the backup recorded:
+   * a dump cut short, or one pg_restore put back only in part.
+   */
+  private async assertRowCountsMatch(database: string, recorded: Readonly<Record<string, number>>): Promise<void> {
+    const restored = await this.withConnection(database, async (client) => {
+      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      try {
+        await client.query('SET LOCAL row_security = off');
+        return await countPublicTables(client);
+      } finally {
+        await client.query('COMMIT').catch(() => {});
+      }
+    });
+    const mismatch = rowCountMismatch(recorded, restored);
+    if (mismatch) {
+      throw new RestoreRefusedError(
+        `The restored data doesn't match the rows the backup counted when it was made (${mismatch}): the backup is incomplete or damaged. Nothing was changed.`,
+        undefined,
+        'BACKUP_ROW_COUNTS'
+      );
+    }
+    logger.info({ tables: Object.keys(restored).length }, 'Restored row counts match the backup');
+  }
+
   private async countRows(database: string): Promise<Record<string, number>> {
     return this.withConnection(database, async (client) => {
       const counts: Record<string, number> = {};
@@ -2283,6 +2476,21 @@ export class BackupService {
       if (errorCode(error) === 'ENOENT') return [];
       logger.error({ err: error }, 'Failed to list backups');
       return [];
+    }
+  }
+
+  /**
+   * The names of the backups in the backup directory (none when it doesn't exist yet). Unlike
+   * listBackups, a directory it can't read throws: retention deletes the record of a file
+   * only once it is sure the file is gone.
+   */
+  async listBackupFileNames(): Promise<string[]> {
+    try {
+      const entries = await fs.readdir(this.backupLocation, { withFileTypes: true });
+      return entries.filter((e) => e.isFile() && isBackupFileName(e.name)).map((e) => e.name);
+    } catch (error) {
+      if (errorCode(error) === 'ENOENT') return [];
+      throw error;
     }
   }
 

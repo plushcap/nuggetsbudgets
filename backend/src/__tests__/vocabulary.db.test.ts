@@ -35,6 +35,7 @@ const sharedList = (column: string) => (Object.hasOwn(VOCABULARIES, column) ? VO
  */
 const NOT_LISTS: Readonly<Record<string, string>> = {
   'backup_recipients.backup_recipients_recipient_check': 'an age public key (a prefix, LIKE, and a length)',
+  'backup_runs.backup_runs_file_check': 'a run that succeeded names the file it made',
   'holding_events.holding_events_adjusted_through_action_check': 'the event types that can be adjusted for later splits, a few of the list',
   'login_throttles.login_throttles_throttle_key_check': 'a hex digest (regex)',
   'securities.securities_exchange_normalized': 'an exchange trimmed and in upper case, not empty',

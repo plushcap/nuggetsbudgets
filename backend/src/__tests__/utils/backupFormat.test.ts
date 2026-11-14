@@ -61,6 +61,7 @@ async function input(overrides: Partial<BundleInput> = {}): Promise<BundleInput>
       appVersion: '3.1.0',
       schemaVersion: '20261113000000',
       recipients: [],
+      rowCounts: { accounts: 3, schema_migrations: 2, users: 1 },
     },
     signer,
     ...overrides,
@@ -88,7 +89,8 @@ async function packed(entries: Array<{ header: Partial<Header> & { name: string 
   return bytes.subarray(0, bytes.length - 1024);
 }
 
-const manifestOf = (members: Array<{ path: string; size: number }>) =>
+/** A manifest.json: format 4 (before the row counts) unless `extra` says otherwise. */
+const manifestOf = (members: Array<{ path: string; size: number }>, extra: Record<string, unknown> = {}) =>
   Buffer.from(
     JSON.stringify({
       manifestVersion: 4,
@@ -98,6 +100,7 @@ const manifestOf = (members: Array<{ path: string; size: number }>) =>
       schemaVersion: null,
       recipients: [],
       members,
+      ...extra,
     })
   );
 
@@ -153,6 +156,8 @@ describe('a backup made, encrypted and opened with a file key', () => {
       'uploads/résumé.pdf',
       'uploads/statements/2026/march.pdf',
     ]);
+    // Format 5: the row counts the backup was made with.
+    expect(manifest).toMatchObject({ manifestVersion: 5, rowCounts: { accounts: 3, schema_migrations: 2, users: 1 } });
     expect(await readFile(file('out/database.dump'))).toEqual(await readFile(file('db.dump')));
     expect(await readFile(file('out/uploads/statements/2026/march.pdf'), 'utf8')).toBe('march statement');
     expect(await readFile(file(`out/uploads/${'n'.repeat(160)}.pdf`), 'utf8')).toBe('long name');
@@ -333,7 +338,32 @@ describe('a bundle whose signature checks is still parsed with care', () => {
     await expect(readFile(path.join(dir, '..', 'escape.pdf'))).rejects.toThrow();
   });
 
-  it('refuses a member after the manifest, and a manifest that is not format 4', async () => {
+  it('reads the row counts of a format-5 manifest, and a format-4 one without them', async () => {
+    const members = [{ path: 'database.dump', size: dump.length }];
+    const v5 = await checkAndExtract(
+      signPayload(await packed([file0('database.dump', dump), file0('manifest.json', manifestOf(members, { manifestVersion: 5, rowCounts: { users: 2, accounts: 0 } }))]), signer)
+    );
+    expect(v5).toMatchObject({ manifestVersion: 5, rowCounts: { users: 2, accounts: 0 } });
+    await rm(file('out'), { recursive: true, force: true });
+    const v4 = await checkAndExtract(signPayload(await packed([file0('database.dump', dump), file0('manifest.json', manifestOf(members))]), signer));
+    expect(v4.manifestVersion).toBe(4);
+    expect('rowCounts' in v4).toBe(false);
+  });
+
+  it.each([
+    ['format 5 without its row counts', { manifestVersion: 5 }],
+    ['format 4 with row counts (a field it never had)', { rowCounts: { users: 1 } }],
+    ['a count that is not a whole number of rows', { manifestVersion: 5, rowCounts: { users: 1.5 } }],
+    ['a negative count', { manifestVersion: 5, rowCounts: { users: -1 } }],
+    ['a format after 5', { manifestVersion: 6, rowCounts: {} }],
+  ])('refuses a manifest with %s', async (_what, extra) => {
+    const members = [{ path: 'database.dump', size: dump.length }];
+    await expect(
+      checkAndExtract(signPayload(await packed([file0('database.dump', dump), file0('manifest.json', manifestOf(members, extra))]), signer))
+    ).rejects.toThrow(/format-4 or format-5 manifest/);
+  });
+
+  it('refuses a member after the manifest, and a manifest that is not format 4 or 5', async () => {
     const members = [{ path: 'database.dump', size: dump.length }];
     await expect(
       checkAndExtract(signPayload(await packed([file0('database.dump', dump), file0('manifest.json', manifestOf(members)), file0('uploads/late.pdf', Buffer.from('x'))]), signer))
@@ -341,7 +371,7 @@ describe('a bundle whose signature checks is still parsed with care', () => {
     await rm(file('out'), { recursive: true, force: true });
     await expect(
       checkAndExtract(signPayload(await packed([file0('database.dump', dump), file0('manifest.json', Buffer.from('{"manifestVersion":1}'))]), signer))
-    ).rejects.toThrow(/format-4 manifest/);
+    ).rejects.toThrow(/format-4 or format-5 manifest/);
   });
 });
 

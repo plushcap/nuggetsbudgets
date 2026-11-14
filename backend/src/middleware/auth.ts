@@ -363,7 +363,8 @@ export const requireInteractiveSession = (req: AuthenticatedRequest, res: Respon
  * Step-up: require a signed-in browser session whose user proved their password or
  * passkey in the last few minutes (signing in counts; see SessionService.REAUTH_WINDOW_MS).
  * Without it, 403 REAUTH_REQUIRED, so the UI can ask and retry. Used before minting a
- * personal access token and enrolling a passkey.
+ * personal access token, enrolling a passkey, adding or removing a backup key, downloading
+ * the old backup key, and restoring a backup.
  */
 export const requireRecentReauth = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   if (!req.user) {

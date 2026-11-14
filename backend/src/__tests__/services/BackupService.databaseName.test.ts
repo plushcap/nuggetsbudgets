@@ -26,13 +26,28 @@ describe('BackupService database name', () => {
     spawned.length = 0;
   });
 
-  async function dumpedDatabase(): Promise<string> {
+  /** pg_dump's arguments, for a dump of the exported snapshot `snap-1`. */
+  async function dumpArgs(): Promise<string[]> {
     const service = new BackupService({} as unknown as Pool);
-    await (service as unknown as { createDatabaseDump(dir: string, backupId: string): Promise<string> })
-      .createDatabaseDump('/tmp', 'dump');
-    const args = spawned.at(-1)!;
+    await (service as unknown as { runPgDump(file: string, owner: { user: string; password: string }, snapshot: string): Promise<void> })
+      .runPgDump('/tmp/dump.dump', { user: 'owner', password: 'x' }, 'snap-1');
+    return spawned.at(-1)!;
+  }
+
+  async function dumpedDatabase(): Promise<string> {
+    const args = await dumpArgs();
     return args[args.indexOf('-d') + 1];
   }
+
+  it("dumps the snapshot the row counts were taken in, and doesn't wait for ever for a lock", async () => {
+    vi.stubEnv('DB_PASSWORD', 'x');
+    vi.stubEnv('JWT_SECRET', 'x');
+    vi.stubEnv('SESSION_SECRET', 'x');
+    vi.stubEnv('CSRF_SECRET', 'x');
+    const args = await dumpArgs();
+    expect(args).toContain('--snapshot=snap-1');
+    expect(args).toContain('--lock-wait-timeout=30s');
+  });
 
   it('is DB_NAME', async () => {
     vi.stubEnv('DB_PASSWORD', 'x');

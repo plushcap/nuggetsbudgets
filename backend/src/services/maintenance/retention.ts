@@ -13,6 +13,7 @@
  * | `import_sync_log` (per ledger) | started that long ago, except the ledger's newest | RETENTION_SYNC_LOG_DAYS (180) |
  * | `organization_price_sync_runs` (per organization) | started that long ago, except the organization's newest | RETENTION_SYNC_LOG_DAYS (180) |
  * | `stored_images` (per ledger) | nothing points at it, a day after it was stored | — |
+ * | `backup_runs` (global) | its file gone from the backup directory for a year (a failed run, which made none: run a year ago) | — |
  *
  * - A notification delivery is what stops the same alert going twice: its subject (a
  *   budget item in the current month, a transaction added in the last week, a bill due
@@ -81,6 +82,12 @@ export interface RetentionOptions {
   tenantIds?: number[] | undefined;
   /** The organizations the per-organization job covers (default, or undefined: every organization). */
   organizationIds?: number[] | undefined;
+  /**
+   * The backups in the backup directory, by file name (BackupService.listBackupFileNames):
+   * the backup_runs job keeps the record of each. It throws when the directory can't be
+   * read, and that job deletes nothing. Without it the job doesn't run.
+   */
+  backupFileNames?: (() => Promise<readonly string[]>) | undefined;
 }
 
 /** Rows deleted, by job. */
@@ -129,14 +136,15 @@ async function allTenantIds(): Promise<number[]> {
   return (await globalDb.selectFrom('tenants').select('id').orderBy('id').execute()).map((t) => t.id);
 }
 
-type ResolvedOptions = Required<Omit<RetentionOptions, 'tenantIds' | 'organizationIds'>> &
-  Pick<RetentionOptions, 'tenantIds' | 'organizationIds'>;
+type ResolvedOptions = Required<Omit<RetentionOptions, 'tenantIds' | 'organizationIds' | 'backupFileNames'>> &
+  Pick<RetentionOptions, 'tenantIds' | 'organizationIds' | 'backupFileNames'>;
 
 const withDefaults = (options: RetentionOptions): ResolvedOptions => ({
   limits: options.limits ?? DEFAULT_LIMITS,
   shouldStop: options.shouldStop ?? (() => false),
   tenantIds: options.tenantIds,
   organizationIds: options.organizationIds,
+  backupFileNames: options.backupFileNames,
 });
 
 // ---------------------------------------------------------------------------------------
@@ -154,6 +162,35 @@ export async function purgeEndedSessions(policy: RetentionPolicy, options: Reten
         SELECT id FROM sessions
          WHERE expires_at < ${daysAgo(policy.sessionDays)}
             OR (is_revoked AND COALESCE(revoked_at, last_activity_at, created_at) < ${daysAgo(policy.sessionDays)})
+         ORDER BY id
+         LIMIT ${limit}
+         FOR UPDATE SKIP LOCKED`).execute(globalDb)
+    )
+  );
+}
+
+/** The record of a backup is kept this long after its file is gone (a failed run's, after it ran). */
+export const BACKUP_RUN_DAYS = 365;
+
+/**
+ * The record of backups (backup_runs): notes when each run's file is gone from the backup
+ * directory (`fileNames`, all of it), clears the note for a file that is back (a share that
+ * was away), and deletes the records whose file has been gone for BACKUP_RUN_DAYS, and those
+ * of failed runs (which made no file) run that long ago. A record whose file is there stays,
+ * however old.
+ */
+export async function purgeOldBackupRuns(fileNames: readonly string[], options: RetentionOptions = {}): Promise<number> {
+  const files = [...fileNames];
+  await sql`UPDATE backup_runs SET file_gone_at = now()
+             WHERE file_name IS NOT NULL AND file_gone_at IS NULL AND NOT (file_name = ANY(${files}::text[]))`.execute(globalDb);
+  await sql`UPDATE backup_runs SET file_gone_at = NULL
+             WHERE file_gone_at IS NOT NULL AND file_name = ANY(${files}::text[])`.execute(globalDb);
+  return inBatches('backup_runs', withDefaults(options), async (limit) =>
+    affected(
+      await deleteBatch('backup_runs', sql`
+        SELECT id FROM backup_runs
+         WHERE file_gone_at < ${daysAgo(BACKUP_RUN_DAYS)}
+            OR (file_name IS NULL AND started_at < ${daysAgo(BACKUP_RUN_DAYS)})
          ORDER BY id
          LIMIT ${limit}
          FOR UPDATE SKIP LOCKED`).execute(globalDb)
@@ -304,6 +341,8 @@ export async function runRetention(policy: RetentionPolicy, options: RetentionOp
   };
 
   await attempt('sessions', async () => add('sessions', await purgeEndedSessions(policy, opts)));
+  const { backupFileNames } = opts;
+  if (backupFileNames) await attempt('backup_runs', async () => add('backup_runs', await purgeOldBackupRuns(await backupFileNames(), opts)));
   counts.organization_price_sync_runs = 0;
   for (const organizationId of opts.organizationIds ?? (await getAllOrganizationIds())) {
     await attempt(`organization ${organizationId}`, async () =>

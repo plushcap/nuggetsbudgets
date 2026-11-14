@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { isReauthRequiredError } from '../services/api';
+import { getReauthStatus, isReauthRequiredError } from '../services/api';
 
 /** Thrown by `withReauth` when the user closes the prompt instead of confirming. */
 export class ReauthCancelledError extends Error {
@@ -22,10 +22,12 @@ export interface ReauthDialogProps {
 
 /**
  * Step-up prompt for actions the server only allows right after the user confirmed their
- * password or a passkey (creating an MCP token, adding a passkey). `withReauth(action)`
- * runs the action; when the server answers REAUTH_REQUIRED it opens the prompt (render
- * `<ReauthDialog {...dialogProps} />`) and, once the user confirms, runs the action again.
- * If they close the prompt it rejects with ReauthCancelledError.
+ * password or a passkey (creating an MCP token, adding a passkey, restoring a backup).
+ * `withReauth(action)` runs the action; when the server answers REAUTH_REQUIRED it opens the
+ * prompt (render `<ReauthDialog {...dialogProps} />`) and, once the user confirms, runs the
+ * action again. `ensureReauthenticated()` asks first, when the session has no recent
+ * confirmation, for an action whose refusal would come only after a large upload. Either
+ * rejects with ReauthCancelledError when the user closes the prompt.
  */
 export function useReauth() {
   const [open, setOpen] = useState(false);
@@ -61,10 +63,15 @@ export function useReauth() {
     [askToConfirm]
   );
 
+  const ensureReauthenticated = useCallback(async (): Promise<void> => {
+    if ((await getReauthStatus()).reauthenticated) return;
+    if (!(await askToConfirm())) throw new ReauthCancelledError();
+  }, [askToConfirm]);
+
   const dialogProps: ReauthDialogProps = {
     open,
     onConfirmed: () => finish(true),
     onCancel: () => finish(false),
   };
-  return { withReauth, dialogProps };
+  return { withReauth, ensureReauthenticated, dialogProps };
 }

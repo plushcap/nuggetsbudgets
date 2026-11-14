@@ -367,6 +367,13 @@ json_post /api/tags '{"name": "smoke-after-backup"}'
 expect 201 "creating a second tag"
 
 log "Restore"
+# A restore takes step-up too. Signing in counted for five minutes; the password, confirmed
+# again here, starts them over, and the status check the Backup page asks first agrees.
+json_post /api/auth/reauthenticate "$(jq -n --arg p "$ADMIN_PASSWORD" '{password: $p}')"
+expect 200 "confirming the password before the restore"
+api GET /api/auth/reauthenticate
+expect 200 "the step-up status"
+[ "$(jq -r '.reauthenticated' "$BODY")" = "true" ] || fail "the step-up status doesn't count the confirmed password"
 api POST /api/backup/restore -F "backup=@$WORK/$backup_file;type=application/octet-stream" \
   -F "fileKey=$file_key"
 expect 202 "starting the restore"
@@ -391,6 +398,11 @@ for _ in $(seq 1 150); do
 done
 [ "$outcome" = "completed" ] || fail "the restore did not finish"
 echo "restore: $(jq -c '{phase, databaseChanged, previousDatabase, rowCounts}' "$BODY")"
+echo "carried over: $(jq -c '.carryOver | {sameDeployment, ended, kept}' "$BODY")"
+# The backup is this server's own: the restore ended every sign-in (this one too, which the
+# loop above signed in again after) and took the running server's sign-in state and keys.
+jq -e '.carryOver.sameDeployment == true and .carryOver.ended.sessions >= 1 and .carryOver.kept.backupKeys == true' "$BODY" > /dev/null \
+  || fail "the restore didn't end the sign-ins, or didn't keep this server's sign-in state and backup keys"
 
 log "Sign in again, and check the restored data"
 SESSION=""

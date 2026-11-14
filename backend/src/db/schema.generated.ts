@@ -235,6 +235,45 @@ export interface BackupRecipients {
   uuid: Generated<string>;
 }
 
+export interface BackupRuns {
+  /**
+   * When the retention job first found the file gone from the backup directory (cleared if it is back); the row goes a year later.
+   */
+  file_gone_at: Timestamp | null;
+  file_name: string | null;
+  file_size: Int8 | null;
+  finished_at: Timestamp;
+  id: Generated<number>;
+  /**
+   * Why it failed, written for people (never an internal error's text); NULL when it succeeded.
+   */
+  message: string | null;
+  outcome: string;
+  /**
+   * When the backup last passed a verify: a later verify that failed leaves it.
+   */
+  passed_verify_at: Timestamp | null;
+  /**
+   * The fingerprints of the backup keys an age backup was encrypted to; empty for an .enc one.
+   */
+  recipients: Generated<string[]>;
+  sha256: string | null;
+  started_at: Timestamp;
+  started_by: number | null;
+  /**
+   * What started it: manual (the Backup page), scheduled, or before-deletion (Data Management's "Back up first").
+   */
+  trigger: string;
+  uuid: Generated<string>;
+  /**
+   * When the backup was last verified (restored into a scratch database and checked), in the web app or with the restore command; verify_outcome says how that went.
+   */
+  verified_at: Timestamp | null;
+  verified_by: number | null;
+  verify_message: string | null;
+  verify_outcome: string | null;
+}
+
 export interface BillOccurrences {
   budget_item_id: number;
   created_at: Generated<Timestamp>;
@@ -1438,6 +1477,7 @@ export interface DB {
   annotations: Annotations;
   attachments: Attachments;
   backup_recipients: BackupRecipients;
+  backup_runs: BackupRuns;
   bill_occurrence_transactions: BillOccurrenceTransactions;
   bill_occurrences: BillOccurrences;
   budget_alert_tracking: BudgetAlertTracking;

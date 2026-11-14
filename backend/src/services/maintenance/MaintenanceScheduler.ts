@@ -14,6 +14,8 @@ export interface MaintenanceSchedulerOptions {
   intervalMs?: number;
   /** What a run does (runRetention; a stand-in in tests). */
   run?: (policy: RetentionPolicy, options: RetentionOptions) => Promise<RetentionCounts>;
+  /** The backup directory's file names, for the backup_runs job (RetentionOptions.backupFileNames). */
+  backupFileNames?: RetentionOptions['backupFileNames'];
 }
 
 export interface MaintenanceStatus {
@@ -45,11 +47,13 @@ export class MaintenanceScheduler implements Scheduler {
   private readonly firstRunDelayMs: number;
   private readonly intervalMs: number;
   private readonly run: NonNullable<MaintenanceSchedulerOptions['run']>;
+  private readonly backupFileNames: RetentionOptions['backupFileNames'];
 
   constructor(options: MaintenanceSchedulerOptions = {}) {
     this.firstRunDelayMs = options.firstRunDelayMs ?? 10 * 60 * 1000;
     this.intervalMs = options.intervalMs ?? 24 * HOUR_MS;
     this.run = options.run ?? runRetention;
+    this.backupFileNames = options.backupFileNames;
   }
 
   /** Arm the first run. Throws, arming nothing, when the retention settings are invalid. */
@@ -109,7 +113,7 @@ export class MaintenanceScheduler implements Scheduler {
   private async runOnce(): Promise<void> {
     this.lastRunStartedAt = new Date();
     try {
-      await this.run(retentionPolicy(), { shouldStop: () => this.stopping });
+      await this.run(retentionPolicy(), { shouldStop: () => this.stopping, backupFileNames: this.backupFileNames });
       this.lastRunOutcome = 'success';
     } catch (err) {
       this.lastRunOutcome = 'failed';

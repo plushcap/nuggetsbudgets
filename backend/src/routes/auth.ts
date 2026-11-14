@@ -445,6 +445,18 @@ export function createAuthRoutes(): Router {
   }));
 
   /**
+   * GET /auth/reauthenticate
+   * Whether this session confirmed its password or passkey in the last few minutes (signing
+   * in counts): `{ reauthenticated }`. A page asks before an action that needs it, rather than
+   * after, when the refusal would come too late: the server checks step-up before it reads an
+   * uploaded backup to restore, but a browser may send the whole file before it reads the
+   * answer. Needs a browser session, as the POST does.
+   */
+  router.get('/reauthenticate', requireInteractiveSession, authHandler(async (req, res) => {
+    res.json({ reauthenticated: await sessionService.isRecentlyReauthenticated(browserSessionId(req)) });
+  }));
+
+  /**
    * POST /auth/reauthenticate
    * Step-up: the signed-in user confirms their password, which lets this session mint a
    * personal access token or enroll a passkey for the next few minutes. Needs a

@@ -74,6 +74,7 @@ user            DELETE /api/auth/mcp-tokens/:uuid
 user            GET    /api/auth/me
 public          GET    /api/auth/password-policy
 user            PUT    /api/auth/profile
+user            GET    /api/auth/reauthenticate
 user            POST   /api/auth/reauthenticate
 user            GET    /api/auth/sessions
 user            DELETE /api/auth/sessions/:uuid
@@ -96,6 +97,7 @@ deploymentAdmin POST   /api/backup/recipients/:uuid/checked
 deploymentAdmin POST   /api/backup/restore
 deploymentAdmin GET    /api/backup/restore-status
 deploymentAdmin POST   /api/backup/restore/:fileName
+deploymentAdmin GET    /api/backup/runs
 deploymentAdmin POST   /api/backup/scheduler/start
 deploymentAdmin POST   /api/backup/scheduler/stop
 deploymentAdmin GET    /api/backup/settings

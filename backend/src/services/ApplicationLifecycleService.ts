@@ -200,7 +200,11 @@ export class ApplicationLifecycleService {
         prices: { name: 'price-sync scheduler', lifetime: 'kept', create: () => new OrgPriceSyncScheduler() },
         // The daily retention job (services/maintenance/retention.ts). Always
         // started: what it deletes is set by the RETENTION_* settings.
-        retention: { name: 'retention scheduler', lifetime: 'kept', create: () => new MaintenanceScheduler() },
+        retention: {
+          name: 'retention scheduler',
+          lifetime: 'kept',
+          create: () => new MaintenanceScheduler({ backupFileNames: () => this.backupService.listBackupFileNames() }),
+        },
       },
       () => this.isShuttingDown
     );

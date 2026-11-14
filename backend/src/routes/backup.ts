@@ -127,7 +127,7 @@ export function createBackupRoutes({
     logger.info({ userId }, 'Starting manual backup creation (async)');
 
     // Started here, not after an await, so it holds the lock before anything else can ask.
-    const creating = backupService.createBackup();
+    const creating = backupService.createBackup({ trigger: 'manual', startedBy: userId });
 
     // Run the backup in the background and report progress via /create-status,
     // so the HTTP request returns immediately instead of blocking for minutes.
@@ -191,6 +191,15 @@ export function createBackupRoutes({
       logger.error({ err: error, userId }, 'Error restarting the backup scheduler after a backup key changed');
     }
   }
+
+  /**
+   * The record of backups (admin-only via the router mount): the newest runs, failures
+   * included, each with when it was last verified; and whether no backup has passed a verify
+   * for 90 days. GET /api/backup/runs
+   */
+  router.get('/runs', authHandler(async (_req: AuthenticatedRequest, res: Response) => {
+    res.json(await backupService.listRuns());
+  }));
 
   /**
    * The backup keys (admin-only via the router mount): the owner's age public keys, which
@@ -303,10 +312,17 @@ export function createBackupRoutes({
    * waits, and the server is in maintenance mode while it runs.
    * POST /api/backup/restore (multipart: backup, and fileKey for an age backup, or optionally
    * encryptionKey for an older .enc one: without it, this server's old key)
+   *
+   * Both restores take step-up (requireRecentReauth): a restore replaces every account,
+   * password and key with the backup's, so a stolen session alone must not start one. Checked
+   * before the upload is read or written; the Backup page asks first (GET /api/auth/reauthenticate),
+   * since a browser may send the whole file before it reads a refusal. A verify changes nothing,
+   * and needs none.
    */
   router.post(
     '/restore',
     refuseWhileShuttingDown,
+    requireRecentReauth,
     upload.single('backup'),
     discardUploadUnlessRestoring,
     // Its key's text, as every multipart body's: a NUL in it started the restore.
@@ -327,8 +343,9 @@ export function createBackupRoutes({
    * Restore one of the backups in the server's backup directory, by its listed name: no
    * upload, so no size limit. In the background, like POST /restore.
    * POST /api/backup/restore/:fileName  Body: { fileKey?: string, encryptionKey?: string }
+   * Takes step-up, as POST /restore does.
    */
-  router.post('/restore/:fileName', refuseWhileShuttingDown, validateBody(backupRestoreRequestSchema), authHandler(async (req: AuthenticatedRequest, res: Response) => {
+  router.post('/restore/:fileName', refuseWhileShuttingDown, requireRecentReauth, validateBody(backupRestoreRequestSchema), authHandler(async (req: AuthenticatedRequest, res: Response) => {
     const backup = await backupService.findBackup(String(req.params.fileName));
     if (!backup) throw backupNotFound();
     startRestore(req, res, {

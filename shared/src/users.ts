@@ -193,6 +193,9 @@ export const ownSessionsResponseSchema = z.object({ sessions: z.array(ownSession
 /** POST /api/auth/reauthenticate and /api/passkeys/reauthenticate/verify: confirmed, for this long. */
 export const reauthenticatedResponseSchema = z.object({ reauthenticated: z.literal(true), validForSeconds: z.number().int() });
 export type ReauthResult = z.infer<typeof reauthenticatedResponseSchema>;
+/** GET /api/auth/reauthenticate: whether this session confirmed its password or passkey in the last few minutes. */
+export const reauthenticationStatusResponseSchema = z.object({ reauthenticated: z.boolean() });
+export type ReauthStatus = z.infer<typeof reauthenticationStatusResponseSchema>;
 
 /** A personal access token that still works, as its owner (or a deployment admin) lists it: never the token. */
 export const personalAccessTokenResponseSchema = z.object({

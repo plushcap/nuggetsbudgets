@@ -1,14 +1,21 @@
 /**
  * API Reauth Module — step-up re-authentication.
  *
- * Creating an MCP token and adding a passkey need the user to have confirmed their
- * password or a passkey in the last few minutes (signing in counts). Without that the
- * server answers 403 with code REAUTH_REQUIRED; `useReauth` catches it, asks, and retries.
+ * Creating an MCP token, adding a passkey or a backup key, and restoring a backup need the
+ * user to have confirmed their password or a passkey in the last few minutes (signing in
+ * counts). Without that the server answers 403 with code REAUTH_REQUIRED; `useReauth`
+ * catches it, asks, and retries, or asks first (`getReauthStatus`) before an upload.
  */
 import { startAuthentication } from '@simplewebauthn/browser';
 import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser';
-import { reauthenticatedResponseSchema, webAuthnOptionsResponseSchema, type ReauthResult } from '@nuggets/shared';
-import { apiPost } from './base';
+import {
+  reauthenticatedResponseSchema,
+  reauthenticationStatusResponseSchema,
+  webAuthnOptionsResponseSchema,
+  type ReauthResult,
+  type ReauthStatus,
+} from '@nuggets/shared';
+import { apiGet, apiPost } from './base';
 import { parseAnswer } from './parseAnswer';
 
 export const REAUTH_REQUIRED = 'REAUTH_REQUIRED';
@@ -24,6 +31,10 @@ export const isReauthRequiredError = (error: unknown): boolean => apiErrorCode(e
 
 /** Confirmed, and for how long (`validForSeconds`). */
 export type { ReauthResult };
+
+/** Whether this session confirmed its password or a passkey in the last few minutes. */
+export const getReauthStatus = async (): Promise<ReauthStatus> =>
+  parseAnswer(reauthenticationStatusResponseSchema, await apiGet<unknown>('/auth/reauthenticate'), 're-authentication status');
 
 /** Confirm the signed-in user's password. */
 export const reauthenticateWithPassword = async (password: string): Promise<ReauthResult> =>
