@@ -24,6 +24,7 @@ import { apiErrorMessage } from '../utils/errors';
 import { EMPTY_LIST } from '../utils/emptyList';
 import { useSeededState } from '../hooks/useSeededState';
 import { usePageInRange } from '../hooks/usePageInRange';
+import { SMALLEST_TRANSACTION_PAGE_SIZE, TRANSACTION_PAGE_SIZES, useTransactionPageSize } from '../hooks/useTransactionPageSize';
 import {
   type ChartRangeOption,
   CHART_RANGE_OPTIONS,
@@ -141,7 +142,7 @@ const ViewBudgetItemPage: React.FC = () => {
   // Budget item transactions paging: back to page 1 only on a chart-range change
   // (not on background refreshes).
   const [transactionPage, setTransactionPage] = useSeededState(() => 1, [chartRangeKey]);
-  const transactionsPerPage = 25;
+  const [transactionsPerPage, setTransactionsPerPage] = useTransactionPageSize();
 
   // Range-scoped transactions for this item (only the selected window is fetched;
   // include_children pulls split allocations). keepPreviousData keeps the chart/
@@ -684,8 +685,8 @@ const ViewBudgetItemPage: React.FC = () => {
                   onTransactionUpdated={() => rangeTxQuery.refetch()}
                 />
 
-                {/* Pagination Controls */}
-                {budgetItemTransactions.length > transactionsPerPage && (
+                {/* Pagination Controls: whenever the size could change what shows, so a choice can be taken back. */}
+                {budgetItemTransactions.length > SMALLEST_TRANSACTION_PAGE_SIZE && (
                   <Box mt="4">
                     <SharedPagination
                       currentPage={transactionPage}
@@ -694,6 +695,8 @@ const ViewBudgetItemPage: React.FC = () => {
                       itemsPerPage={transactionsPerPage}
                       onPageChange={setTransactionPage}
                       itemLabel="transactions"
+                      pageSizeOptions={TRANSACTION_PAGE_SIZES}
+                      onItemsPerPageChange={setTransactionsPerPage}
                     />
                   </Box>
                 )}

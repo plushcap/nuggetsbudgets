@@ -35,9 +35,9 @@ const routes = () => ({
   'GET /tags': [],
   'GET /tenants/current/users': [userFixture({ id: 1, first_name: 'Ada' })],
   'GET /accounts': accountsResponse([checking]),
-  // 65 matches: three pages of 30.
+  // 125 matches: three pages of 50, the default size.
   'GET /transactions/paginated': ({ query }: ApiRequest) =>
-    transactionsPage(rows, { page: Number(query.get('page')), limit: Number(query.get('limit')), total: 65 }),
+    transactionsPage(rows, { page: Number(query.get('page')), limit: Number(query.get('limit')), total: 125 }),
 });
 
 const Where = () => {
@@ -58,7 +58,10 @@ const urlParams = () => Object.fromEntries(new URLSearchParams(screen.getByTestI
 beforeEach(() => {
   api = mockApi(routes());
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  localStorage.removeItem('transaction-page-size');
+});
 
 describe('TransactionsPage', () => {
   it('lists what the API answers, an expense in parentheses', async () => {
@@ -76,7 +79,7 @@ describe('TransactionsPage', () => {
     await waitFor(() => expect(api.calls('GET /transactions/paginated').length).toBeGreaterThan(0));
     expect(lastListQuery()).toEqual({
       page: '2',
-      limit: '30',
+      limit: '50',
       search: 'rent',
       review_status: 'flagged',
       type: 'expense',
@@ -123,14 +126,42 @@ describe('TransactionsPage', () => {
     await waitFor(() => expect(urlParams()).toEqual({ page: '2' }));
   });
 
+  it('asks for pages of the size chosen in the footer, keeps the first row shown in view, and remembers it', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderAt('/transactions?page=3');
+    await waitFor(() => expect(lastListQuery()).toMatchObject({ page: '3', limit: '50' }));
+    const picker = await screen.findByRole('combobox', { name: 'Rows per page' });
+    expect(picker).toHaveTextContent('50');
+
+    // Page 3 of 50 starts at row 101, which is on page 2 of 100.
+    await user.click(picker);
+    await user.click(await screen.findByRole('option', { name: '100' }));
+    await waitFor(() => expect(lastListQuery()).toMatchObject({ page: '2', limit: '100' }));
+    await waitFor(() => expect(urlParams()).toEqual({ page: '2' }));
+    expect(screen.getByText('Showing 101 to 125 of 125 transactions')).toBeInTheDocument();
+    expect(localStorage.getItem('transaction-page-size')).toBe('100');
+
+    // The next visit starts at the size chosen.
+    unmount();
+    renderAt('/transactions');
+    await waitFor(() => expect(lastListQuery()).toMatchObject({ page: '1', limit: '100' }));
+    expect(await screen.findByRole('combobox', { name: 'Rows per page' })).toHaveTextContent('100');
+  });
+
+  it('asks for the default 50 when the stored size is not one it offers', async () => {
+    localStorage.setItem('transaction-page-size', '1000');
+    renderAt('/transactions');
+    await waitFor(() => expect(lastListQuery()).toMatchObject({ limit: '50' }));
+  });
+
   // A page past the end (after deletes, or a link to a page that no longer
   // exists) showed "No transactions found" with no pagination to get back.
   it('goes back to the last page when the one in the URL is past the end', async () => {
     api = mockApi({
       ...routes(),
-      // 40 matches: two pages of 30.
+      // 80 matches: two pages of 50.
       'GET /transactions/paginated': ({ query }: ApiRequest) =>
-        transactionsPage(Number(query.get('page')) <= 2 ? rows : [], { page: Number(query.get('page')), limit: 30, total: 40 }),
+        transactionsPage(Number(query.get('page')) <= 2 ? rows : [], { page: Number(query.get('page')), limit: Number(query.get('limit')), total: 80 }),
     });
     renderAt('/transactions?page=3');
     await waitFor(() => expect(lastListQuery().page).toBe('2'));
@@ -141,20 +172,21 @@ describe('TransactionsPage', () => {
   // A cached answer for a page (from before the list grew) brought the page
   // back while its refetch was still on the way.
   it('stays on a page that exists again, while its cached answer is refreshed', async () => {
-    let total = 40; // two pages of 30
+    let total = 80; // two pages of 50
     api = mockApi({
       ...routes(),
       'GET /transactions/paginated': async ({ query }: ApiRequest) => {
         const page = Number(query.get('page'));
+        const limit = Number(query.get('limit'));
         await new Promise((resolve) => setTimeout(resolve, 50));
-        return transactionsPage(page <= Math.ceil(total / 30) ? rows : [], { page, limit: 30, total });
+        return transactionsPage(page <= Math.ceil(total / limit) ? rows : [], { page, limit, total });
       },
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000, gcTime: 300_000, refetchOnWindowFocus: false } } });
     renderWithProviders(<Theme><TransactionsPage /><Where /></Theme>, { route: '/transactions?page=3', client });
     await waitFor(() => expect(urlParams()).toEqual({ page: '2' }));
     // The list grows back to three pages; a write invalidates the lists.
-    total = 70;
+    total = 140;
     await act(() => client.invalidateQueries({ queryKey: ['transactions'] }));
     await userEvent.click(await screen.findByRole('button', { name: 'Page 3' }));
     await waitFor(() => expect(lastListQuery().page).toBe('3'));

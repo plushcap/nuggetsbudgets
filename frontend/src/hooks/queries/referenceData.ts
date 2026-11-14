@@ -1,5 +1,6 @@
-import { useQuery, useMutation, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryKey, type UseQueryResult } from '@tanstack/react-query';
 import type { Merchant, MerchantLite } from '../../services/api';
+import { useKeepPreviousLedgerData } from './invalidation';
 import {
   // institutions
   getInstitutions, getInstitution, createInstitution, updateInstitution, deleteInstitution,
@@ -147,8 +148,23 @@ export function useTagQuery(uuid: string | undefined, options?: QueryOverrides) 
 export function useTagSummaryQuery(uuid: string | undefined, options?: QueryOverrides) {
   return useQuery({ queryKey: [...tagKeys.detail(uuid ?? ''), 'summary'], queryFn: () => getTagSummary(uuid as string), enabled: !!uuid, ...options });
 }
+const tagOf = (queryKey: QueryKey): string => String(queryKey[2] ?? '');
+
+/**
+ * A page of a tag's transactions. Keeps the previous page up while the next loads, within
+ * one ledger and one tag, so the table and its footer stay on screen (and the footer's
+ * control keeps focus) through a page or size change.
+ */
 export function useTagTransactionsQuery(uuid: string | undefined, params?: Parameters<typeof getTagTransactions>[1], options?: QueryOverrides) {
-  return useQuery({ queryKey: [...tagKeys.detail(uuid ?? ''), 'transactions', params ?? {}], queryFn: () => getTagTransactions(uuid as string, params), enabled: !!uuid, ...options });
+  const queryKey = [...tagKeys.detail(uuid ?? ''), 'transactions', params ?? {}];
+  const keepPreviousPage = useKeepPreviousLedgerData<Awaited<ReturnType<typeof getTagTransactions>>>(queryKey, tagOf);
+  return useQuery({
+    queryKey,
+    queryFn: () => getTagTransactions(uuid as string, params),
+    enabled: !!uuid,
+    placeholderData: keepPreviousPage,
+    ...options,
+  });
 }
 export function useTagBreakdownQuery(uuid: string | undefined, params?: Parameters<typeof getTagBreakdown>[1], options?: QueryOverrides) {
   return useQuery({ queryKey: [...tagKeys.detail(uuid ?? ''), 'breakdown', params ?? {}], queryFn: () => getTagBreakdown(uuid as string, params), enabled: !!uuid, ...options });

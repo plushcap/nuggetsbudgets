@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Card, Button, Flex, Text } from '@radix-ui/themes';
+import { Card, Button, Flex, Select, Text } from '@radix-ui/themes';
 
 export interface SharedPaginationProps {
   currentPage: number;
@@ -10,6 +10,10 @@ export interface SharedPaginationProps {
   onPageChange: (page: number) => void;
   itemLabel?: string; // e.g., "transactions", "accounts", "items"
   className?: string;
+  /** The rows-per-page sizes to offer: with onItemsPerPageChange, a "Rows per page" picker. */
+  pageSizeOptions?: readonly number[];
+  /** Called with the size chosen, after onPageChange moves to the page holding the first row shown. */
+  onItemsPerPageChange?: (size: number) => void;
 }
 
 const SharedPagination: React.FC<SharedPaginationProps> = ({
@@ -19,11 +23,22 @@ const SharedPagination: React.FC<SharedPaginationProps> = ({
   itemsPerPage = 20,
   onPageChange,
   itemLabel = 'items',
-  className = ''
+  className = '',
+  pageSizeOptions,
+  onItemsPerPageChange,
 }) => {
+  const pageSizeId = useId();
   // Calculate range of items being shown
   const startItem = Math.min((currentPage - 1) * itemsPerPage + 1, totalItems);
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+  // A new size: the page that holds the first row shown now, so the rows in view stay in view.
+  const changePageSize = (value: string) => {
+    const size = Number(value);
+    if (!onItemsPerPageChange || !Number.isInteger(size) || size < 1 || size === itemsPerPage) return;
+    onPageChange(Math.floor(((currentPage - 1) * itemsPerPage) / size) + 1);
+    onItemsPerPageChange(size);
+  };
 
   // Generate page numbers to display (max 5)
   const getPageNumbers = () => {
@@ -59,10 +74,30 @@ const SharedPagination: React.FC<SharedPaginationProps> = ({
   return (
     <Card className={className}>
       <Flex direction={{ initial: 'column', sm: 'row' }} align="center" justify="between" gap="4">
-        {/* Item Count Text */}
-        <Text size="2" color="gray">
-          Showing {startItem} to {endItem} of {totalItems} {itemLabel}
-        </Text>
+        <Flex direction={{ initial: 'column', sm: 'row' }} align="center" gap={{ initial: '2', sm: '4' }}>
+          {/* Item Count Text */}
+          <Text size="2" color="gray">
+            Showing {startItem} to {endItem} of {totalItems} {itemLabel}
+          </Text>
+
+          {pageSizeOptions && onItemsPerPageChange && (
+            <Flex align="center" gap="2">
+              <Text as="label" size="2" color="gray" htmlFor={pageSizeId}>
+                Rows per page
+              </Text>
+              <Select.Root size="2" value={String(itemsPerPage)} onValueChange={changePageSize}>
+                <Select.Trigger id={pageSizeId} variant="soft" color="gray" />
+                <Select.Content>
+                  {pageSizeOptions.map((size) => (
+                    <Select.Item key={size} value={String(size)}>
+                      {size}
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Root>
+            </Flex>
+          )}
+        </Flex>
 
         {/* Pagination Controls */}
         <Flex align="center" gap="2">

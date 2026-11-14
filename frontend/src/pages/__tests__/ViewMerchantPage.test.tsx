@@ -36,6 +36,8 @@ const spending = {
 
 // The merchant's transactions in all, as the server's pagination counts them.
 let transactionTotal = 0;
+// The pages the table asked for: [page, limit].
+const pagesAsked: Array<[number, number]> = [];
 
 // Other merchants in the ledger, as GET /merchants answers them: with each one's counts, or
 // with ?fields=lite only the names. None by default.
@@ -49,11 +51,14 @@ vi.mock('../../hooks/queries', () => ({
     return { data: opts?.lite ? all.map(({ id, uuid, name }) => ({ id, uuid, name })) : all, isLoading: false };
   },
   useMerchantSpendingQuery: () => ({ data: spending, isLoading: false, isError: false }),
-  usePaginatedTransactionsQuery: (page: number, limit: number) => ({
-    data: { transactions: [], pagination: { total: transactionTotal, totalPages: Math.ceil(transactionTotal / limit), page, limit } },
-    isLoading: false,
-    isError: false,
-  }),
+  usePaginatedTransactionsQuery: (page: number, limit: number) => {
+    pagesAsked.push([page, limit]);
+    return {
+      data: { transactions: [], pagination: { total: transactionTotal, totalPages: Math.ceil(transactionTotal / limit), page, limit } },
+      isLoading: false,
+      isError: false,
+    };
+  },
   useBudgetItemsQuery: () => ({ data: [], isLoading: false }),
   useBulkUpdateTransactionsMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   merchantKeys: { all: ['merchants'] },
@@ -76,18 +81,56 @@ describe('ViewMerchantPage monthly chart in Los Angeles', () => {
 // page was open, the table said "Page 3 of 2" with nothing in it, and stayed so.
 describe('ViewMerchantPage transactions paging', () => {
   it('goes back to the last page when the list shrinks under the page shown', async () => {
-    transactionTotal = 60; // three pages of 25
+    transactionTotal = 120; // three pages of 50, the default size
     try {
       const { rerender } = renderWithProviders(<Theme><ViewMerchantPage /></Theme>);
       await userEvent.click(await screen.findByRole('button', { name: 'Page 3' }));
       expect(screen.getByRole('button', { name: 'Page 3' })).toHaveAttribute('aria-current', 'page');
 
-      transactionTotal = 40; // two pages now
+      transactionTotal = 80; // two pages now
       rerender(<Theme><ViewMerchantPage /></Theme>);
       expect(await screen.findByRole('button', { name: 'Page 2' })).toHaveAttribute('aria-current', 'page');
       expect(screen.queryByRole('button', { name: 'Page 3' })).not.toBeInTheDocument();
     } finally {
       transactionTotal = 0;
+    }
+  });
+
+  // The footer holds the rows-per-page picker: shown while a size could change what shows,
+  // so someone who chose 200 can choose again, even with every row on one page.
+  it('shows the footer and its rows-per-page picker for more rows than the smallest size, on one page too', async () => {
+    transactionTotal = 40; // one page of 50
+    try {
+      const { rerender } = renderWithProviders(<Theme><ViewMerchantPage /></Theme>);
+      expect(await screen.findByRole('combobox', { name: 'Rows per page' })).toHaveTextContent('50');
+      expect(screen.getByText('Showing 1 to 40 of 40 transactions')).toBeInTheDocument();
+
+      transactionTotal = 25; // fits one page at every size
+      rerender(<Theme><ViewMerchantPage /></Theme>);
+      expect(screen.queryByRole('combobox', { name: 'Rows per page' })).not.toBeInTheDocument();
+    } finally {
+      transactionTotal = 0;
+    }
+  });
+
+  it('asks for the size chosen in its footer, from the page holding the first row shown', async () => {
+    // jsdom lacks the pointer-capture APIs Radix Select calls.
+    Object.assign(window.HTMLElement.prototype, { hasPointerCapture: () => false, releasePointerCapture: () => {}, scrollIntoView: () => {} });
+    transactionTotal = 300;
+    pagesAsked.length = 0;
+    try {
+      renderWithProviders(<Theme><ViewMerchantPage /></Theme>);
+      await userEvent.click(await screen.findByRole('button', { name: 'Page 3' }));
+      expect(pagesAsked[pagesAsked.length - 1]).toEqual([3, 50]);
+
+      // Page 3 of 50 starts at row 101, which is on page 2 of 100.
+      await userEvent.click(screen.getByRole('combobox', { name: 'Rows per page' }));
+      await userEvent.click(await screen.findByRole('option', { name: '100' }));
+      expect(pagesAsked[pagesAsked.length - 1]).toEqual([2, 100]);
+      expect(localStorage.getItem('transaction-page-size')).toBe('100');
+    } finally {
+      transactionTotal = 0;
+      localStorage.removeItem('transaction-page-size');
     }
   });
 });

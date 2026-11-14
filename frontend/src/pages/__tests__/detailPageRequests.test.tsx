@@ -175,7 +175,8 @@ describe('detail-page requests', () => {
     expect(sent).not.toContain('/api/merchants'); // the full list, with per-merchant counts
     expect(sent.filter(isAllTransactions)).toEqual([]);
     expect(sent.filter((u) => u.startsWith('/api/transactions/paginated'))).toHaveLength(1);
-    expect(sent.find((u) => u.startsWith('/api/transactions/paginated'))).toMatch(/limit=25/);
+    // One page of the transaction tables' default size (no size chosen in this browser).
+    expect(sent.find((u) => u.startsWith('/api/transactions/paginated'))).toMatch(/limit=50(&|$)/);
     expect(sent).toHaveLength(5); // merchant, lite names, budget items, spending, one page
   });
 

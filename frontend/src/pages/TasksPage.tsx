@@ -18,6 +18,7 @@ import PageHeader from '../components/PageHeader';
 import { useSeededState } from '../hooks/useSeededState';
 import { readStoredJson, writeStoredJson } from '../utils/storage';
 import { usePageInRange } from '../hooks/usePageInRange';
+import { TRANSACTION_PAGE_SIZES, useTransactionPageSize } from '../hooks/useTransactionPageSize';
 import PageContainer from '../components/PageContainer';
 
 // Fixed filter for tasks page - only show transactions that need review
@@ -97,7 +98,8 @@ const TasksPage: React.FC = () => {
     return params;
   }, [showMyTasks, showUnassigned, user]);
 
-  const transactionsQuery = usePaginatedTransactionsQuery(currentPage, 30, filterParams);
+  const [pageSize, setPageSize] = useTransactionPageSize();
+  const transactionsQuery = usePaginatedTransactionsQuery(currentPage, pageSize, filterParams);
 
   // Back to the last page when the list shrinks under the one shown: after deletes, or
   // when the last tasks on the last page are reviewed. An answer still being fetched (the
@@ -261,9 +263,11 @@ const TasksPage: React.FC = () => {
             currentPage={pagination.currentPage}
             totalPages={pagination.totalPages}
             totalItems={pagination.totalTransactions}
-            itemsPerPage={30}
+            itemsPerPage={pageSize}
             onPageChange={handlePageChange}
             itemLabel="tasks"
+            pageSizeOptions={TRANSACTION_PAGE_SIZES}
+            onItemsPerPageChange={setPageSize}
           />
         </Box>
       )}

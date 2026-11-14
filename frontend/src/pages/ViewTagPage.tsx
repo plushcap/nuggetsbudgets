@@ -23,6 +23,7 @@ import {
 } from '../utils/chartRanges';
 import { parseCalendarDate, toCalendarDateString } from '../utils/dateUtils';
 import PageContainer from '../components/PageContainer';
+import { SMALLEST_TRANSACTION_PAGE_SIZE, TRANSACTION_PAGE_SIZES, useTransactionPageSize } from '../hooks/useTransactionPageSize';
 import { formatMoney } from '@nuggets/shared';
 
 interface TagSummary {
@@ -70,7 +71,7 @@ const ViewTagPage: React.FC = () => {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const transactionsPerPage = 25;
+  const [transactionsPerPage, setTransactionsPerPage] = useTransactionPageSize();
 
   // Tag detail + summary.
   const { data: tag = null, isLoading, isError } = useTagQuery(tagUuid);
@@ -529,12 +530,17 @@ const ViewTagPage: React.FC = () => {
                   }}
                 />
 
-                {totalPages > 1 && (
+                {/* Whenever the size could change what shows, so a choice can be taken back. */}
+                {totalTransactions > SMALLEST_TRANSACTION_PAGE_SIZE && (
                   <SharedPagination
                     currentPage={currentPage}
                     totalPages={totalPages}
                     totalItems={totalTransactions}
+                    itemsPerPage={transactionsPerPage}
                     onPageChange={setCurrentPage}
+                    itemLabel="transactions"
+                    pageSizeOptions={TRANSACTION_PAGE_SIZES}
+                    onItemsPerPageChange={setTransactionsPerPage}
                   />
                 )}
               </>
