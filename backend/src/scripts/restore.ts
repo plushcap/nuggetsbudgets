@@ -162,7 +162,8 @@ const { sessionOptions } = await import('../db/pgSession.js');
 const { handleConnectionErrors } = await import('../db/connectionErrors.js');
 const { BackupService, BackupInProgressError, RestoreFailedError, RestoreRefusedError, ShuttingDownError, assertBackupFileExists } = await import('../services/BackupService.js');
 const { publicErrorMessage } = await import('../utils/apiError.js');
-const { parseIdentityFile, parseSignerId } = await import('../utils/backupFormat.js');
+const { BackupWrongKeyError, parseIdentityFile, parseSignerId } = await import('../utils/backupFormat.js');
+const { BackupKeyError } = await import('../utils/backupCrypto.js');
 
 // A --signer that isn't a signer's public key is a usage mistake, like a missing value.
 const signers = options.signers.map((text) => parseSignerId(text));
@@ -191,6 +192,11 @@ handleConnectionErrors(pool, (err) => logger.debug({ err }, 'A pooled connection
 const service = new BackupService(pool, { migrationsDir: path.join(__dirname, '../../migrations') });
 const write = (line: string) => process.stdout.write(`${line}\n`);
 
+/**
+ * Whether this --verify is of the server's own copy of a listed backup: only that one's verify
+ * is recorded on the Backup page (another copy, or a file named like it, proves nothing about it).
+ */
+let recordable = false;
 try {
   const key = options.keyFile ? (await readFile(options.keyFile, 'utf8')).trim() : null;
   // The private key: from standard input, or a file. Its text is never printed, whatever is wrong with it.
@@ -202,6 +208,10 @@ try {
   await assertBackupFileExists(file).catch((error: unknown) => {
     throw error instanceof RestoreRefusedError ? new Error(`There is no backup file at ${file}`) : error;
   });
+  if (options.verify) {
+    const listed = await service.findBackup(path.basename(file));
+    recordable = listed !== null && path.resolve(listed.filePath) === file;
+  }
   if (options.yes) {
     const others = await service.otherSessions();
     if (others.length > 0) {
@@ -242,7 +252,7 @@ try {
   if (options.verify) {
     write('OK: the backup restores, migrates and passes the checks. Nothing was changed.');
     // The Backup page's history shows it verified (by the restore command: no one signed in).
-    await service.recordVerify(result.manifest?.backupId ? `${result.manifest.backupId}.tar.age` : path.basename(file), null, 'passed', null);
+    if (recordable) await service.recordVerify(path.basename(file), null, 'passed', null);
     // The browser can't check a hardware key: opening a backup this server made to it alone counts.
     if (options.decrypted && result.signature === 'valid' && result.manifest?.recipients) {
       const marked = await service.markOnlyHardwareRecipientChecked(result.manifest.recipients).catch(() => null);
@@ -278,7 +288,10 @@ try {
 } catch (error) {
   const changed = error instanceof RestoreFailedError && error.databaseChanged;
   const cause = error instanceof RestoreFailedError ? error.cause : error;
-  if (options.verify && !(error instanceof BackupInProgressError) && !(cause instanceof ShuttingDownError)) {
+  // A verify of the listed backup that ran and failed; not a wrong key (the person's mistake,
+  // not the backup's), nor one held up by another operation or a shutdown.
+  const keyMistake = cause instanceof BackupWrongKeyError || cause instanceof BackupKeyError;
+  if (recordable && !keyMistake && !(error instanceof BackupInProgressError) && !(cause instanceof ShuttingDownError)) {
     await service.recordVerify(path.basename(options.file), null, 'failed', publicErrorMessage(cause, 'The backup did not verify; the restore command said why.'));
   }
   process.stderr.write(`${(error as Error).message}\n${changed ? 'The data WAS replaced; see the message above.' : 'Nothing was changed.'}\n`);

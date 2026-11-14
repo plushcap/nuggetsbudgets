@@ -446,7 +446,8 @@ const BackupPage: React.FC = () => {
       details: [
         'All current financial data, user accounts and settings are replaced by the backup\'s',
         'All uploaded files and attachments are replaced',
-        'Nothing can be changed while it runs, and you may have to sign in again afterwards',
+        'Nothing can be changed while it runs',
+        'Everyone is signed out afterwards, you too: sign in with the email you had when the backup was made (a password changed since still works)',
         'The data from before is kept on the server until the next restore',
       ],
     });

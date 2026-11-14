@@ -1634,7 +1634,9 @@ export class BackupService {
 
       // Sign-ins ended, the running server's state taken over, and a restore that would leave
       // no one able to manage the server refused, all in the scratch database (a verify skips it).
-      const carryOver = await this.carryOver(live, scratch, manifest, options);
+      // Signed with this server's own key: its sealed secrets open here.
+      const signedHere = signature === 'valid' && signer !== null && signer === (await this.signerPublicId().catch(() => null));
+      const carryOver = await this.carryOver(live, scratch, manifest, options, signedHere);
 
       await options.beforeSwap?.();
 
@@ -2169,7 +2171,13 @@ export class BackupService {
    * (restoreCarryOver.ts). The running database is read as the owner, in one snapshot; one
    * that can't be read refuses the restore, unless the restore command was told to ignore it.
    */
-  private async carryOver(live: string, scratch: string, manifest: BackupManifest | null, options: RestoreOptions): Promise<CarryOverReport> {
+  private async carryOver(
+    live: string,
+    scratch: string,
+    manifest: BackupManifest | null,
+    options: RestoreOptions,
+    backupSignedHere: boolean
+  ): Promise<CarryOverReport> {
     const restorerId = options.restorerId ?? null;
     const backupCreatedAt = manifest?.createdAt ?? null;
     let running: RunningState | null = null;
@@ -2185,7 +2193,7 @@ export class BackupService {
         );
       }
     }
-    const report = await this.withConnection(scratch, (client) => applyCarryOver(client, running, { restorerId, backupCreatedAt }));
+    const report = await this.withConnection(scratch, (client) => applyCarryOver(client, running, { restorerId, backupCreatedAt, backupSignedHere }));
     logger.info(
       {
         sameDeployment: report.sameDeployment,

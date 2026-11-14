@@ -6,6 +6,7 @@ import { BackupService, BackupInProgressError, RestoreFailedError, ShuttingDownE
 import { ControlPlaneError } from './controlPlaneErrors.js';
 import { assertServingRoleEnforcesRls, RlsBypassRoleError } from '../db/servingRole.js';
 import { BackupFormatError, BackupKeyError } from '../utils/backupCrypto.js';
+import { BackupWrongKeyError } from '../utils/backupFormat.js';
 import { runDetached } from '../db/withTenant.js';
 import { createLogger } from '../utils/logger.js';
 
@@ -264,8 +265,9 @@ async function runVerify(backupService: BackupService, input: StartRestoreInput,
         verifyStatus = { ...verifyStatus, phase };
       },
     });
-    // Recorded against the backup it is (its signed id), whatever it was uploaded as.
-    await backupService.recordVerify(result.manifest?.backupId ? `${result.manifest.backupId}.tar.age` : fileName, userId, 'passed', null);
+    // Recorded only for the server's own copy of a listed backup: an upload is another copy,
+    // which proves nothing about this one (and its name proves nothing at all).
+    if (!input.deleteAfter) await backupService.recordVerify(fileName, userId, 'passed', null);
     verifyStatus = {
       status: 'completed',
       fileName,
@@ -281,10 +283,10 @@ async function runVerify(backupService: BackupService, input: StartRestoreInput,
   } catch (error) {
     verifyStatus = { status: 'failed', fileName, startedAt, finishedAt: new Date().toISOString(), error: shownVerifyError(error) };
     const cause = error instanceof RestoreFailedError ? error.cause : error;
-    // A verify that ran and failed, of a backup on the server: an uploaded file's name proves
-    // nothing (a renamed or damaged copy would mark the real backup failed). Not one held up by
-    // another operation or the shutdown.
-    if (!input.deleteAfter && !(error instanceof BackupInProgressError) && !(cause instanceof ShuttingDownError)) {
+    // A verify of a listed backup that ran and failed; not a wrong key (the person's mistake,
+    // not the backup's), nor one held up by another operation or the shutdown.
+    const keyMistake = cause instanceof BackupWrongKeyError || cause instanceof BackupKeyError;
+    if (!input.deleteAfter && !keyMistake && !(error instanceof BackupInProgressError) && !(cause instanceof ShuttingDownError)) {
       await backupService.recordVerify(fileName, userId, 'failed', verifyStatus.error ?? null);
     }
     if (error instanceof BackupInProgressError) logger.warn({ err: error, userId, fileName }, 'Verify refused: a backup or restore is running');

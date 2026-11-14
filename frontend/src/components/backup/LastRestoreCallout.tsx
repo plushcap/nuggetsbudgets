@@ -53,7 +53,7 @@ const LastRestoreCallout: React.FC = () => {
         </Callout.Icon>
         <Callout.Text>
           The last restore{named} failed{when}: {(restore.error ?? 'the server log says why').replace(/\.$/, '')}.{' '}
-          {restore.databaseChanged ? 'The data was replaced: see the server log.' : 'The data is as it was before it.'}
+          {restore.databaseChanged ? 'The data was replaced.' : 'The data is as it was before it.'}
         </Callout.Text>
       </Callout.Root>
     );

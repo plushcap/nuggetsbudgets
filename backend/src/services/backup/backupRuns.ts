@@ -6,8 +6,9 @@ import type { DB } from '../../db/schema.generated.js';
  * The record of backups (`backup_runs`, control plane): one row per run, failures included,
  * with the file it made and when it was last verified. The Backup page shows it, the backup
  * health check reads the last scheduled run from it after a restart, a restore keeps the
- * running server's rows (restoreCarryOver.ts), and the daily retention job deletes rows
- * over a year old whose file is gone (retention.ts).
+ * running server's rows (restoreCarryOver.ts), and the daily retention job deletes a row a
+ * year after its file is gone (retention.ts). A verify is recorded only for the server's own
+ * copy of a listed backup.
  */
 
 export type { BackupRunTrigger, BackupVerifyOutcome };

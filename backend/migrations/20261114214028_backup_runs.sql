@@ -34,6 +34,8 @@ CREATE TABLE public.backup_runs (
     CONSTRAINT backup_runs_file_check CHECK (outcome = 'failed' OR file_name IS NOT NULL),
     CONSTRAINT backup_runs_verify_outcome_check CHECK (verify_outcome IN ('passed', 'failed')),
     CONSTRAINT backup_runs_verified_check CHECK ((verified_at IS NULL) = (verify_outcome IS NULL)),
+    CONSTRAINT backup_runs_passed_verify_check CHECK (passed_verify_at IS NULL OR verified_at IS NOT NULL),
+    CONSTRAINT backup_runs_file_gone_check CHECK (file_gone_at IS NULL OR file_name IS NOT NULL),
     CONSTRAINT backup_runs_message_check CHECK (length(message) <= 2000 AND length(verify_message) <= 2000),
     CONSTRAINT backup_runs_started_by_fkey FOREIGN KEY (started_by) REFERENCES public.users(id) ON DELETE SET NULL,
     CONSTRAINT backup_runs_verified_by_fkey FOREIGN KEY (verified_by) REFERENCES public.users(id) ON DELETE SET NULL

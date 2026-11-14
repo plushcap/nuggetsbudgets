@@ -51,6 +51,11 @@ export interface CarryOverOptions {
   restorerId: number | null;
   /** When the backup was made (its manifest): the deliveries made since are copied in. */
   backupCreatedAt: string | null;
+  /**
+   * This server's key signed the backup, so its sealed secrets (the OneDrive connections) open
+   * here: on another deployment the backup's connections are kept only then.
+   */
+  backupSignedHere: boolean;
 }
 
 /** What a restore did to sign-in and the deployment's settings (RestoreCarryOver in @nuggets/shared). */
@@ -196,7 +201,7 @@ export async function applyCarryOver(client: ClientBase, running: RunningState |
   await client.query('BEGIN');
   try {
     await client.query('SET LOCAL row_security = off');
-    const report = await carryOver(client, running);
+    const report = await carryOver(client, running, options.backupSignedHere);
     await assertSomeoneCanManage(client, running, options, report.sameDeployment);
     await client.query('COMMIT');
     return report;
@@ -206,7 +211,7 @@ export async function applyCarryOver(client: ClientBase, running: RunningState |
   }
 }
 
-async function carryOver(client: ClientBase, running: RunningState | null): Promise<CarryOverReport> {
+async function carryOver(client: ClientBase, running: RunningState | null, backupSignedHere: boolean): Promise<CarryOverReport> {
   const count = async (text: string, values: unknown[] = []) => (await client.query(text, values)).rowCount ?? 0;
   const json = (value: unknown) => JSON.stringify(value);
 
@@ -325,9 +330,9 @@ async function carryOver(client: ClientBase, running: RunningState | null): Prom
   }
   // Its OneDrive connections, by person; a connection whose person isn't in the restored data
   // is dropped (they connect again). On this deployment always (one disconnected since stays
-  // disconnected); on another server only when it has some: a new server has none, and with
-  // the same data key the backup's still open.
-  if (report.sameDeployment || running.oneDriveTokens.length > 0) {
+  // disconnected); on another server when it has some, or when the backup's wouldn't open here
+  // (another key signed it). A new server with the same key keeps the backup's.
+  if (report.sameDeployment || running.oneDriveTokens.length > 0 || !backupSignedHere) {
     await client.query('DELETE FROM onedrive_tokens');
     report.kept.oneDriveConnections = await count(
     `INSERT INTO onedrive_tokens (uuid, user_id, access_token, refresh_token, expires_at, folder_path, auto_sync_enabled, created_at, updated_at)
@@ -422,8 +427,9 @@ async function assertSomeoneCanManage(
       throw new RestoreCarryOverRefusal(
         'RESTORE_WOULD_LOCK_OUT',
         "In this backup's data you aren't a deployment admin who can sign in (an admin, not locked, sign-in not " +
-          'disabled), so the restore would leave you unable to manage this server. Nothing was changed. Restore it as a ' +
-          'deployment admin the backup has, or with the restore command on the server.'
+          'disabled), so the restore would leave you unable to manage this server. Nothing was changed. (A backup from ' +
+          'another server is matched by your email.) Restore it as a deployment admin the backup has, or with the ' +
+          'restore command on the server.'
       );
     }
     return;
