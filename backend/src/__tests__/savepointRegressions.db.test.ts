@@ -9,8 +9,7 @@ import { NotificationQueueService } from '../services/NotificationQueueService.j
 import { EmailTemplateService } from '../services/EmailTemplateService.js';
 import { NotificationRuleService } from '../services/notifications/NotificationRuleService.js';
 import { addDays } from '../services/notifications/schedule.js';
-import { DEFAULT_APP_TIMEZONE } from '../utils/appDate.js';
-import { calendarDateIn } from '../utils/calendarDate.js';
+import { appDateOf } from '../utils/appDate.js';
 import { ImportService } from '../services/ImportService.js';
 import { BalanceRebalanceService } from '../services/BalanceRebalanceService.js';
 import { createInvestmentsRoutes } from '../routes/investments.js';
@@ -27,8 +26,6 @@ import { fixtureAccountId } from '../test/fixtureAccount.js';
 
 describe('A notification that keeps failing', () => {
   const now = new Date();
-  // The application time zone: the test DB has the seeded default (UTC).
-  const today = calendarDateIn(DEFAULT_APP_TIMEZONE, now);
   let tenant: TestTenant;
   const ruleService = new NotificationRuleService(async () => 'a-test-secret-that-is-at-least-32-chars');
   const push = { sendToUser: vi.fn().mockResolvedValue({ sent: 0, failed: 1, removed: 0 }) };
@@ -49,6 +46,8 @@ describe('A notification that keeps failing', () => {
     tenant = await createTestTenant('Savepoints: failing notification');
     await inTenant(async () => {
       const db = getDb();
+      // The engine's day at `now`, in the ledger's time zone as the engine reads it.
+      const today = await appDateOf(now);
       const period = await db
         .insertInto('budget_period')
         .values({ name: `Notify ${Date.now()}`, month: 'Test', year: 2026, month_number: 1, start_date: addDays(today, -9), end_date: addDays(today, 20) })
