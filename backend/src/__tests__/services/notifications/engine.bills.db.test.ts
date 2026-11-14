@@ -6,8 +6,7 @@ import { NotificationQueueService } from '../../../services/NotificationQueueSer
 import { EmailTemplateService } from '../../../services/EmailTemplateService.js';
 import { NotificationRuleService } from '../../../services/notifications/NotificationRuleService.js';
 import { addDays } from '../../../services/notifications/schedule.js';
-import { DEFAULT_APP_TIMEZONE } from '../../../utils/appDate.js';
-import { calendarDateIn } from '../../../utils/calendarDate.js';
+import { appDateOf } from '../../../utils/appDate.js';
 import type { EmailDeliveryService } from '../../../services/EmailDeliveryService.js';
 import type { PushNotificationService } from '../../../services/PushNotificationService.js';
 import { fixtureAccountId } from '../../../test/fixtureAccount.js';
@@ -20,9 +19,10 @@ import { fixtureAccountId } from '../../../test/fixtureAccount.js';
  */
 describe('NotificationRulesEngine bill reminders (database)', () => {
   const now = new Date();
-  // The engine reads the application time zone; the test DB has the seeded default (UTC).
-  const today = calendarDateIn(DEFAULT_APP_TIMEZONE, now);
-  const due = addDays(today, 2);
+  // The engine's day at `now`, in the ledger's time zone as the engine reads it: read once
+  // the ledger exists.
+  let today = '';
+  let due = '';
   const stamp = Date.now();
 
   let tenantId: number;
@@ -55,6 +55,8 @@ describe('NotificationRulesEngine bill reminders (database)', () => {
     tenantId = (await globalDb.insertInto('tenants').values({ name: `Bill reminders ${stamp}`, organization_id: organizationId }).returning('id').executeTakeFirstOrThrow()).id;
     userId = (await globalDb.insertInto('users').values({ email: `bill-reminders-${stamp}@test.local`, password_hash: 'x', first_name: 'Pat' }).returning('id').executeTakeFirstOrThrow()).id;
     await globalDb.insertInto('tenant_users').values({ tenant_id: tenantId, user_id: userId }).execute();
+    today = await inTenant(() => appDateOf(now));
+    due = addDays(today, 2);
 
     await inTenant(async () => {
       billId = (await getDb().insertInto('budget_items')

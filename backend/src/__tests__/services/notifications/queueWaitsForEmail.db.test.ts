@@ -6,8 +6,7 @@ import { NotificationQueueService } from '../../../services/NotificationQueueSer
 import { EmailTemplateService } from '../../../services/EmailTemplateService.js';
 import { NotificationRuleService } from '../../../services/notifications/NotificationRuleService.js';
 import { addDays } from '../../../services/notifications/schedule.js';
-import { DEFAULT_APP_TIMEZONE } from '../../../utils/appDate.js';
-import { calendarDateIn } from '../../../utils/calendarDate.js';
+import { appDateOf } from '../../../utils/appDate.js';
 import { SmtpNotConfiguredError, type EmailDeliveryService } from '../../../services/EmailDeliveryService.js';
 import type { PushNotificationService } from '../../../services/PushNotificationService.js';
 import { createTestTenant, type TestTenant } from '../../../test/testTenant.js';
@@ -23,7 +22,6 @@ import { fixtureAccountId } from '../../../test/fixtureAccount.js';
  */
 describe('A queued email while SMTP is not set up', () => {
   const now = new Date();
-  const today = calendarDateIn(DEFAULT_APP_TIMEZONE, now);
   let tenant: TestTenant;
   const ruleService = new NotificationRuleService(async () => 'a-test-secret-that-is-at-least-32-chars');
   const push = { sendToUser: vi.fn() };
@@ -51,6 +49,8 @@ describe('A queued email while SMTP is not set up', () => {
     tenant = await createTestTenant('Queued email waits for SMTP');
     await inTenant(async () => {
       const db = getDb();
+      // The engine's day at `now`, in the ledger's time zone as the engine reads it.
+      const today = await appDateOf(now);
       const period = await db
         .insertInto('budget_period')
         .values({ name: `Wait ${Date.now()}`, month: 'Test', year: 2026, month_number: 1, start_date: addDays(today, -9), end_date: addDays(today, 20) })

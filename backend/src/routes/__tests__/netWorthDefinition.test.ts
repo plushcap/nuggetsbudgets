@@ -18,8 +18,7 @@ import { withTenant } from '../../db/withTenant.js';
 import { BalanceRebalanceService } from '../../services/BalanceRebalanceService.js';
 import { createTestTenant, type TestTenant } from '../../test/testTenant.js';
 import type { TenantRequest } from '../../middleware/tenant.js';
-import { DEFAULT_APP_TIMEZONE } from '../../utils/appDate.js';
-import { addDays, calendarDateIn } from '../../utils/calendarDate.js';
+import { addDays } from '../../utils/calendarDate.js';
 import { inTransaction } from '../../test/inTransaction.js';
 
 // Net worth had three definitions. The live snapshot took
@@ -33,10 +32,16 @@ import { inTransaction } from '../../test/inTransaction.js';
 describe('One definition of balance and net worth', () => {
   let app: Express;
   let tenant: TestTenant;
-  // Today in the application time zone: the test DB has the seeded default (UTC).
-  const today = calendarDateIn(DEFAULT_APP_TIMEZONE);
-  const yesterday = addDays(today, -1);
-  const tomorrow = addDays(today, 1);
+  // The ledger's own time zone, so the deployment's (every test file's, and on a fresh
+  // database the cluster's TimeZone, not always UTC) doesn't decide its day: one where it's
+  // about noon as the file starts, so midnight doesn't pass during the run. Etc/GMT names
+  // are signed the POSIX way: Etc/GMT-5 is UTC+5.
+  const offset = 12 - new Date().getUTCHours();
+  const zone = offset === 0 ? 'UTC' : `Etc/GMT${offset > 0 ? '-' : '+'}${Math.abs(offset)}`;
+  // Today as the routes have it, app_today() in that zone: read once the ledger has it.
+  let today = '';
+  let yesterday = '';
+  let tomorrow = '';
   const ids = {} as Record<'checking' | 'card' | 'loan' | 'closed' | 'hidden' | 'excluded' | 'miles' | 'euro', { id: number; uuid: string }>;
 
   const totals = (row: Record<string, unknown>) => ({
@@ -49,6 +54,10 @@ describe('One definition of balance and net worth', () => {
 
   beforeAll(async () => {
     tenant = await createTestTenant('Net worth definition');
+    await tenant.pool.query(`INSERT INTO tenant_settings (setting_key, setting_value) VALUES ('application_timezone', $1)`, [zone]);
+    today = (await tenant.pool.query<{ d: string }>('SELECT app_today()::text AS d')).rows[0].d;
+    yesterday = addDays(today, -1);
+    tomorrow = addDays(today, 1);
     const account = async (
       key: keyof typeof ids,
       type: 'Asset' | 'Liability',
